@@ -1,0 +1,19 @@
+module = { expression }
+
+WHITESPACE = _{ " " | "\t" }
+NEWLINE = _{ "\n" | "\n\r" }
+letter = _{ ASCII_ALPHA }
+digit = _{ ASCII_DIGIT }
+
+identifier_token = @{ (letter)+ }
+number_token = @{ (digit)+ }
+
+atom = _{ identifier_token | number_token }
+
+binary_operator = _{ addition | subtraction | multiplication | division }
+    addition = { "+" }
+    subtraction = { "-" }
+    multiplication = { "*" }
+    division = { "/" }
+
+expression = { atom ~ (binary_operator ~ atom)* }
