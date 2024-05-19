@@ -1,19 +1,42 @@
-module = { expression }
+module = { (statement)* }
 
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = _{ " " | "\t" | NEWLINE }
 NEWLINE = _{ "\n" | "\n\r" }
-letter = _{ ASCII_ALPHA }
+letter = _{ ASCII_ALPHA | "_" }
 digit = _{ ASCII_DIGIT }
+
+keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword }
+    if_keyword = _{ "if" | "IF" }
+    then_keyword = _{ "then" | "THEN" }
+    end_keyword = _{ "end" | "END" }
+    else_keyword = _{ "else" | "ELSE" }
+    output_keyword = _{ "output" | "OUTPUT" }
+
+statement = _{ if_statement | output_statement | expression_statement }
+    if_statement = { if_keyword ~ expression ~ then_keyword ~ statement ~ end_keyword }
+    output_statement = { output_keyword ~ expression_statement }
+    expression_statement = { expression }
 
 identifier_token = @{ (letter)+ }
 number_token = @{ (digit)+ }
 
-atom = _{ identifier_token | number_token }
-
-binary_operator = _{ addition | subtraction | multiplication | division }
+binary_operator = _{ addition | subtraction | multiplication | division | equality | not }
     addition = { "+" }
     subtraction = { "-" }
     multiplication = { "*" }
     division = { "/" }
+    assignment = { "=" }
+    equality = { "==" }
 
+unary_operator = _{ not }
+    not = { "not" }
+
+atom_types = _{ assignment_expression | reference_expression | literal_expression }
+    assignment_expression = { reference_expression ~ assignment ~ expression }
+    reference_expression = { identifier_token }
+    literal_expression = { number_token }
+
+primary = _{ atom_types | "(" ~ expression ~ ")" }
+atom = _{ unary_operator? ~ primary }
 expression = { atom ~ (binary_operator ~ atom)* }
+
