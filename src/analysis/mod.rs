@@ -1,9 +1,12 @@
+pub mod binding;
+pub mod error_bag;
+pub mod operator;
 mod parser;
-mod error_bag;
 
 use self::error_bag::{ErrorBag, ErrorKind};
 
 pub fn analyze(contents: String) -> ErrorBag {
+    // parsing
     let mut bag = ErrorBag::new();
     let root = match parser::parse_contents(contents, &mut bag) {
         Some(root) => root,
@@ -13,6 +16,14 @@ pub fn analyze(contents: String) -> ErrorBag {
         }
     };
 
-    println!("{:#?}", root);
+    print!("{:#?}", &root);
+
+    // binding
+    let bound = match binding::bind_root(&root, &mut bag) {
+        Some(bound_root) => bound_root,
+        None => return bag,
+    };
+
+    println!("{:#?}", bound);
     bag
 }

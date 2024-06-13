@@ -10,7 +10,7 @@ use std::fs;
 
 mod analysis;
 
-fn parse_file(){
+fn parse_file() {
     let contents = fs::read_to_string("test.ib").unwrap();
     let bag = analysis::analyze(contents);
     bag.report();

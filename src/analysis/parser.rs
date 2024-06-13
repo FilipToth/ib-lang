@@ -4,7 +4,10 @@ use pest::{
     Parser,
 };
 
-use super::error_bag::{ErrorBag, ErrorKind};
+use super::{
+    error_bag::{ErrorBag, ErrorKind},
+    operator::Operator,
+};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -41,16 +44,6 @@ pub enum SyntaxToken {
     NumberToken(i32),
 }
 
-#[derive(Debug, Clone)]
-pub enum Operator {
-    Addition,
-    Subtraction,
-    Division,
-    Multiplication,
-    Not,
-    Equality,
-}
-
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let subtokens = module.into_inner();
 
@@ -58,7 +51,7 @@ fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken
     for subtoken in subtokens {
         let parsed = match parse(Pairs::single(subtoken), errors) {
             Some(t) => t,
-            None => return None
+            None => return None,
         };
 
         tokens.push(parsed);
@@ -76,22 +69,22 @@ fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<Sy
 
     let condition = match subtokens.nth(0) {
         Some(c) => parse(Pairs::single(c), errors),
-        None => unreachable!("Cannot find condition in if statement"),
+        None => return None,
     };
 
     let condition = match condition {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let next = match subtokens.nth(0) {
         Some(n) => parse(Pairs::single(n), errors),
-        None => unreachable!("Cannot find next block in if statement"),
+        None => return None,
     };
 
     let next = match next {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let if_statement = SyntaxToken::IfStatement {
@@ -107,12 +100,12 @@ fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Optio
 
     let expr = match subtokens.nth(0) {
         Some(e) => parse(Pairs::single(e), errors),
-        None => unreachable!("Cannot find expression in output statement"),
+        None => return None,
     };
 
     let expr = match expr {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let output_statement = SyntaxToken::OutputStatement {
@@ -126,24 +119,24 @@ fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Optio
     let mut subtokens = expr.into_inner();
     let reference = match subtokens.nth(0) {
         Some(i) => parse_reference_expression(i, errors),
-        None => unreachable!("Cannot find identifier in assignment expression"),
+        None => return None,
     };
 
     let reference = match reference {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let _assignment = subtokens.nth(0);
 
     let value = match subtokens.nth(0) {
         Some(v) => parse(Pairs::single(v), errors),
-        None => unreachable!("Cannot find value expression in assignment expression"),
+        None => return None,
     };
 
     let value = match value {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let assignment = SyntaxToken::AssignmentExpression {
@@ -154,10 +147,13 @@ fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Optio
     Some(assignment)
 }
 
-fn parse_reference_expression(reference: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
+fn parse_reference_expression(
+    reference: Pair<Rule>,
+    _errors: &mut ErrorBag,
+) -> Option<SyntaxToken> {
     let identifier = match reference.into_inner().nth(0) {
         Some(i) => String::from(i.as_str()),
-        None => unreachable!("Cannot find identifier when parsing reference expression"),
+        None => return None,
     };
 
     let reference = SyntaxToken::ReferenceExpression(identifier);
@@ -172,12 +168,12 @@ fn parse_identifier_token(identifier: Pair<Rule>, _errors: &mut ErrorBag) -> Opt
 fn parse_literal_expression(literal: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let inner = match literal.into_inner().nth(0) {
         Some(i) => parse(Pairs::single(i), errors),
-        None => unreachable!("Cannot find literal expression inner token"),
+        None => return None,
     };
 
     let inner = match inner {
         Some(t) => t,
-        None => return None
+        None => return None,
     };
 
     let literal_expr = SyntaxToken::LiteralExpression(Box::new(inner));
@@ -225,12 +221,12 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
 
             let lhs = match lhs {
                 Some(t) => t,
-                None => return None
+                None => return None,
             };
 
             let rhs = match rhs {
                 Some(t) => t,
-                None => return None
+                None => return None,
             };
 
             let expr = SyntaxToken::BinaryExpression {
@@ -249,7 +245,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
 
             let rhs = match rhs {
                 Some(t) => t,
-                None => return None
+                None => return None,
             };
 
             let expr = SyntaxToken::UnaryExpression {
