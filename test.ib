@@ -1,3 +1,1 @@
-if idk == 0 then
-    output idk
-end
+output 1 + 2
