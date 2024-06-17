@@ -28,6 +28,7 @@ pub enum BoundNodeKind {
         rhs: Box<BoundNode>,
     },
     NumberLiteral(i32),
+    BooleanLiteral(bool)
 }
 
 fn bind_module(children: &Vec<SyntaxToken>, errors: &mut ErrorBag) -> Option<BoundNode> {
@@ -85,6 +86,11 @@ fn bind_literal_expression(subtoken: &SyntaxToken, _errors: &mut ErrorBag) -> Op
         SyntaxToken::NumberToken(number) => {
             let kind = BoundNodeKind::NumberLiteral(number.clone());
             let node = BoundNode::new(kind, TypeKind::Int);
+            Some(node)
+        },
+        SyntaxToken::BooleanToken(value) => {
+            let kind = BoundNodeKind::BooleanLiteral(value.clone());
+            let node = BoundNode::new(kind, TypeKind::Boolean);
             Some(node)
         }
         _ => unreachable!(),

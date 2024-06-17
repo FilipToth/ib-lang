@@ -38,7 +38,7 @@ impl ErrorKind {
             Self::EqualityNonMatchingTypes { lhs, rhs } => {
                 format!(
                     "Equality operator must have matching types, found '{:?}' and '{:?}'",
-                    rhs, rhs
+                    lhs, rhs
                 )
             }
         }

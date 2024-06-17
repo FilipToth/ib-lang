@@ -42,6 +42,7 @@ pub enum SyntaxToken {
     LiteralExpression(Box<SyntaxToken>),
     IdentifierToken(String),
     NumberToken(i32),
+    BooleanToken(bool)
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -194,6 +195,20 @@ fn parse_number_token(pairs: Pair<Rule>, errors: &mut ErrorBag) -> Option<Syntax
     Some(number_token)
 }
 
+fn parse_boolean_token(pairs: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let inner_text = pairs.as_str().to_lowercase();
+    let value = if inner_text == "true" {
+        true
+    } else if inner_text == "false" {
+        false
+    } else {
+        unreachable!()
+    };
+
+    let boolean_token = SyntaxToken::BooleanToken(value);
+    Some(boolean_token)
+}
+
 fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -206,6 +221,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
             Rule::reference_expression => parse_reference_expression(primary, errors),
             Rule::literal_expression => parse_literal_expression(primary, errors),
             Rule::number_token => parse_number_token(primary, errors),
+            Rule::boolean_token => parse_boolean_token(primary, errors),
             Rule::identifier_token => parse_identifier_token(primary, errors),
             rule => unreachable!("Unexpected parser rule type: {:?}", rule),
         })
