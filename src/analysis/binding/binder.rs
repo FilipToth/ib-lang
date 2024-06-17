@@ -27,8 +27,12 @@ pub enum BoundNodeKind {
         op: Operator,
         rhs: Box<BoundNode>,
     },
+    UnaryExpression {
+        op: Operator,
+        rhs: Box<BoundNode>,
+    },
     NumberLiteral(i32),
-    BooleanLiteral(bool)
+    BooleanLiteral(bool),
 }
 
 fn bind_module(children: &Vec<SyntaxToken>, errors: &mut ErrorBag) -> Option<BoundNode> {
@@ -81,13 +85,37 @@ fn bind_binary_expression(
     Some(node)
 }
 
+fn bind_unary_expression(
+    op: &Operator,
+    rhs: &SyntaxToken,
+    errors: &mut ErrorBag,
+) -> Option<BoundNode> {
+    let rhs = match bind(rhs, errors) {
+        Some(n) => n,
+        None => return None,
+    };
+
+    let op_type = match op.return_type_unary(&rhs, errors) {
+        Some(t) => t,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::UnaryExpression {
+        op: op.clone(),
+        rhs: Box::new(rhs),
+    };
+
+    let node = BoundNode::new(kind, op_type);
+    Some(node)
+}
+
 fn bind_literal_expression(subtoken: &SyntaxToken, _errors: &mut ErrorBag) -> Option<BoundNode> {
     match subtoken {
         SyntaxToken::NumberToken(number) => {
             let kind = BoundNodeKind::NumberLiteral(number.clone());
             let node = BoundNode::new(kind, TypeKind::Int);
             Some(node)
-        },
+        }
         SyntaxToken::BooleanToken(value) => {
             let kind = BoundNodeKind::BooleanLiteral(value.clone());
             let node = BoundNode::new(kind, TypeKind::Boolean);
@@ -103,6 +131,7 @@ pub fn bind(token: &SyntaxToken, errors: &mut ErrorBag) -> Option<BoundNode> {
         SyntaxToken::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(lhs, op, rhs, errors)
         }
+        SyntaxToken::UnaryExpression { op, rhs } => bind_unary_expression(op, rhs, errors),
         SyntaxToken::LiteralExpression(subtoken) => bind_literal_expression(subtoken, errors),
         _ => unreachable!(),
     }

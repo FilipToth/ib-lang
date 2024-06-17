@@ -42,7 +42,7 @@ pub enum SyntaxToken {
     LiteralExpression(Box<SyntaxToken>),
     IdentifierToken(String),
     NumberToken(i32),
-    BooleanToken(bool)
+    BooleanToken(bool),
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
