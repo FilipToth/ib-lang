@@ -6,7 +6,8 @@ use pest::{
 
 use super::{
     error_bag::{ErrorBag, ErrorKind},
-    operator::Operator, CodeLocation,
+    operator::Operator,
+    CodeLocation,
 };
 
 #[derive(Parser)]
@@ -16,13 +17,16 @@ struct IbParser;
 #[derive(Debug)]
 pub struct SyntaxToken {
     pub kind: SyntaxKind,
-    pub loc: CodeLocation
+    pub loc: CodeLocation,
 }
 
 impl SyntaxToken {
     fn new(kind: SyntaxKind, rule: &Pair<Rule>) -> SyntaxToken {
         let location = CodeLocation::from_pair(rule);
-        SyntaxToken { kind: kind, loc: location }
+        SyntaxToken {
+            kind: kind,
+            loc: location,
+        }
     }
 }
 
@@ -274,7 +278,10 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
                 rhs: Box::new(rhs_token),
             };
 
-            let node = SyntaxToken { kind: expr_kind, loc: loc };
+            let node = SyntaxToken {
+                kind: expr_kind,
+                loc: loc,
+            };
             Some(node)
         })
         .map_prefix(|op, rhs| {

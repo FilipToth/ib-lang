@@ -11,12 +11,15 @@ use self::parser::Rule;
 #[derive(Debug, Clone)]
 pub struct CodeLocation {
     line: usize,
-    col: usize
+    col: usize,
 }
 
 impl CodeLocation {
     pub fn new(line: usize, col: usize) -> CodeLocation {
-        CodeLocation { line: line, col: col }
+        CodeLocation {
+            line: line,
+            col: col,
+        }
     }
 
     pub fn from_pair(rule: &Pair<Rule>) -> CodeLocation {
