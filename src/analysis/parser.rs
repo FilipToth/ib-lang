@@ -6,7 +6,7 @@ use pest::{
 
 use super::{
     error_bag::{ErrorBag, ErrorKind},
-    operator::Operator,
+    operator::Operator, CodeLocation,
 };
 
 #[derive(Parser)]
@@ -14,7 +14,20 @@ use super::{
 struct IbParser;
 
 #[derive(Debug)]
-pub enum SyntaxToken {
+pub struct SyntaxToken {
+    pub kind: SyntaxKind,
+    pub loc: CodeLocation
+}
+
+impl SyntaxToken {
+    fn new(kind: SyntaxKind, rule: &Pair<Rule>) -> SyntaxToken {
+        let location = CodeLocation::from_pair(rule);
+        SyntaxToken { kind: kind, loc: location }
+    }
+}
+
+#[derive(Debug)]
+pub enum SyntaxKind {
     Module {
         children: Box<Vec<SyntaxToken>>,
     },
@@ -46,7 +59,7 @@ pub enum SyntaxToken {
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let subtokens = module.into_inner();
+    let subtokens = module.clone().into_inner();
 
     let mut tokens: Vec<SyntaxToken> = Vec::new();
     for subtoken in subtokens {
@@ -58,15 +71,16 @@ fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken
         tokens.push(parsed);
     }
 
-    let module = SyntaxToken::Module {
+    let module_kind = SyntaxKind::Module {
         children: Box::new(tokens),
     };
 
-    Some(module)
+    let node = SyntaxToken::new(module_kind, &module);
+    Some(node)
 }
 
 fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = statement.into_inner();
+    let mut subtokens = statement.clone().into_inner();
 
     let condition = match subtokens.nth(0) {
         Some(c) => parse(Pairs::single(c), errors),
@@ -88,16 +102,17 @@ fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<Sy
         None => return None,
     };
 
-    let if_statement = SyntaxToken::IfStatement {
+    let if_kind = SyntaxKind::IfStatement {
         condition: Box::new(condition),
         next: Box::new(next),
     };
 
-    Some(if_statement)
+    let node = SyntaxToken::new(if_kind, &statement);
+    Some(node)
 }
 
 fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = statement.into_inner();
+    let mut subtokens = statement.clone().into_inner();
 
     let expr = match subtokens.nth(0) {
         Some(e) => parse(Pairs::single(e), errors),
@@ -109,15 +124,16 @@ fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Optio
         None => return None,
     };
 
-    let output_statement = SyntaxToken::OutputStatement {
+    let output_kind = SyntaxKind::OutputStatement {
         expr: Box::new(expr),
     };
 
-    Some(output_statement)
+    let node = SyntaxToken::new(output_kind, &statement);
+    Some(node)
 }
 
 fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = expr.into_inner();
+    let mut subtokens = expr.clone().into_inner();
     let reference = match subtokens.nth(0) {
         Some(i) => parse_reference_expression(i, errors),
         None => return None,
@@ -140,34 +156,37 @@ fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Optio
         None => return None,
     };
 
-    let assignment = SyntaxToken::AssignmentExpression {
+    let assignment_kind = SyntaxKind::AssignmentExpression {
         reference: Box::new(reference),
         value: Box::new(value),
     };
 
-    Some(assignment)
+    let node = SyntaxToken::new(assignment_kind, &expr);
+    Some(node)
 }
 
 fn parse_reference_expression(
     reference: Pair<Rule>,
     _errors: &mut ErrorBag,
 ) -> Option<SyntaxToken> {
-    let identifier = match reference.into_inner().nth(0) {
+    let identifier = match reference.clone().into_inner().nth(0) {
         Some(i) => String::from(i.as_str()),
         None => return None,
     };
 
-    let reference = SyntaxToken::ReferenceExpression(identifier);
-    Some(reference)
+    let reference_kind = SyntaxKind::ReferenceExpression(identifier);
+    let node = SyntaxToken::new(reference_kind, &reference);
+    Some(node)
 }
 
 fn parse_identifier_token(identifier: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let identifier_token = SyntaxToken::IdentifierToken(String::from(identifier.as_str()));
-    Some(identifier_token)
+    let identifier_token_kind = SyntaxKind::IdentifierToken(String::from(identifier.as_str()));
+    let node = SyntaxToken::new(identifier_token_kind, &identifier);
+    Some(node)
 }
 
 fn parse_literal_expression(literal: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let inner = match literal.into_inner().nth(0) {
+    let inner = match literal.clone().into_inner().nth(0) {
         Some(i) => parse(Pairs::single(i), errors),
         None => return None,
     };
@@ -177,22 +196,24 @@ fn parse_literal_expression(literal: Pair<Rule>, errors: &mut ErrorBag) -> Optio
         None => return None,
     };
 
-    let literal_expr = SyntaxToken::LiteralExpression(Box::new(inner));
-    Some(literal_expr)
+    let literal_expr_kind = SyntaxKind::LiteralExpression(Box::new(inner));
+    let node = SyntaxToken::new(literal_expr_kind, &literal);
+    Some(node)
 }
 
 fn parse_number_token(pairs: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let (line, col) = pairs.line_col();
     let num = match pairs.as_str().parse::<i32>() {
         Ok(n) => n,
         Err(_) => {
-            let (line, col) = pairs.line_col();
             errors.add(ErrorKind::NumberParsing, line, col);
             return None;
         }
     };
 
-    let number_token = SyntaxToken::NumberToken(num);
-    Some(number_token)
+    let number_token_kind = SyntaxKind::NumberToken(num);
+    let node = SyntaxToken::new(number_token_kind, &pairs);
+    Some(node)
 }
 
 fn parse_boolean_token(pairs: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -205,8 +226,9 @@ fn parse_boolean_token(pairs: Pair<Rule>, _errors: &mut ErrorBag) -> Option<Synt
         unreachable!()
     };
 
-    let boolean_token = SyntaxToken::BooleanToken(value);
-    Some(boolean_token)
+    let boolean_token_kind = SyntaxKind::BooleanToken(value);
+    let node = SyntaxToken::new(boolean_token_kind, &pairs);
+    Some(node)
 }
 
 fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -235,23 +257,25 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
                 _ => unreachable!(),
             };
 
-            let lhs = match lhs {
+            let lhs_token = match lhs {
                 Some(t) => t,
                 None => return None,
             };
 
-            let rhs = match rhs {
+            let rhs_token = match rhs {
                 Some(t) => t,
                 None => return None,
             };
 
-            let expr = SyntaxToken::BinaryExpression {
-                lhs: Box::new(lhs),
+            let loc = lhs_token.loc.clone();
+            let expr_kind = SyntaxKind::BinaryExpression {
+                lhs: Box::new(lhs_token),
                 op: operator,
-                rhs: Box::new(rhs),
+                rhs: Box::new(rhs_token),
             };
 
-            Some(expr)
+            let node = SyntaxToken { kind: expr_kind, loc: loc };
+            Some(node)
         })
         .map_prefix(|op, rhs| {
             let operator = match op.as_rule() {
@@ -264,12 +288,13 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
                 None => return None,
             };
 
-            let expr = SyntaxToken::UnaryExpression {
+            let expr_kind = SyntaxKind::UnaryExpression {
                 op: operator,
                 rhs: Box::new(rhs),
             };
 
-            Some(expr)
+            let node = SyntaxToken::new(expr_kind, &op);
+            Some(node)
         })
         .parse(pairs)
 }

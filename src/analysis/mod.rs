@@ -3,7 +3,27 @@ pub mod error_bag;
 pub mod operator;
 mod parser;
 
+use pest::iterators::Pair;
+
 use self::error_bag::{ErrorBag, ErrorKind};
+use self::parser::Rule;
+
+#[derive(Debug, Clone)]
+pub struct CodeLocation {
+    line: usize,
+    col: usize
+}
+
+impl CodeLocation {
+    pub fn new(line: usize, col: usize) -> CodeLocation {
+        CodeLocation { line: line, col: col }
+    }
+
+    pub fn from_pair(rule: &Pair<Rule>) -> CodeLocation {
+        let (line, col) = rule.line_col();
+        CodeLocation::new(line, col)
+    }
+}
 
 pub fn analyze(contents: String) -> ErrorBag {
     // parsing

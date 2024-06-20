@@ -78,6 +78,7 @@ impl ErrorBag {
             line: line,
             column: col,
         };
+
         self.errors.push(err);
     }
 

@@ -1,4 +1,4 @@
-use crate::analysis::{error_bag::ErrorBag, operator::Operator, parser::SyntaxToken};
+use crate::analysis::{error_bag::ErrorBag, operator::Operator, parser::{SyntaxKind, SyntaxToken}, CodeLocation};
 
 use super::types::TypeKind;
 
@@ -35,10 +35,10 @@ pub enum BoundNodeKind {
     BooleanLiteral(bool),
 }
 
-fn bind_module(children: &Vec<SyntaxToken>, errors: &mut ErrorBag) -> Option<BoundNode> {
+fn bind_module(children: &Vec<SyntaxToken>, errors: &mut ErrorBag, loc: &CodeLocation) -> Option<BoundNode> {
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
-        let bound_child = match bind(child, errors) {
+        let bound_child = match bind(child, errors, loc) {
             Some(n) => n,
             None => return None,
         };
@@ -59,18 +59,19 @@ fn bind_binary_expression(
     op: &Operator,
     rhs: &SyntaxToken,
     errors: &mut ErrorBag,
+    loc: &CodeLocation
 ) -> Option<BoundNode> {
-    let lhs = match bind(lhs, errors) {
+    let lhs = match bind(lhs, errors, loc) {
         Some(n) => n,
         None => return None,
     };
 
-    let rhs = match bind(rhs, errors) {
+    let rhs = match bind(rhs, errors, loc) {
         Some(n) => n,
         None => return None,
     };
 
-    let op_type = match op.return_type_binary(&lhs, &rhs, errors) {
+    let op_type = match op.return_type_binary(&lhs, &rhs, errors, loc) {
         Some(t) => t,
         None => return None,
     };
@@ -89,13 +90,14 @@ fn bind_unary_expression(
     op: &Operator,
     rhs: &SyntaxToken,
     errors: &mut ErrorBag,
+    loc: &CodeLocation
 ) -> Option<BoundNode> {
-    let rhs = match bind(rhs, errors) {
+    let rhs = match bind(rhs, errors, loc) {
         Some(n) => n,
         None => return None,
     };
 
-    let op_type = match op.return_type_unary(&rhs, errors) {
+    let op_type = match op.return_type_unary(&rhs, errors, loc) {
         Some(t) => t,
         None => return None,
     };
@@ -109,14 +111,14 @@ fn bind_unary_expression(
     Some(node)
 }
 
-fn bind_literal_expression(subtoken: &SyntaxToken, _errors: &mut ErrorBag) -> Option<BoundNode> {
-    match subtoken {
-        SyntaxToken::NumberToken(number) => {
+fn bind_literal_expression(subtoken: &SyntaxToken, _errors: &mut ErrorBag, _loc: &CodeLocation) -> Option<BoundNode> {
+    match subtoken.kind {
+        SyntaxKind::NumberToken(number) => {
             let kind = BoundNodeKind::NumberLiteral(number.clone());
             let node = BoundNode::new(kind, TypeKind::Int);
             Some(node)
         }
-        SyntaxToken::BooleanToken(value) => {
+        SyntaxKind::BooleanToken(value) => {
             let kind = BoundNodeKind::BooleanLiteral(value.clone());
             let node = BoundNode::new(kind, TypeKind::Boolean);
             Some(node)
@@ -125,14 +127,13 @@ fn bind_literal_expression(subtoken: &SyntaxToken, _errors: &mut ErrorBag) -> Op
     }
 }
 
-pub fn bind(token: &SyntaxToken, errors: &mut ErrorBag) -> Option<BoundNode> {
-    match token {
-        SyntaxToken::Module { children } => bind_module(children, errors),
-        SyntaxToken::BinaryExpression { lhs, op, rhs } => {
-            bind_binary_expression(lhs, op, rhs, errors)
-        }
-        SyntaxToken::UnaryExpression { op, rhs } => bind_unary_expression(op, rhs, errors),
-        SyntaxToken::LiteralExpression(subtoken) => bind_literal_expression(subtoken, errors),
+pub fn bind(token: &SyntaxToken, errors: &mut ErrorBag, loc: &CodeLocation) -> Option<BoundNode> {
+    let loc = &token.loc;
+    match &token.kind {
+        SyntaxKind::Module { children } => bind_module(&children, errors, loc),
+        SyntaxKind::BinaryExpression { lhs, op, rhs } => bind_binary_expression(&lhs, &op, &rhs, errors, loc),
+        SyntaxKind::UnaryExpression { op, rhs } => bind_unary_expression(&op, &rhs, errors, loc),
+        SyntaxKind::LiteralExpression(subtoken) => bind_literal_expression(&subtoken, errors, loc),
         _ => unreachable!(),
     }
 }

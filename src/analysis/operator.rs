@@ -1,6 +1,6 @@
 use super::{
     binding::{binder::BoundNode, types::TypeKind},
-    error_bag::{ErrorBag, ErrorKind},
+    error_bag::{ErrorBag, ErrorKind}, CodeLocation,
 };
 
 #[derive(Debug, Clone)]
@@ -14,7 +14,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn return_type_unary(&self, rhs: &BoundNode, errors: &mut ErrorBag) -> Option<TypeKind> {
+    pub fn return_type_unary(&self, rhs: &BoundNode, errors: &mut ErrorBag, loc: &CodeLocation) -> Option<TypeKind> {
         let rhs_type = rhs.node_type.clone();
         match self {
             Operator::Not => {
@@ -23,7 +23,8 @@ impl Operator {
                         op: self.clone(),
                         used_type: rhs_type,
                     };
-                    errors.add(err, 0, 0);
+
+                    errors.add(err, loc.line, loc.col);
                     return None;
                 }
 
@@ -38,6 +39,7 @@ impl Operator {
         lhs: &BoundNode,
         rhs: &BoundNode,
         errors: &mut ErrorBag,
+        loc: &CodeLocation
     ) -> Option<TypeKind> {
         let rhs_type = rhs.node_type.clone();
         let lhs_type = lhs.node_type.clone();
@@ -51,7 +53,7 @@ impl Operator {
                         rhs: rhs_type,
                     };
 
-                    errors.add(err, 0, 0);
+                    errors.add(err, loc.line, loc.col);
                     return None;
                 }
 
@@ -69,7 +71,8 @@ impl Operator {
                     lhs: lhs_type,
                     rhs: rhs_type,
                 };
-                errors.add(err, 0, 0);
+
+                errors.add(err, loc.line, loc.col);
                 None
             }
             Operator::Equality => {
@@ -78,7 +81,7 @@ impl Operator {
                         lhs: lhs_type,
                         rhs: rhs_type,
                     };
-                    errors.add(err, 0, 0);
+                    errors.add(err, loc.line, loc.col);
                     return None;
                 }
 
