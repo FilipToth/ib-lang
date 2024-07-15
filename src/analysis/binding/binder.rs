@@ -1,11 +1,13 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::analysis::{
-    error_bag::ErrorBag,
+    error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
     parser::{SyntaxKind, SyntaxToken},
     CodeLocation,
 };
 
-use super::types::TypeKind;
+use super::{bound_scope::BoundScope, types::TypeKind};
 
 #[derive(Debug)]
 pub struct BoundNode {
@@ -25,47 +27,6 @@ impl BoundNode {
 }
 
 #[derive(Debug)]
-pub struct BoundScope {
-    parent: Box<BoundScope>,
-    variables: Vec<VariableDefinition>,
-}
-
-impl BoundScope {
-    pub fn new(parent: BoundScope) -> BoundScope {
-        BoundScope {
-            parent: Box::new(parent),
-            variables: Vec::new(),
-        }
-    }
-
-    pub fn declare_variable(
-        &mut self,
-        identifier: String,
-        var_type: TypeKind,
-        errors: &mut ErrorBag,
-    ) -> Option<VariableDefinition> {
-        let mut matching = self.variables.to_vec();
-        matching.retain(|v| v.identifier == identifier);
-
-        if matching.len() != 0 {
-            return None;
-        }
-
-        let def = VariableDefinition {
-            identifier: identifier,
-            var_type: var_type,
-        };
-        Some(def)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VariableDefinition {
-    identifier: String,
-    var_type: TypeKind,
-}
-
-#[derive(Debug)]
 pub enum BoundNodeKind {
     Module {
         children: Box<Vec<BoundNode>>,
@@ -79,18 +40,23 @@ pub enum BoundNodeKind {
         op: Operator,
         rhs: Box<BoundNode>,
     },
+    AssignmentExpression {
+        identifier: String,
+        value: Box<BoundNode>,
+    },
     NumberLiteral(i32),
     BooleanLiteral(bool),
 }
 
 fn bind_module(
     children: &Vec<SyntaxToken>,
+    scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
-        let bound_child = match bind(child, errors) {
+        let bound_child = match bind(child, scope.clone(), errors) {
             Some(n) => n,
             None => return None,
         };
@@ -110,15 +76,16 @@ fn bind_binary_expression(
     lhs: &SyntaxToken,
     op: &Operator,
     rhs: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let lhs = match bind(lhs, errors) {
+    let lhs = match bind(lhs, scope.clone(), errors) {
         Some(n) => n,
         None => return None,
     };
 
-    let rhs = match bind(rhs, errors) {
+    let rhs = match bind(rhs, scope, errors) {
         Some(n) => n,
         None => return None,
     };
@@ -141,10 +108,11 @@ fn bind_binary_expression(
 fn bind_unary_expression(
     op: &Operator,
     rhs: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let rhs = match bind(rhs, errors) {
+    let rhs = match bind(rhs, scope, errors) {
         Some(n) => n,
         None => return None,
     };
@@ -183,15 +151,59 @@ fn bind_literal_expression(
     }
 }
 
-pub fn bind(token: &SyntaxToken, errors: &mut ErrorBag) -> Option<BoundNode> {
+fn bind_assignment_expression(
+    reference: &SyntaxToken,
+    value: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let identifier = match &reference.kind {
+        SyntaxKind::ReferenceExpression(i) => i.clone(),
+        _ => unreachable!(),
+    };
+
+    let value = match bind(value, scope.clone(), errors) {
+        Some(v) => v,
+        None => return None,
+    };
+
+    let node_type = value.node_type.clone();
+    let success = scope
+        .borrow_mut()
+        .assign(identifier.clone(), node_type.clone());
+    if !success {
+        errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
+        return None;
+    }
+
+    let kind = BoundNodeKind::AssignmentExpression {
+        identifier: identifier,
+        value: Box::new(value),
+    };
+
+    let node = BoundNode::new(kind, node_type, loc);
+    Some(node)
+}
+
+pub fn bind(
+    token: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+) -> Option<BoundNode> {
     let loc = token.loc.clone();
     match &token.kind {
-        SyntaxKind::Module { children } => bind_module(&children, errors, loc),
+        SyntaxKind::Module { children } => bind_module(&children, scope, errors, loc),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
-            bind_binary_expression(&lhs, &op, &rhs, errors, loc)
+            bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
         }
-        SyntaxKind::UnaryExpression { op, rhs } => bind_unary_expression(&op, &rhs, errors, loc),
+        SyntaxKind::UnaryExpression { op, rhs } => {
+            bind_unary_expression(&op, &rhs, scope, errors, loc)
+        }
         SyntaxKind::LiteralExpression(subtoken) => bind_literal_expression(&subtoken, errors, loc),
+        SyntaxKind::AssignmentExpression { reference, value } => {
+            bind_assignment_expression(reference, value, scope, errors, loc)
+        }
         _ => unreachable!(),
     }
 }

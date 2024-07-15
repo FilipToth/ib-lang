@@ -11,5 +11,6 @@ function SUMDOUBLE(A, B)
     end if
 end function
 
-output SUMDOUBLE(10, 10)
+A = 10
+output SUMDOUBLE(A, A)
 output SUMDOUBLE(4, 10)

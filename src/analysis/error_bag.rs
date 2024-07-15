@@ -3,6 +3,7 @@ use super::{binding::types::TypeKind, operator::Operator};
 pub enum ErrorKind {
     FailedParsing,
     NumberParsing,
+    AssignMismatchedTypes,
     UnaryOperatorNotDefinedOnType {
         op: Operator,
         used_type: TypeKind,
@@ -23,6 +24,7 @@ impl ErrorKind {
         match self {
             Self::FailedParsing => "Failed parsing".to_string(),
             Self::NumberParsing => "Cannot parse number".to_string(),
+            Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),
             Self::UnaryOperatorNotDefinedOnType { op, used_type } => {
                 format!(
                     "Unary operator '{:?}' not defined on type: '{:?}'",
