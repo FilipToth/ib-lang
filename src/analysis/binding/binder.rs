@@ -44,6 +44,7 @@ pub enum BoundNodeKind {
         identifier: String,
         value: Box<BoundNode>,
     },
+    ReferenceExpression(String),
     NumberLiteral(i32),
     BooleanLiteral(bool),
 }
@@ -186,6 +187,25 @@ fn bind_assignment_expression(
     Some(node)
 }
 
+fn bind_reference_expression(
+    identifier: String,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let ref_type = match scope.borrow().get(identifier.clone()) {
+        Some(def) => def.var_type,
+        None => {
+            errors.add(ErrorKind::CannotFindValue(identifier), loc.line, loc.col);
+            return None;
+        }
+    };
+
+    let kind = BoundNodeKind::ReferenceExpression(identifier);
+    let node = BoundNode::new(kind, ref_type, loc);
+    Some(node)
+}
+
 pub fn bind(
     token: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
@@ -203,6 +223,9 @@ pub fn bind(
         SyntaxKind::LiteralExpression(subtoken) => bind_literal_expression(&subtoken, errors, loc),
         SyntaxKind::AssignmentExpression { reference, value } => {
             bind_assignment_expression(reference, value, scope, errors, loc)
+        }
+        SyntaxKind::ReferenceExpression(identifier) => {
+            bind_reference_expression(identifier.clone(), scope, errors, loc)
         }
         _ => unreachable!(),
     }

@@ -57,6 +57,6 @@ impl BoundScope {
 
 #[derive(Debug, Clone)]
 pub struct VariableDefinition {
-    identifier: String,
-    var_type: TypeKind,
+    pub identifier: String,
+    pub var_type: TypeKind,
 }
