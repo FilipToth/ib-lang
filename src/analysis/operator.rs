@@ -86,7 +86,7 @@ impl Operator {
                     return None;
                 }
 
-                Some(rhs_type)
+                Some(TypeKind::Boolean)
             }
             _ => unreachable!(),
         }

@@ -31,6 +31,13 @@ pub enum BoundNodeKind {
     Module {
         children: Box<Vec<BoundNode>>,
     },
+    OutputStatement {
+        expr: Box<BoundNode>,
+    },
+    IfStatement {
+        condition: Box<BoundNode>,
+        inner: Box<BoundNode>,
+    },
     BinaryExpression {
         lhs: Box<BoundNode>,
         op: Operator,
@@ -67,6 +74,57 @@ fn bind_module(
 
     let kind = BoundNodeKind::Module {
         children: Box::new(bound),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    Some(node)
+}
+
+fn bind_output_statement(
+    expr: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let expr = match bind(expr, scope, errors) {
+        Some(expr) => expr,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::OutputStatement {
+        expr: Box::new(expr),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    Some(node)
+}
+
+fn bind_if_statement(
+    condition: &SyntaxToken,
+    next: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let condition = match bind(condition, scope.clone(), errors) {
+        Some(cond) => cond,
+        None => return None,
+    };
+
+    if condition.node_type != TypeKind::Boolean {
+        errors.add(ErrorKind::ConditionMustBeBoolean(condition.node_type), loc.line, loc.col);
+        return None;
+    }
+
+    let child_scope = BoundScope::new(scope);
+    let next = match bind(next, Rc::new(RefCell::new(child_scope)), errors) {
+        Some(n) => n,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::IfStatement {
+        condition: Box::new(condition),
+        inner: Box::new(next),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);
@@ -214,6 +272,10 @@ pub fn bind(
     let loc = token.loc.clone();
     match &token.kind {
         SyntaxKind::Module { children } => bind_module(&children, scope, errors, loc),
+        SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
+        SyntaxKind::IfStatement { condition, next } => {
+            bind_if_statement(&condition, &next, scope, errors, loc)
+        }
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
         }

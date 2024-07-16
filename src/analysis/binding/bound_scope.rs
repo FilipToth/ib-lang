@@ -9,9 +9,9 @@ pub struct BoundScope {
 }
 
 impl BoundScope {
-    pub fn new(parent: BoundScope) -> BoundScope {
+    pub fn new(parent: Rc<RefCell<BoundScope>>) -> BoundScope {
         BoundScope {
-            parent: Some(Rc::new(RefCell::new(parent))),
+            parent: Some(parent),
             variables: Vec::new(),
         }
     }
