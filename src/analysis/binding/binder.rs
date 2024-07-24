@@ -260,6 +260,7 @@ fn bind_assignment_expression(
     let success = scope
         .borrow_mut()
         .assign(identifier.clone(), node_type.clone());
+
     if !success {
         errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
         return None;

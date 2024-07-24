@@ -45,6 +45,14 @@ pub enum SyntaxKind {
     OutputStatement {
         expr: Box<SyntaxToken>,
     },
+    FunctionDeclaration {
+        identifier: Box<SyntaxToken>,
+        params: Box<SyntaxToken>,
+        block: Box<SyntaxToken>,
+    },
+    ParameterList {
+        params: Vec<Parameter>,
+    },
     AssignmentExpression {
         reference: Box<SyntaxToken>,
         value: Box<SyntaxToken>,
@@ -63,6 +71,12 @@ pub enum SyntaxKind {
     IdentifierToken(String),
     NumberToken(i32),
     BooleanToken(bool),
+}
+
+#[derive(Debug)]
+pub struct Parameter {
+    identifier: String,
+    type_annotation: String,
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -149,6 +163,82 @@ fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Optio
     };
 
     let node = SyntaxToken::new(output_kind, &statement);
+    Some(node)
+}
+
+fn parse_function_declaration(
+    declaration: Pair<Rule>,
+    errors: &mut ErrorBag,
+) -> Option<SyntaxToken> {
+    let mut subtokens = declaration.clone().into_inner();
+
+    let identifier = match subtokens.nth(0) {
+        Some(i) => parse(Pairs::single(i), errors),
+        None => return None,
+    };
+
+    let identifier = match identifier {
+        Some(i) => i,
+        None => return None,
+    };
+
+    let params = match subtokens.nth(0) {
+        Some(p) => parse(Pairs::single(p), errors),
+        None => return None,
+    };
+
+    let params = match params {
+        Some(p) => p,
+        None => return None,
+    };
+
+    let block = match subtokens.nth(0) {
+        Some(b) => parse(Pairs::single(b), errors),
+        None => return None,
+    };
+
+    let block = match block {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let kind = SyntaxKind::FunctionDeclaration {
+        identifier: Box::new(identifier),
+        params: Box::new(params),
+        block: Box::new(block),
+    };
+
+    let node = SyntaxToken::new(kind, &declaration);
+    Some(node)
+}
+
+fn parse_parameter_list(params: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let mut subtokens = params.clone().into_inner();
+    let num_subtokens = subtokens.len();
+    let num_params = num_subtokens / 2;
+
+    let mut parameters: Vec<Parameter> = Vec::new();
+    for _ in 0..num_params {
+        let identifier = match subtokens.nth(0) {
+            Some(i) => i,
+            None => return None,
+        };
+
+        let type_annotation = match subtokens.nth(0) {
+            Some(i) => i,
+            None => return None,
+        };
+
+        let param = Parameter {
+            identifier: String::from(identifier.as_str()),
+            type_annotation: String::from(type_annotation.as_str()),
+        };
+
+        parameters.push(param);
+    }
+
+    let kind = SyntaxKind::ParameterList { params: parameters };
+    let node = SyntaxToken::new(kind, &params);
     Some(node)
 }
 
@@ -259,6 +349,8 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
             Rule::expression_statement => parse(primary.into_inner(), errors),
             Rule::if_statement => parse_if_statement(primary, errors),
             Rule::output_statement => parse_output_statement(primary, errors),
+            Rule::function_declaration_statement => parse_function_declaration(primary, errors),
+            Rule::parameter_list => parse_parameter_list(primary, errors),
             Rule::expression => parse(primary.into_inner(), errors),
             Rule::assignment_expression => parse_assignment_expression(primary, errors),
             Rule::reference_expression => parse_reference_expression(primary, errors),

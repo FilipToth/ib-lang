@@ -12,15 +12,21 @@ keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword }
     end_keyword = _{ "end" | "END" }
     else_keyword = _{ "else" | "ELSE" }
     output_keyword = _{ "output" | "OUTPUT" }
+    func_keyword = _{ "FUNCTION" | "function" }
 
-statement = _{ if_statement | output_statement | expression_statement }
-    if_statement = { if_keyword ~ expression ~ then_keyword ~ block ~ end_keyword }
+statement = _{ if_statement | output_statement | function_declaration_statement | expression_statement }
+    if_statement = { if_keyword ~ expression ~ then_keyword ~ block ~ end_keyword ~ if_keyword }
     output_statement = { output_keyword ~ expression_statement }
     expression_statement = { expression }
+    function_declaration_statement = { func_keyword ~ identifier_token ~ parameter_list ~ block ~ end_keyword ~ func_keyword  }
 
 identifier_token = @{ !keyword ~ (letter)+ }
 number_token = @{ (digit)+ }
 boolean_token = @{ "true" | "TRUE" | "false" | "FALSE" }
+
+type_annotation = _{ ":" ~ identifier_token }
+parameter = _{ identifier_token ~ type_annotation }
+parameter_list = { "(" ~ (parameter ~ ("," ~ parameter)*)? ~ ")" }
 
 binary_operator = _{ addition | subtraction | multiplication | division | equality | not }
     addition = { "+" }

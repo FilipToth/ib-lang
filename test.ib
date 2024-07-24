@@ -1,4 +1,3 @@
-IF true THEN
-    output 2
-    output 2
-END
+FUNCTION my_func(num: Int, idk: String, test: MyType)
+    output num
+END FUNCTION
