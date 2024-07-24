@@ -33,11 +33,14 @@ impl SyntaxToken {
 #[derive(Debug)]
 pub enum SyntaxKind {
     Module {
+        block: Box<SyntaxToken>,
+    },
+    Block {
         children: Box<Vec<SyntaxToken>>,
     },
     IfStatement {
         condition: Box<SyntaxToken>,
-        next: Box<SyntaxToken>,
+        block: Box<SyntaxToken>,
     },
     OutputStatement {
         expr: Box<SyntaxToken>,
@@ -63,23 +66,40 @@ pub enum SyntaxKind {
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let subtokens = module.clone().into_inner();
+    let mut subtokens = module.clone().into_inner();
+    let block = subtokens.nth(0).unwrap();
+
+    let block = match parse(Pairs::single(block), errors) {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let module_kind = SyntaxKind::Module {
+        block: Box::new(block),
+    };
+
+    let node = SyntaxToken::new(module_kind, &module);
+    Some(node)
+}
+
+fn parse_block(block: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let subtokens = block.clone().into_inner();
 
     let mut tokens: Vec<SyntaxToken> = Vec::new();
     for subtoken in subtokens {
-        let parsed = match parse(Pairs::single(subtoken), errors) {
+        let subtoken = match parse(Pairs::single(subtoken), errors) {
             Some(t) => t,
             None => return None,
         };
 
-        tokens.push(parsed);
+        tokens.push(subtoken);
     }
 
-    let module_kind = SyntaxKind::Module {
+    let block_kind = SyntaxKind::Block {
         children: Box::new(tokens),
     };
 
-    let node = SyntaxToken::new(module_kind, &module);
+    let node = SyntaxToken::new(block_kind, &block);
     Some(node)
 }
 
@@ -96,19 +116,15 @@ fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<Sy
         None => return None,
     };
 
-    let next = match subtokens.nth(0) {
-        Some(n) => parse(Pairs::single(n), errors),
-        None => return None,
-    };
-
-    let next = match next {
-        Some(t) => t,
+    let block = subtokens.nth(0).unwrap();
+    let block = match parse(Pairs::single(block), errors) {
+        Some(b) => b,
         None => return None,
     };
 
     let if_kind = SyntaxKind::IfStatement {
         condition: Box::new(condition),
-        next: Box::new(next),
+        block: Box::new(block),
     };
 
     let node = SyntaxToken::new(if_kind, &statement);
@@ -239,6 +255,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::module => parse_module(primary, errors),
+            Rule::block => parse_block(primary, errors),
             Rule::expression_statement => parse(primary.into_inner(), errors),
             Rule::if_statement => parse_if_statement(primary, errors),
             Rule::output_statement => parse_output_statement(primary, errors),
@@ -323,7 +340,10 @@ lazy_static! {
 
 pub fn parse_contents(contents: String, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     match IbParser::parse(Rule::module, contents.as_str()) {
-        Ok(mut pairs) => parse(Pairs::single(pairs.next().unwrap()), errors),
+        Ok(mut pairs) => {
+            println!("{:#?}", pairs.clone());
+            parse(Pairs::single(pairs.next().unwrap()), errors)
+        }
         Err(_) => None,
     }
 }

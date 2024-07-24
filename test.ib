@@ -1,8 +1,4 @@
-abc = 2
-x = abc + 1
-
-IF x == 3 THEN
-    y = x + 1
+IF true THEN
+    output 2
+    output 2
 END
-
-output y

@@ -29,6 +29,9 @@ impl BoundNode {
 #[derive(Debug)]
 pub enum BoundNodeKind {
     Module {
+        block: Box<BoundNode>,
+    },
+    Block {
         children: Box<Vec<BoundNode>>,
     },
     OutputStatement {
@@ -36,7 +39,7 @@ pub enum BoundNodeKind {
     },
     IfStatement {
         condition: Box<BoundNode>,
-        inner: Box<BoundNode>,
+        block: Box<BoundNode>,
     },
     BinaryExpression {
         lhs: Box<BoundNode>,
@@ -57,14 +60,37 @@ pub enum BoundNodeKind {
 }
 
 fn bind_module(
-    children: &Vec<SyntaxToken>,
+    block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
+    let block = match bind(block, scope, errors) {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let node_type = block.node_type.clone();
+    let kind = BoundNodeKind::Module {
+        block: Box::new(block),
+    };
+
+    let node = BoundNode::new(kind, node_type, loc);
+    Some(node)
+}
+
+fn bind_block(
+    children: &Vec<SyntaxToken>,
+    parent_scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let scope = BoundScope::new(parent_scope);
+    let scope_ref = Rc::new(RefCell::new(scope));
+
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
-        let bound_child = match bind(child, scope.clone(), errors) {
+        let bound_child = match bind(child, scope_ref.clone(), errors) {
             Some(n) => n,
             None => return None,
         };
@@ -72,7 +98,7 @@ fn bind_module(
         bound.push(bound_child);
     }
 
-    let kind = BoundNodeKind::Module {
+    let kind = BoundNodeKind::Block {
         children: Box::new(bound),
     };
 
@@ -112,19 +138,22 @@ fn bind_if_statement(
     };
 
     if condition.node_type != TypeKind::Boolean {
-        errors.add(ErrorKind::ConditionMustBeBoolean(condition.node_type), loc.line, loc.col);
+        errors.add(
+            ErrorKind::ConditionMustBeBoolean(condition.node_type),
+            loc.line,
+            loc.col,
+        );
         return None;
     }
 
-    let child_scope = BoundScope::new(scope);
-    let next = match bind(next, Rc::new(RefCell::new(child_scope)), errors) {
+    let block = match bind(next, scope, errors) {
         Some(n) => n,
         None => return None,
     };
 
     let kind = BoundNodeKind::IfStatement {
         condition: Box::new(condition),
-        inner: Box::new(next),
+        block: Box::new(block),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);
@@ -271,10 +300,11 @@ pub fn bind(
 ) -> Option<BoundNode> {
     let loc = token.loc.clone();
     match &token.kind {
-        SyntaxKind::Module { children } => bind_module(&children, scope, errors, loc),
+        SyntaxKind::Module { block } => bind_module(&block, scope, errors, loc),
+        SyntaxKind::Block { children } => bind_block(&children, scope, errors, loc),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
-        SyntaxKind::IfStatement { condition, next } => {
-            bind_if_statement(&condition, &next, scope, errors, loc)
+        SyntaxKind::IfStatement { condition, block } => {
+            bind_if_statement(&condition, &block, scope, errors, loc)
         }
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)

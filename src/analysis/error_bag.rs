@@ -28,7 +28,9 @@ impl ErrorKind {
             Self::NumberParsing => "Cannot parse number".to_string(),
             Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),
             Self::CannotFindValue(id) => format!("Cannot find value '{}' in the current scope", id),
-            Self::ConditionMustBeBoolean(cond_type) => format!("Condition type must be boolean, found {:?}", cond_type),
+            Self::ConditionMustBeBoolean(cond_type) => {
+                format!("Condition type must be boolean, found {:?}", cond_type)
+            }
             Self::UnaryOperatorNotDefinedOnType { op, used_type } => {
                 format!(
                     "Unary operator '{:?}' not defined on type: '{:?}'",

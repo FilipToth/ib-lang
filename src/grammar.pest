@@ -1,4 +1,5 @@
-module = { (statement)* }
+module = { block }
+block = { (statement)* }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 NEWLINE = _{ "\n" | "\n\r" }
@@ -13,11 +14,11 @@ keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword }
     output_keyword = _{ "output" | "OUTPUT" }
 
 statement = _{ if_statement | output_statement | expression_statement }
-    if_statement = { if_keyword ~ expression ~ then_keyword ~ statement ~ end_keyword }
+    if_statement = { if_keyword ~ expression ~ then_keyword ~ block ~ end_keyword }
     output_statement = { output_keyword ~ expression_statement }
     expression_statement = { expression }
 
-identifier_token = @{ (letter)+ }
+identifier_token = @{ !keyword ~ (letter)+ }
 number_token = @{ (digit)+ }
 boolean_token = @{ "true" | "TRUE" | "false" | "FALSE" }
 
