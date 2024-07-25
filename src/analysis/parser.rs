@@ -57,6 +57,10 @@ pub enum SyntaxKind {
         reference: Box<SyntaxToken>,
         value: Box<SyntaxToken>,
     },
+    CallExpression {
+        identifier: Box<SyntaxToken>,
+        args: Box<Vec<SyntaxToken>>,
+    },
     ReferenceExpression(String),
     BinaryExpression {
         lhs: Box<SyntaxToken>,
@@ -278,6 +282,52 @@ fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Optio
     Some(node)
 }
 
+fn parse_call_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let mut subtokens = expr.clone().into_inner();
+    let identifier = match subtokens.nth(0) {
+        Some(i) => parse(Pairs::single(i), errors),
+        None => return None,
+    };
+
+    let identifier = match identifier {
+        Some(i) => i,
+        None => return None,
+    };
+
+    let args = match subtokens.nth(0) {
+        Some(a) => a,
+        None => return None,
+    };
+
+    let args = match parse_args_list(args, errors) {
+        Some(a) => a,
+        None => return None,
+    };
+
+    let kind = SyntaxKind::CallExpression {
+        identifier: Box::new(identifier),
+        args: Box::new(args),
+    };
+
+    let node = SyntaxToken::new(kind, &expr);
+    Some(node)
+}
+
+fn parse_args_list(args: Pair<Rule>, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {
+    let subtokens = args.clone().into_inner();
+
+    let mut tokens: Vec<SyntaxToken> = Vec::new();
+    for subtoken in subtokens {
+        let parsed = parse(Pairs::single(subtoken), errors);
+        match parsed {
+            Some(t) => tokens.push(t),
+            None => return None,
+        };
+    }
+
+    Some(tokens)
+}
+
 fn parse_reference_expression(
     reference: Pair<Rule>,
     _errors: &mut ErrorBag,
@@ -356,6 +406,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
             Rule::parameter_list => parse_parameter_list(primary, errors),
             Rule::expression => parse(primary.into_inner(), errors),
             Rule::assignment_expression => parse_assignment_expression(primary, errors),
+            Rule::call_expression => parse_call_expression(primary, errors),
             Rule::reference_expression => parse_reference_expression(primary, errors),
             Rule::literal_expression => parse_literal_expression(primary, errors),
             Rule::number_token => parse_number_token(primary, errors),

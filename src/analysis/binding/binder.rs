@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::Index, rc::Rc};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -61,6 +61,10 @@ pub enum BoundNodeKind {
     AssignmentExpression {
         identifier: String,
         value: Box<BoundNode>,
+    },
+    BoundCallExpression {
+        identifier: String,
+        args: Box<Vec<BoundNode>>,
     },
     ReferenceExpression(String),
     NumberLiteral(i32),
@@ -390,6 +394,73 @@ fn bind_assignment_expression(
     Some(node)
 }
 
+fn bind_call_expression(
+    identifier: &SyntaxToken,
+    args: &Vec<SyntaxToken>,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let SyntaxKind::IdentifierToken(id) = &identifier.kind else {
+        return None;
+    };
+
+    let identifier = id.clone();
+    let params = match scope.borrow().get_function(identifier.clone()) {
+        Some(def) => def.parameters,
+        None => {
+            let kind = ErrorKind::CannotFindFunction(identifier);
+            errors.add(kind, loc.line, loc.col);
+            return None;
+        }
+    };
+
+    // check if params match args
+    let num_params = params.len();
+    if num_params != args.len() {
+        let kind = ErrorKind::MismatchedNumberOfArgs {
+            id: identifier.clone(),
+            expected: num_params,
+            found: args.len(),
+        };
+
+        errors.add(kind, loc.line, loc.col);
+        return None;
+    }
+
+    let mut bound_args: Vec<BoundNode> = Vec::new();
+    for index in 0..num_params {
+        let param = &params[index];
+        let arg = &args[index];
+
+        let bound_arg = match bind(arg, scope.clone(), errors) {
+            Some(a) => a,
+            None => return None,
+        };
+
+        if param.param_type != bound_arg.node_type {
+            let kind = ErrorKind::MismatchedArgTypes {
+                id: identifier.clone(),
+                expected: param.param_type.clone(),
+                found: bound_arg.node_type,
+            };
+
+            errors.add(kind, loc.line, loc.col);
+            return None;
+        }
+
+        bound_args.push(bound_arg);
+    }
+
+    let kind = BoundNodeKind::BoundCallExpression {
+        identifier: identifier,
+        args: Box::new(bound_args),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    Some(node)
+}
+
 fn bind_reference_expression(
     identifier: String,
     scope: Rc<RefCell<BoundScope>>,
@@ -436,6 +507,9 @@ pub fn bind(
         SyntaxKind::LiteralExpression(subtoken) => bind_literal_expression(&subtoken, errors, loc),
         SyntaxKind::AssignmentExpression { reference, value } => {
             bind_assignment_expression(reference, value, scope, errors, loc)
+        }
+        SyntaxKind::CallExpression { identifier, args } => {
+            bind_call_expression(&identifier, &args, scope, errors, loc)
         }
         SyntaxKind::ReferenceExpression(identifier) => {
             bind_reference_expression(identifier.clone(), scope, errors, loc)

@@ -27,6 +27,7 @@ boolean_token = @{ "true" | "TRUE" | "false" | "FALSE" }
 type_annotation = _{ ":" ~ identifier_token }
 parameter = _{ identifier_token ~ type_annotation }
 parameter_list = { "(" ~ (parameter ~ ("," ~ parameter)*)? ~ ")" }
+argument_list = { "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
 
 binary_operator = _{ addition | subtraction | multiplication | division | equality | not }
     addition = { "+" }
@@ -39,9 +40,10 @@ binary_operator = _{ addition | subtraction | multiplication | division | equali
 unary_operator = _{ not }
     not = { "not" }
 
-atom_types = _{ assignment_expression | literal_expression | reference_expression }
+atom_types = _{ assignment_expression | literal_expression | call_expression | reference_expression }
     assignment_expression = { reference_expression ~ assignment ~ expression }
     literal_expression = { number_token | boolean_token }
+    call_expression = { identifier_token ~ argument_list }
     reference_expression = { identifier_token }
 
 primary = _{ atom_types | "(" ~ expression ~ ")" }

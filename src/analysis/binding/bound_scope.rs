@@ -63,7 +63,7 @@ impl BoundScope {
             Some(_) => return false,
             None => {
                 let def = FunctionDefinition {
-                    identifier: identifier,
+                    identifier: identifier.clone(),
                     parameters: params,
                 };
 

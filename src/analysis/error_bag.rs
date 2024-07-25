@@ -6,7 +6,18 @@ pub enum ErrorKind {
     AssignMismatchedTypes,
     ParamMismatchedTypes(String),
     CannotFindValue(String),
+    CannotFindFunction(String),
     CannotDeclareFunction(String),
+    MismatchedNumberOfArgs {
+        id: String,
+        expected: usize,
+        found: usize,
+    },
+    MismatchedArgTypes {
+        id: String,
+        expected: TypeKind,
+        found: TypeKind,
+    },
     ConditionMustBeBoolean(TypeKind),
     UndefinedType(String),
     UnaryOperatorNotDefinedOnType {
@@ -32,7 +43,10 @@ impl ErrorKind {
             Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),
             Self::ParamMismatchedTypes(param) => format!("Cannot assign parameter '{}' because a value with a different type already exists in the current scope", param),
             Self::CannotFindValue(id) => format!("Cannot find value '{}' in the current scope", id),
+            Self::CannotFindFunction(id) => format!("Cannot find function '{}' in the current scope", id),
             Self::CannotDeclareFunction(id) => format!("Cannot declare function '{}' because the scope already contains one with the same name", id),
+            Self::MismatchedNumberOfArgs { id, expected, found } => format!("Expected {} arguments, found {} when calling function '{}'", expected, found, id),
+            Self::MismatchedArgTypes { id, expected, found } => format!("Expected an argument of type {:?}, found {:?} when calling function {}", expected, found, id),
             Self::ConditionMustBeBoolean(cond_type) => {
                 format!("Condition type must be boolean, found {:?}", cond_type)
             }
