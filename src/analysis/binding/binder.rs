@@ -196,7 +196,7 @@ fn bind_function_declaration(
     let scope_ref = Rc::new(RefCell::new(func_scope));
 
     let params = match params.kind {
-        SyntaxKind::ParameterList { ref params } => bind_params(params, scope_ref.clone()),
+        SyntaxKind::ParameterList { ref params } => bind_params(params, scope_ref.clone(), errors),
         _ => return None,
     };
 
@@ -228,18 +228,17 @@ fn bind_function_declaration(
 fn bind_params(
     params: &Vec<ParameterSyntax>,
     scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
 ) -> Option<Vec<BoundParameter>> {
     let mut parameters: Vec<BoundParameter> = Vec::new();
     for param in params {
         let identifier = param.identifier.clone();
         let type_identifier = param.type_annotation.clone();
+        let loc = param.location.clone();
 
-        let param_type = match get_type(type_identifier) {
+        let param_type = match get_type(type_identifier, &loc, errors) {
             Some(t) => t,
-            None => {
-                // TODO: report error
-                return None;
-            }
+            None => return None,
         };
 
         let bound_param = BoundParameter {
@@ -248,9 +247,10 @@ fn bind_params(
         };
 
         // declare in scope
-        let success = scope.borrow_mut().assign(identifier, param_type);
+        let success = scope.borrow_mut().assign(identifier.clone(), param_type);
         if !success {
-            // TODO: report error
+            let kind = ErrorKind::ParamMismatchedTypes(identifier);
+            errors.add(kind, loc.line, loc.col);
             return None;
         }
 

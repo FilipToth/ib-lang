@@ -77,6 +77,7 @@ pub enum SyntaxKind {
 pub struct ParameterSyntax {
     pub identifier: String,
     pub type_annotation: String,
+    pub location: CodeLocation,
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -229,9 +230,11 @@ fn parse_parameter_list(params: Pair<Rule>, _errors: &mut ErrorBag) -> Option<Sy
             None => return None,
         };
 
+        let loc = CodeLocation::from_pair(&identifier);
         let param = ParameterSyntax {
             identifier: String::from(identifier.as_str()),
             type_annotation: String::from(type_annotation.as_str()),
+            location: loc,
         };
 
         parameters.push(param);

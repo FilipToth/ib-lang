@@ -1,3 +1,5 @@
+test = 1
+
 FUNCTION my_func(num: Int, idk: String, test: Boolean)
     output test
 END FUNCTION

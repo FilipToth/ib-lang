@@ -4,8 +4,10 @@ pub enum ErrorKind {
     FailedParsing,
     NumberParsing,
     AssignMismatchedTypes,
+    ParamMismatchedTypes(String),
     CannotFindValue(String),
     ConditionMustBeBoolean(TypeKind),
+    UndefinedType(String),
     UnaryOperatorNotDefinedOnType {
         op: Operator,
         used_type: TypeKind,
@@ -27,9 +29,13 @@ impl ErrorKind {
             Self::FailedParsing => "Failed parsing".to_string(),
             Self::NumberParsing => "Cannot parse number".to_string(),
             Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),
+            Self::ParamMismatchedTypes(param) => format!("Cannot assign parameter '{}' because a value with a different type already exists in the current scope", param),
             Self::CannotFindValue(id) => format!("Cannot find value '{}' in the current scope", id),
             Self::ConditionMustBeBoolean(cond_type) => {
                 format!("Condition type must be boolean, found {:?}", cond_type)
+            }
+            Self::UndefinedType(type_ref) => {
+                format!("Undefined type '{}' in the current scope", type_ref)
             }
             Self::UnaryOperatorNotDefinedOnType { op, used_type } => {
                 format!(
