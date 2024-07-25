@@ -51,7 +51,7 @@ pub enum SyntaxKind {
         block: Box<SyntaxToken>,
     },
     ParameterList {
-        params: Vec<Parameter>,
+        params: Vec<ParameterSyntax>,
     },
     AssignmentExpression {
         reference: Box<SyntaxToken>,
@@ -74,9 +74,9 @@ pub enum SyntaxKind {
 }
 
 #[derive(Debug)]
-pub struct Parameter {
-    identifier: String,
-    type_annotation: String,
+pub struct ParameterSyntax {
+    pub identifier: String,
+    pub type_annotation: String,
 }
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -212,12 +212,12 @@ fn parse_function_declaration(
     Some(node)
 }
 
-fn parse_parameter_list(params: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+fn parse_parameter_list(params: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let mut subtokens = params.clone().into_inner();
     let num_subtokens = subtokens.len();
     let num_params = num_subtokens / 2;
 
-    let mut parameters: Vec<Parameter> = Vec::new();
+    let mut parameters: Vec<ParameterSyntax> = Vec::new();
     for _ in 0..num_params {
         let identifier = match subtokens.nth(0) {
             Some(i) => i,
@@ -229,7 +229,7 @@ fn parse_parameter_list(params: Pair<Rule>, errors: &mut ErrorBag) -> Option<Syn
             None => return None,
         };
 
-        let param = Parameter {
+        let param = ParameterSyntax {
             identifier: String::from(identifier.as_str()),
             type_annotation: String::from(type_annotation.as_str()),
         };

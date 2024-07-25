@@ -3,11 +3,14 @@ use std::{cell::RefCell, rc::Rc};
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
-    parser::{SyntaxKind, SyntaxToken},
+    parser::{ParameterSyntax, SyntaxKind, SyntaxToken},
     CodeLocation,
 };
 
-use super::{bound_scope::BoundScope, types::TypeKind};
+use super::{
+    bound_scope::BoundScope,
+    types::{get_type, TypeKind},
+};
 
 #[derive(Debug)]
 pub struct BoundNode {
@@ -41,6 +44,11 @@ pub enum BoundNodeKind {
         condition: Box<BoundNode>,
         block: Box<BoundNode>,
     },
+    FunctionDeclaration {
+        identifier: String,
+        params: Vec<BoundParameter>,
+        block: Box<BoundNode>,
+    },
     BinaryExpression {
         lhs: Box<BoundNode>,
         op: Operator,
@@ -57,6 +65,12 @@ pub enum BoundNodeKind {
     ReferenceExpression(String),
     NumberLiteral(i32),
     BooleanLiteral(bool),
+}
+
+#[derive(Debug)]
+pub struct BoundParameter {
+    identifier: String,
+    param_type: TypeKind,
 }
 
 fn bind_module(
@@ -81,12 +95,17 @@ fn bind_module(
 
 fn bind_block(
     children: &Vec<SyntaxToken>,
-    parent_scope: Rc<RefCell<BoundScope>>,
+    scope: Rc<RefCell<BoundScope>>,
+    create_child_scope: bool,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let scope = BoundScope::new(parent_scope);
-    let scope_ref = Rc::new(RefCell::new(scope));
+    let scope_ref = if create_child_scope {
+        let child_scope = BoundScope::new(scope);
+        Rc::new(RefCell::new(child_scope))
+    } else {
+        scope
+    };
 
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
@@ -158,6 +177,87 @@ fn bind_if_statement(
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);
     Some(node)
+}
+
+fn bind_function_declaration(
+    identifier: &SyntaxToken,
+    params: &SyntaxToken,
+    block: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let identifier = match identifier.kind {
+        SyntaxKind::IdentifierToken(ref i) => i.clone(),
+        _ => return None,
+    };
+
+    let func_scope = BoundScope::new(scope);
+    let scope_ref = Rc::new(RefCell::new(func_scope));
+
+    let params = match params.kind {
+        SyntaxKind::ParameterList { ref params } => bind_params(params, scope_ref.clone()),
+        _ => return None,
+    };
+
+    let params = match params {
+        Some(p) => p,
+        None => return None,
+    };
+
+    let block_loc = block.loc.clone();
+    let SyntaxKind::Block { children } = &block.kind else {
+        return None;
+    };
+
+    let block = match bind_block(&children, scope_ref, false, errors, block_loc) {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::FunctionDeclaration {
+        identifier: identifier,
+        params: params,
+        block: Box::new(block),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    Some(node)
+}
+
+fn bind_params(
+    params: &Vec<ParameterSyntax>,
+    scope: Rc<RefCell<BoundScope>>,
+) -> Option<Vec<BoundParameter>> {
+    let mut parameters: Vec<BoundParameter> = Vec::new();
+    for param in params {
+        let identifier = param.identifier.clone();
+        let type_identifier = param.type_annotation.clone();
+
+        let param_type = match get_type(type_identifier) {
+            Some(t) => t,
+            None => {
+                // TODO: report error
+                return None;
+            }
+        };
+
+        let bound_param = BoundParameter {
+            identifier: identifier.clone(),
+            param_type: param_type.clone(),
+        };
+
+        // declare in scope
+        let success = scope.borrow_mut().assign(identifier, param_type);
+        if !success {
+            // TODO: report error
+            return None;
+        }
+
+        parameters.push(bound_param);
+    }
+
+    Some(parameters)
 }
 
 fn bind_binary_expression(
@@ -302,11 +402,16 @@ pub fn bind(
     let loc = token.loc.clone();
     match &token.kind {
         SyntaxKind::Module { block } => bind_module(&block, scope, errors, loc),
-        SyntaxKind::Block { children } => bind_block(&children, scope, errors, loc),
+        SyntaxKind::Block { children } => bind_block(&children, scope, true, errors, loc),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
         SyntaxKind::IfStatement { condition, block } => {
             bind_if_statement(&condition, &block, scope, errors, loc)
         }
+        SyntaxKind::FunctionDeclaration {
+            identifier,
+            params,
+            block,
+        } => bind_function_declaration(&identifier, &params, &block, scope, errors, loc),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
         }
