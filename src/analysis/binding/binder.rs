@@ -67,10 +67,10 @@ pub enum BoundNodeKind {
     BooleanLiteral(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundParameter {
-    identifier: String,
-    param_type: TypeKind,
+    pub identifier: String,
+    pub param_type: TypeKind,
 }
 
 fn bind_module(
@@ -192,11 +192,13 @@ fn bind_function_declaration(
         _ => return None,
     };
 
-    let func_scope = BoundScope::new(scope);
-    let scope_ref = Rc::new(RefCell::new(func_scope));
+    let func_scope = BoundScope::new(scope.clone());
+    let func_scope_ref = Rc::new(RefCell::new(func_scope));
 
     let params = match params.kind {
-        SyntaxKind::ParameterList { ref params } => bind_params(params, scope_ref.clone(), errors),
+        SyntaxKind::ParameterList { ref params } => {
+            bind_params(params, func_scope_ref.clone(), errors)
+        }
         _ => return None,
     };
 
@@ -210,10 +212,20 @@ fn bind_function_declaration(
         return None;
     };
 
-    let block = match bind_block(&children, scope_ref, false, errors, block_loc) {
+    let block = match bind_block(&children, func_scope_ref, false, errors, block_loc) {
         Some(b) => b,
         None => return None,
     };
+
+    let success = scope
+        .borrow_mut()
+        .declare_function(identifier.clone(), params.clone());
+
+    if !success {
+        let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
+        errors.add(kind, loc.line, loc.col);
+        return None;
+    }
 
     let kind = BoundNodeKind::FunctionDeclaration {
         identifier: identifier,
@@ -247,7 +259,10 @@ fn bind_params(
         };
 
         // declare in scope
-        let success = scope.borrow_mut().assign(identifier.clone(), param_type);
+        let success = scope
+            .borrow_mut()
+            .assign_variable(identifier.clone(), param_type);
+
         if !success {
             let kind = ErrorKind::ParamMismatchedTypes(identifier);
             errors.add(kind, loc.line, loc.col);
@@ -359,7 +374,7 @@ fn bind_assignment_expression(
     let node_type = value.node_type.clone();
     let success = scope
         .borrow_mut()
-        .assign(identifier.clone(), node_type.clone());
+        .assign_variable(identifier.clone(), node_type.clone());
 
     if !success {
         errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
@@ -381,7 +396,7 @@ fn bind_reference_expression(
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let ref_type = match scope.borrow().get(identifier.clone()) {
+    let ref_type = match scope.borrow().get_variable(identifier.clone()) {
         Some(def) => def.var_type,
         None => {
             errors.add(ErrorKind::CannotFindValue(identifier), loc.line, loc.col);

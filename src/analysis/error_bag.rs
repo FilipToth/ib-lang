@@ -6,6 +6,7 @@ pub enum ErrorKind {
     AssignMismatchedTypes,
     ParamMismatchedTypes(String),
     CannotFindValue(String),
+    CannotDeclareFunction(String),
     ConditionMustBeBoolean(TypeKind),
     UndefinedType(String),
     UnaryOperatorNotDefinedOnType {
@@ -31,6 +32,7 @@ impl ErrorKind {
             Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),
             Self::ParamMismatchedTypes(param) => format!("Cannot assign parameter '{}' because a value with a different type already exists in the current scope", param),
             Self::CannotFindValue(id) => format!("Cannot find value '{}' in the current scope", id),
+            Self::CannotDeclareFunction(id) => format!("Cannot declare function '{}' because the scope already contains one with the same name", id),
             Self::ConditionMustBeBoolean(cond_type) => {
                 format!("Condition type must be boolean, found {:?}", cond_type)
             }

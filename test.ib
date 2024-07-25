@@ -1,5 +1,7 @@
-test = 1
+FUNCTION my_func()
+    output 1
+END FUNCTION
 
-FUNCTION my_func(num: Int, idk: String, test: Boolean)
+FUNCTION my_other_func(num: Int, idk: String, test: Boolean)
     output test
 END FUNCTION
