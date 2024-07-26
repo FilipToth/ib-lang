@@ -48,8 +48,10 @@ pub enum SyntaxKind {
     FunctionDeclaration {
         identifier: Box<SyntaxToken>,
         params: Box<SyntaxToken>,
+        ret_type: String,
         block: Box<SyntaxToken>,
     },
+    FunctionTypeAnnotation(String),
     ParameterList {
         params: Vec<ParameterSyntax>,
     },
@@ -197,23 +199,65 @@ fn parse_function_declaration(
         None => return None,
     };
 
-    let block = match subtokens.nth(0) {
-        Some(b) => parse(Pairs::single(b), errors),
+    let block_or_type = match subtokens.nth(0) {
+        Some(f) => parse(Pairs::single(f), errors),
         None => return None,
     };
 
-    let block = match block {
-        Some(b) => b,
+    let block_or_type = match block_or_type {
+        Some(f) => f,
         None => return None,
+    };
+
+    let (type_annotation, block) = match block_or_type.kind {
+        SyntaxKind::FunctionTypeAnnotation(id) => {
+            let block = match subtokens.nth(0) {
+                Some(b) => parse(Pairs::single(b), errors),
+                None => return None,
+            };
+
+            let block = match block {
+                Some(b) => b,
+                None => return None,
+            };
+
+            (id, block)
+        },
+        _ => {
+            // must be a block
+            ("Void".to_string(), block_or_type)
+        }
     };
 
     let kind = SyntaxKind::FunctionDeclaration {
         identifier: Box::new(identifier),
         params: Box::new(params),
+        ret_type: type_annotation,
         block: Box::new(block),
     };
 
     let node = SyntaxToken::new(kind, &declaration);
+    Some(node)
+}
+
+fn parse_func_type_annotation(annot: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let mut subtokens = annot.clone().into_inner();
+    let identifier = match subtokens.nth(0) {
+        Some(i) => parse(Pairs::single(i), errors),
+        None => return None,
+    };
+
+    let identifier = match identifier {
+        Some(i) => i,
+        None => return None,
+    };
+
+    let SyntaxKind::IdentifierToken(id) = identifier.kind else {
+        return None;
+    };
+
+    let kind = SyntaxKind::FunctionTypeAnnotation(id);
+    let node = SyntaxToken::new(kind, &annot);
     Some(node)
 }
 
@@ -403,6 +447,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
             Rule::if_statement => parse_if_statement(primary, errors),
             Rule::output_statement => parse_output_statement(primary, errors),
             Rule::function_declaration_statement => parse_function_declaration(primary, errors),
+            Rule::function_type_annotation => parse_func_type_annotation(primary, errors),
             Rule::parameter_list => parse_parameter_list(primary, errors),
             Rule::expression => parse(primary.into_inner(), errors),
             Rule::assignment_expression => parse_assignment_expression(primary, errors),

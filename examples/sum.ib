@@ -3,7 +3,7 @@
 # equal output the
 # product of the two
 
-function SUMDOUBLE(A: int, B: int)
+function SUMDOUBLE(A: Int, B: Int) -> Int
     if A = B then
         return A * B
     else

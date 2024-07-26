@@ -18,7 +18,7 @@ statement = _{ if_statement | output_statement | function_declaration_statement 
     if_statement = { if_keyword ~ expression ~ then_keyword ~ block ~ end_keyword ~ if_keyword }
     output_statement = { output_keyword ~ expression_statement }
     expression_statement = { expression }
-    function_declaration_statement = { func_keyword ~ identifier_token ~ parameter_list ~ block ~ end_keyword ~ func_keyword  }
+    function_declaration_statement = { func_keyword ~ identifier_token ~ parameter_list ~ (function_type_annotation)? ~ block ~ end_keyword ~ func_keyword  }
 
 identifier_token = @{ !keyword ~ (letter)+ }
 number_token = @{ (digit)+ }
@@ -28,6 +28,7 @@ type_annotation = _{ ":" ~ identifier_token }
 parameter = _{ identifier_token ~ type_annotation }
 parameter_list = { "(" ~ (parameter ~ ("," ~ parameter)*)? ~ ")" }
 argument_list = { "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
+function_type_annotation = { "->" ~ identifier_token }
 
 binary_operator = _{ addition | subtraction | multiplication | division | equality | not }
     addition = { "+" }

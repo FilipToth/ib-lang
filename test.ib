@@ -1,6 +1,3 @@
-FUNCTION my_func(num: Int, other_num: Int)
+FUNCTION my_func(num: Int) -> Int
     output num
-    output other_num
 END FUNCTION
-
-my_func(4, 2)

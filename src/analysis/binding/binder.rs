@@ -47,6 +47,7 @@ pub enum BoundNodeKind {
     FunctionDeclaration {
         identifier: String,
         params: Vec<BoundParameter>,
+        ret_type: TypeKind,
         block: Box<BoundNode>,
     },
     BinaryExpression {
@@ -186,6 +187,7 @@ fn bind_if_statement(
 fn bind_function_declaration(
     identifier: &SyntaxToken,
     params: &SyntaxToken,
+    ret_type: String,
     block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
@@ -208,6 +210,11 @@ fn bind_function_declaration(
 
     let params = match params {
         Some(p) => p,
+        None => return None,
+    };
+
+    let ret_type = match get_type(ret_type, &loc, errors) {
+        Some(t) => t,
         None => return None,
     };
 
@@ -234,6 +241,7 @@ fn bind_function_declaration(
     let kind = BoundNodeKind::FunctionDeclaration {
         identifier: identifier,
         params: params,
+        ret_type,
         block: Box::new(block),
     };
 
@@ -496,8 +504,9 @@ pub fn bind(
         SyntaxKind::FunctionDeclaration {
             identifier,
             params,
+            ret_type,
             block,
-        } => bind_function_declaration(&identifier, &params, &block, scope, errors, loc),
+        } => bind_function_declaration(&identifier, &params, ret_type.to_string(), &block, scope, errors, loc),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
         }
