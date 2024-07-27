@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Index, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -38,6 +38,9 @@ pub enum BoundNodeKind {
         children: Box<Vec<BoundNode>>,
     },
     OutputStatement {
+        expr: Box<BoundNode>,
+    },
+    ReturnStatement {
         expr: Box<BoundNode>,
     },
     IfStatement {
@@ -146,6 +149,26 @@ fn bind_output_statement(
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);
+    Some(node)
+}
+
+fn bind_return_statement(
+    ret_expr: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    loc: CodeLocation,
+) -> Option<BoundNode> {
+    let ret_expr = match bind(ret_expr, scope.clone(), errors) {
+        Some(e) => e,
+        None => return None,
+    };
+
+    let ret_type = ret_expr.node_type.clone();
+    let kind = BoundNodeKind::ReturnStatement {
+        expr: Box::new(ret_expr),
+    };
+
+    let node = BoundNode::new(kind, ret_type, loc);
     Some(node)
 }
 
@@ -498,6 +521,7 @@ pub fn bind(
         SyntaxKind::Module { block } => bind_module(&block, scope, errors, loc),
         SyntaxKind::Block { children } => bind_block(&children, scope, true, errors, loc),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
+        SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, loc),
         SyntaxKind::IfStatement { condition, block } => {
             bind_if_statement(&condition, &block, scope, errors, loc)
         }
@@ -506,7 +530,15 @@ pub fn bind(
             params,
             ret_type,
             block,
-        } => bind_function_declaration(&identifier, &params, ret_type.to_string(), &block, scope, errors, loc),
+        } => bind_function_declaration(
+            &identifier,
+            &params,
+            ret_type.to_string(),
+            &block,
+            scope,
+            errors,
+            loc,
+        ),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
         }

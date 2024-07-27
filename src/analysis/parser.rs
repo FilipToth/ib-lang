@@ -45,6 +45,9 @@ pub enum SyntaxKind {
     OutputStatement {
         expr: Box<SyntaxToken>,
     },
+    ReturnStatement {
+        expr: Box<SyntaxToken>,
+    },
     FunctionDeclaration {
         identifier: Box<SyntaxToken>,
         params: Box<SyntaxToken>,
@@ -173,6 +176,27 @@ fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Optio
     Some(node)
 }
 
+fn parse_return_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let mut subtokens = statement.clone().into_inner();
+
+    let ret_expr = match subtokens.nth(0) {
+        Some(e) => parse(Pairs::single(e), errors),
+        None => return None,
+    };
+
+    let ret_expr = match ret_expr {
+        Some(e) => e,
+        None => return None,
+    };
+
+    let kind = SyntaxKind::ReturnStatement {
+        expr: Box::new(ret_expr),
+    };
+
+    let node = SyntaxToken::new(kind, &statement);
+    Some(node)
+}
+
 fn parse_function_declaration(
     declaration: Pair<Rule>,
     errors: &mut ErrorBag,
@@ -222,7 +246,7 @@ fn parse_function_declaration(
             };
 
             (id, block)
-        },
+        }
         _ => {
             // must be a block
             ("Void".to_string(), block_or_type)
@@ -446,6 +470,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
             Rule::expression_statement => parse(primary.into_inner(), errors),
             Rule::if_statement => parse_if_statement(primary, errors),
             Rule::output_statement => parse_output_statement(primary, errors),
+            Rule::return_statement => parse_return_statement(primary, errors),
             Rule::function_declaration_statement => parse_function_declaration(primary, errors),
             Rule::function_type_annotation => parse_func_type_annotation(primary, errors),
             Rule::parameter_list => parse_parameter_list(primary, errors),
