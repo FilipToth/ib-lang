@@ -51,7 +51,7 @@ pub enum BoundNodeKind {
         identifier: String,
         params: Vec<BoundParameter>,
         ret_type: TypeKind,
-        block: Box<BoundNode>,
+        block: Rc<BoundNode>,
     },
     BinaryExpression {
         lhs: Box<BoundNode>,
@@ -265,7 +265,7 @@ fn bind_function_declaration(
         identifier: identifier,
         params: params,
         ret_type,
-        block: Box::new(block),
+        block: Rc::new(block),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);

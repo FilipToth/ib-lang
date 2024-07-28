@@ -1,3 +1,7 @@
 FUNCTION my_func(num: Int) -> Int
-    return num + 1
+    IF num == 0 THEN
+        return num + 1
+    END IF
+
+    return num
 END FUNCTION

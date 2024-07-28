@@ -1,4 +1,5 @@
 pub mod binding;
+pub mod control_flow;
 pub mod error_bag;
 pub mod operator;
 mod parser;
@@ -48,5 +49,9 @@ pub fn analyze(contents: String) -> ErrorBag {
     };
 
     println!("{:#?}", bound);
+
+    // control flow analysis
+    control_flow::analyze(&bound, &mut bag);
+
     bag
 }
