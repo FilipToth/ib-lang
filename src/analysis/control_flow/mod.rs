@@ -10,7 +10,7 @@ use super::{
 
 pub mod control_flow_graph;
 
-struct FuncControlFlow {
+pub struct FuncControlFlow {
     block: Rc<BoundNode>,
     ret_type: TypeKind,
 }
