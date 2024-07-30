@@ -11,6 +11,19 @@ pub enum TypeKind {
     Boolean,
 }
 
+impl TypeKind {
+    pub fn to_string(&self) -> String {
+        let kind = match &self {
+            TypeKind::Void => "Void",
+            TypeKind::Int => "Int",
+            TypeKind::String => "String",
+            TypeKind::Boolean => "Boolean",
+        };
+
+        kind.to_string()
+    }
+}
+
 pub fn get_type(identifier: String, loc: &CodeLocation, errors: &mut ErrorBag) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
         "Void" => TypeKind::Void,

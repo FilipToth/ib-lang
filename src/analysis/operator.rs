@@ -91,4 +91,17 @@ impl Operator {
             _ => unreachable!(),
         }
     }
+
+    pub fn to_string(&self) -> String {
+        let op = match &self {
+            Operator::Addition => "+",
+            Operator::Subtraction => "-",
+            Operator::Division => "/",
+            Operator::Multiplication => "*",
+            Operator::Not => "!",
+            Operator::Equality => "==",
+        };
+
+        op.to_string()
+    }
 }

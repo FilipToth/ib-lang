@@ -1,5 +1,6 @@
 FUNCTION my_func(num: Int) -> Int
     IF num == 0 THEN
+        output num
         return num + 1
     END IF
 

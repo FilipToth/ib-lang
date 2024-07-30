@@ -51,7 +51,8 @@ pub fn analyze(contents: String) -> ErrorBag {
     println!("{:#?}", bound);
 
     // control flow analysis
-    control_flow::analyze(&bound, &mut bag);
+    let graphs = control_flow::analyze(&bound, &mut bag);
+    control_flow::digraph(&graphs, "controlflow.dot");
 
     bag
 }

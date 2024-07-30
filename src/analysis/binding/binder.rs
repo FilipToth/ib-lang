@@ -27,6 +27,43 @@ impl BoundNode {
             loc: loc,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match &self.kind {
+            BoundNodeKind::Module { .. } => "Module".to_string(),
+            BoundNodeKind::Block { .. } => "Block".to_string(),
+            BoundNodeKind::OutputStatement { expr } => format!("output {}", &expr.to_string()),
+            BoundNodeKind::ReturnStatement { expr } => format!("return {}", &expr.to_string()),
+            BoundNodeKind::IfStatement {
+                condition,
+                block: _,
+            } => format!("if {}", &condition.to_string()),
+            BoundNodeKind::FunctionDeclaration {
+                identifier,
+                params: _,
+                ret_type,
+                block: _,
+            } => {
+                format!("function {}(...) -> {}", identifier, &ret_type.to_string())
+            }
+            BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
+                format!("{} {} {}", lhs.to_string(), op.to_string(), rhs.to_string())
+            }
+            BoundNodeKind::UnaryExpression { op, rhs } => {
+                format!("{}{}", op.to_string(), rhs.to_string())
+            }
+            BoundNodeKind::AssignmentExpression { identifier, value } => {
+                format!("{} = {}", identifier, value.to_string())
+            }
+            BoundNodeKind::BoundCallExpression {
+                identifier,
+                args: _,
+            } => format!("{}(...)", identifier),
+            BoundNodeKind::ReferenceExpression(id) => id.clone(),
+            BoundNodeKind::NumberLiteral(num) => num.to_string(),
+            BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
