@@ -21,6 +21,13 @@ fn analyze_func_rec(
         return;
     }
 
+    if let Some(on_condition) = &node.on_condition {
+        // we don't have to check for next return
+        // since the next token is always a block
+        let next_ref = on_condition.clone();
+        analyze_func_rec(next_ref, loc, func_ret_type, errors);
+    }
+
     if let Some(next) = &node.next {
         let next_node = next.borrow();
         let next_ref = next.clone();
