@@ -1,5 +1,5 @@
 use super::{
-    binding::{binder::BoundNode, types::TypeKind},
+    binding::{bound_node::BoundNode, types::TypeKind},
     error_bag::{ErrorBag, ErrorKind},
 };
 

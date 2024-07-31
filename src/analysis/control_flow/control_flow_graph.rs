@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::analysis::binding::binder::{BoundNode, BoundNodeKind};
+use crate::analysis::binding::bound_node::{BoundNode, BoundNodeKind};
 
 use super::FuncControlFlow;
 
@@ -153,7 +153,7 @@ pub fn contruct_graph(func: FuncControlFlow) -> Rc<RefCell<ControlFlowNode>> {
     start_node.is_start = true;
     let start_node_ref = Rc::new(RefCell::new(start_node));
 
-    let mut end_node = ControlFlowNode::new(counter.clone(), "<Start>".to_string());
+    let mut end_node = ControlFlowNode::new(counter.clone(), "<End>".to_string());
     end_node.is_end = true;
     let end_node_ref = Rc::new(RefCell::new(end_node));
 

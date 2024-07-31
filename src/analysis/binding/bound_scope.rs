@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::{binder::BoundParameter, types::TypeKind};
+use super::{bound_node::BoundParameter, types::TypeKind};
 
 #[derive(Debug)]
 pub struct BoundScope {

@@ -4,7 +4,7 @@ use self::control_flow_graph::ControlFlowNode;
 
 use super::{
     binding::{
-        binder::{BoundNode, BoundNodeKind},
+        bound_node::{BoundNode, BoundNodeKind},
         types::TypeKind,
     },
     error_bag::ErrorBag,
@@ -24,7 +24,7 @@ fn scan_for_functions_recursive(
 ) {
     match &node.kind {
         BoundNodeKind::Module { block } => {
-            scan_for_functions_recursive(block, errors, functions);
+            scan_for_functions_recursive(&block, errors, functions);
         }
         BoundNodeKind::Block { children } => {
             for child in children.iter() {
