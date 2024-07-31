@@ -1,9 +1,10 @@
-FUNCTION my_func(num: Int) -> Int
+FUNCTION my_func(num: Int)
     x = num / 5
     IF x == 0 THEN
         output num
-        return num + 1
+        return
     END IF
 
     y = x + 1
+    return
 END FUNCTION

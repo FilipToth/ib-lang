@@ -7,14 +7,16 @@ use super::{
         bound_node::{BoundNode, BoundNodeKind},
         types::TypeKind,
     },
-    error_bag::ErrorBag,
+    error_bag::ErrorBag, CodeLocation,
 };
 
 pub mod control_flow_graph;
+pub mod control_flow_analyzer;
 
 pub struct FuncControlFlow {
     block: Rc<BoundNode>,
     ret_type: TypeKind,
+    loc: CodeLocation
 }
 
 fn scan_for_functions_recursive(
@@ -46,6 +48,7 @@ fn scan_for_functions_recursive(
             let func = FuncControlFlow {
                 block: block.clone(),
                 ret_type: ret_type.clone(),
+                loc: node.loc.clone(),
             };
 
             functions.push(func);
@@ -73,7 +76,11 @@ pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<Rc<RefCell<Contro
 
     let mut graphs: Vec<Rc<RefCell<ControlFlowNode>>> = Vec::new();
     for func in function_declarations {
+        let loc = func.loc.clone();
+        let ret_type = func.ret_type.clone();
+
         let graph = control_flow_graph::contruct_graph(func);
+        control_flow_analyzer::analyze_func(graph.clone(), &loc, &ret_type, errors);
         graphs.push(graph);
     }
 

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::analysis::binding::bound_node::{BoundNode, BoundNodeKind};
+use crate::analysis::binding::{bound_node::{BoundNode, BoundNodeKind}, types::TypeKind};
 
 use super::FuncControlFlow;
 
@@ -9,6 +9,7 @@ pub struct ControlFlowNode {
     pub is_end: bool,
     pub next: Option<Rc<RefCell<ControlFlowNode>>>,
     pub on_condition: Option<Rc<RefCell<ControlFlowNode>>>,
+    pub ret_type: Option<TypeKind>,
     graph_label: String,
     graph_id: String,
 }
@@ -23,6 +24,7 @@ impl ControlFlowNode {
             is_end: false,
             next: None,
             on_condition: None,
+            ret_type: None,
             graph_label: label,
             graph_id: count.to_string(),
         }
@@ -116,9 +118,11 @@ fn walk(
 
             block_ptr
         }
-        BoundNodeKind::ReturnStatement { expr: _ } => {
+        BoundNodeKind::ReturnStatement { expr } => {
             let mut node = ControlFlowNode::new(counter, node.to_string());
+
             node.next = Some(end_node);
+            node.ret_type = Some(expr.node_type.clone());
 
             Rc::new(RefCell::new(node))
         }

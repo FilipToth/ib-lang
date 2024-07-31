@@ -18,6 +18,11 @@ pub enum ErrorKind {
         expected: TypeKind,
         found: TypeKind,
     },
+    NotAllCodePathsReturn,
+    ReturnTypeMismatch {
+        found: TypeKind,
+        expected: TypeKind,
+    },
     ConditionMustBeBoolean(TypeKind),
     UndefinedType(String),
     UnaryOperatorNotDefinedOnType {
@@ -47,6 +52,8 @@ impl ErrorKind {
             Self::CannotDeclareFunction(id) => format!("Cannot declare function '{}' because the scope already contains one with the same name", id),
             Self::MismatchedNumberOfArgs { id, expected, found } => format!("Expected {} arguments, found {} when calling function '{}'", expected, found, id),
             Self::MismatchedArgTypes { id, expected, found } => format!("Expected an argument of type {:?}, found {:?} when calling function {}", expected, found, id),
+            Self::NotAllCodePathsReturn => "Not all code paths return".to_string(),
+            Self::ReturnTypeMismatch { found, expected } => format!("Return type doesn't match function return type, found {:?}, expected {:?}", found, expected),
             Self::ConditionMustBeBoolean(cond_type) => {
                 format!("Condition type must be boolean, found {:?}", cond_type)
             }
