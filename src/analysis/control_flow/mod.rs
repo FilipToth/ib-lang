@@ -7,16 +7,17 @@ use super::{
         bound_node::{BoundNode, BoundNodeKind},
         types::TypeKind,
     },
-    error_bag::ErrorBag, CodeLocation,
+    error_bag::ErrorBag,
+    CodeLocation,
 };
 
-pub mod control_flow_graph;
 pub mod control_flow_analyzer;
+pub mod control_flow_graph;
 
 pub struct FuncControlFlow {
     block: Rc<BoundNode>,
     ret_type: TypeKind,
-    loc: CodeLocation
+    loc: CodeLocation,
 }
 
 fn scan_for_functions_recursive(

@@ -1,6 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::analysis::binding::{bound_node::{BoundNode, BoundNodeKind}, types::TypeKind};
+use crate::analysis::binding::{
+    bound_node::{BoundNode, BoundNodeKind},
+    types::TypeKind,
+};
 
 use super::FuncControlFlow;
 
@@ -118,13 +121,13 @@ fn walk(
 
             block_ptr
         }
-        BoundNodeKind::ReturnStatement { expr } => {
-            let mut node = ControlFlowNode::new(counter, node.to_string());
+        BoundNodeKind::ReturnStatement { expr: _ } => {
+            let mut new_node = ControlFlowNode::new(counter, node.to_string());
 
-            node.next = Some(end_node);
-            node.ret_type = Some(expr.node_type.clone());
+            new_node.next = Some(end_node);
+            new_node.ret_type = Some(node.node_type.clone());
 
-            Rc::new(RefCell::new(node))
+            Rc::new(RefCell::new(new_node))
         }
         BoundNodeKind::IfStatement {
             condition: _,

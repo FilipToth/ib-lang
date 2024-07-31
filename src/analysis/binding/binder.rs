@@ -85,21 +85,26 @@ fn bind_output_statement(
 }
 
 fn bind_return_statement(
-    ret_expr: &SyntaxToken,
+    ret_expr: &Option<Box<SyntaxToken>>,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let ret_expr = match bind(ret_expr, scope.clone(), errors) {
-        Some(e) => e,
-        None => return None,
+    let (ret_type, expr) = match ret_expr {
+        Some(ret_expr) => {
+            let ret_expr = match bind(ret_expr, scope.clone(), errors) {
+                Some(e) => e,
+                None => return None,
+            };
+
+            let ret_type = ret_expr.node_type.clone();
+            let ret_expr = Some(Box::new(ret_expr));
+            (ret_type, ret_expr)
+        }
+        None => (TypeKind::Void, None),
     };
 
-    let ret_type = ret_expr.node_type.clone();
-    let kind = BoundNodeKind::ReturnStatement {
-        expr: Box::new(ret_expr),
-    };
-
+    let kind = BoundNodeKind::ReturnStatement { expr: expr };
     let node = BoundNode::new(kind, ret_type, loc);
     Some(node)
 }

@@ -25,7 +25,14 @@ impl BoundNode {
             BoundNodeKind::Module { .. } => "Module".to_string(),
             BoundNodeKind::Block { .. } => "Block".to_string(),
             BoundNodeKind::OutputStatement { expr } => format!("output {}", &expr.to_string()),
-            BoundNodeKind::ReturnStatement { expr } => format!("return {}", &expr.to_string()),
+            BoundNodeKind::ReturnStatement { expr } => {
+                let expr_fmt = match expr {
+                    Some(expr) => format!(" {}", expr.to_string()),
+                    None => "".to_string(),
+                };
+
+                format!("return{}", expr_fmt)
+            }
             BoundNodeKind::IfStatement {
                 condition,
                 block: _,
@@ -70,7 +77,7 @@ pub enum BoundNodeKind {
         expr: Box<BoundNode>,
     },
     ReturnStatement {
-        expr: Box<BoundNode>,
+        expr: Option<Box<BoundNode>>,
     },
     IfStatement {
         condition: Box<BoundNode>,

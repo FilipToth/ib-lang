@@ -2,7 +2,7 @@ FUNCTION my_func(num: Int)
     x = num / 5
     IF x == 0 THEN
         output num
-        return
+        return num
     END IF
 
     y = x + 1

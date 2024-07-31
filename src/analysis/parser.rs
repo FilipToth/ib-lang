@@ -46,7 +46,7 @@ pub enum SyntaxKind {
         expr: Box<SyntaxToken>,
     },
     ReturnStatement {
-        expr: Box<SyntaxToken>,
+        expr: Option<Box<SyntaxToken>>,
     },
     FunctionDeclaration {
         identifier: Box<SyntaxToken>,
@@ -179,20 +179,20 @@ fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Optio
 fn parse_return_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let mut subtokens = statement.clone().into_inner();
 
-    let ret_expr = match subtokens.nth(0) {
-        Some(e) => parse(Pairs::single(e), errors),
-        None => return None,
-    };
-
+    let ret_expr = subtokens.nth(0);
     let ret_expr = match ret_expr {
-        Some(e) => e,
-        None => return None,
+        Some(e) => {
+            let ret_expr = match parse(Pairs::single(e), errors) {
+                Some(e) => e,
+                None => return None,
+            };
+
+            Some(Box::new(ret_expr))
+        }
+        None => None,
     };
 
-    let kind = SyntaxKind::ReturnStatement {
-        expr: Box::new(ret_expr),
-    };
-
+    let kind = SyntaxKind::ReturnStatement { expr: ret_expr };
     let node = SyntaxToken::new(kind, &statement);
     Some(node)
 }

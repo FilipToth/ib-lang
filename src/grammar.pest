@@ -6,7 +6,7 @@ NEWLINE = _{ "\n" | "\n\r" }
 letter = _{ ASCII_ALPHA | "_" }
 digit = _{ ASCII_DIGIT }
 
-keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword }
+keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword | output_keyword | func_keyword | return_keyword }
     if_keyword = _{ "if" | "IF" }
     then_keyword = _{ "then" | "THEN" }
     end_keyword = _{ "end" | "END" }
@@ -18,7 +18,7 @@ keyword = _{ if_keyword | then_keyword | end_keyword | else_keyword }
 statement = _{ if_statement | output_statement | return_statement | function_declaration_statement | expression_statement }
     if_statement = { if_keyword ~ expression ~ then_keyword ~ block ~ end_keyword ~ if_keyword }
     output_statement = { output_keyword ~ expression_statement }
-    return_statement = { return_keyword ~ expression_statement }
+    return_statement = { return_keyword ~ expression_statement? }
     function_declaration_statement = { func_keyword ~ identifier_token ~ parameter_list ~ (function_type_annotation)? ~ block ~ end_keyword ~ func_keyword  }
     expression_statement = { expression }
 
