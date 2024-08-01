@@ -4,91 +4,17 @@ use pest::{
     Parser,
 };
 
-use super::{
+use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
     CodeLocation,
 };
 
+use super::syntax_token::{ParameterSyntax, SyntaxKind, SyntaxToken};
+
 #[derive(Parser)]
-#[grammar = "grammar.pest"]
+#[grammar = "analysis/syntax/grammar.pest"]
 struct IbParser;
-
-#[derive(Debug)]
-pub struct SyntaxToken {
-    pub kind: SyntaxKind,
-    pub loc: CodeLocation,
-}
-
-impl SyntaxToken {
-    fn new(kind: SyntaxKind, rule: &Pair<Rule>) -> SyntaxToken {
-        let location = CodeLocation::from_pair(rule);
-        SyntaxToken {
-            kind: kind,
-            loc: location,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum SyntaxKind {
-    Module {
-        block: Box<SyntaxToken>,
-    },
-    Block {
-        children: Box<Vec<SyntaxToken>>,
-    },
-    IfStatement {
-        condition: Box<SyntaxToken>,
-        block: Box<SyntaxToken>,
-        else_block: Option<Box<SyntaxToken>>,
-    },
-    OutputStatement {
-        expr: Box<SyntaxToken>,
-    },
-    ReturnStatement {
-        expr: Option<Box<SyntaxToken>>,
-    },
-    FunctionDeclaration {
-        identifier: Box<SyntaxToken>,
-        params: Box<SyntaxToken>,
-        ret_type: String,
-        block: Box<SyntaxToken>,
-    },
-    FunctionTypeAnnotation(String),
-    ParameterList {
-        params: Vec<ParameterSyntax>,
-    },
-    AssignmentExpression {
-        reference: Box<SyntaxToken>,
-        value: Box<SyntaxToken>,
-    },
-    CallExpression {
-        identifier: Box<SyntaxToken>,
-        args: Box<Vec<SyntaxToken>>,
-    },
-    ReferenceExpression(String),
-    BinaryExpression {
-        lhs: Box<SyntaxToken>,
-        op: Operator,
-        rhs: Box<SyntaxToken>,
-    },
-    UnaryExpression {
-        op: Operator,
-        rhs: Box<SyntaxToken>,
-    },
-    LiteralExpression(Box<SyntaxToken>),
-    IdentifierToken(String),
-    NumberToken(i32),
-    BooleanToken(bool),
-}
-
-#[derive(Debug)]
-pub struct ParameterSyntax {
-    pub identifier: String,
-    pub type_annotation: String,
-    pub location: CodeLocation,
-}
 
 fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let mut subtokens = module.clone().into_inner();
@@ -552,7 +478,7 @@ fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
 lazy_static! {
     static ref PARSER: PrattParser<Rule> = {
         use pest::pratt_parser::{Op, Assoc::*};
-        use analysis::parser::Rule::*;
+        use analysis::syntax::parser::Rule::*;
 
         // instantiate pratt parser and define
         // operator precedences

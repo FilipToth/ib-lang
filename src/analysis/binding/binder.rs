@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
-    parser::{ParameterSyntax, SyntaxKind, SyntaxToken},
+    syntax::syntax_token::{ParameterSyntax, SyntaxKind, SyntaxToken},
     CodeLocation,
 };
 

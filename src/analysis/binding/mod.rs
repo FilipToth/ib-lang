@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::{error_bag::ErrorBag, parser::SyntaxToken};
+use super::{error_bag::ErrorBag, syntax::syntax_token::SyntaxToken};
 
 pub mod binder;
 pub mod bound_node;

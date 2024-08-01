@@ -2,12 +2,13 @@ pub mod binding;
 pub mod control_flow;
 pub mod error_bag;
 pub mod operator;
-mod parser;
+pub mod syntax;
 
 use pest::iterators::Pair;
 
 use self::error_bag::{ErrorBag, ErrorKind};
-use self::parser::Rule;
+use self::syntax::parser;
+use self::syntax::parser::Rule;
 
 #[derive(Debug, Clone)]
 pub struct CodeLocation {
