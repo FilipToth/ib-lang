@@ -36,6 +36,7 @@ impl BoundNode {
             BoundNodeKind::IfStatement {
                 condition,
                 block: _,
+                else_block: _,
             } => format!("if {}", &condition.to_string()),
             BoundNodeKind::FunctionDeclaration {
                 identifier,
@@ -82,6 +83,7 @@ pub enum BoundNodeKind {
     IfStatement {
         condition: Box<BoundNode>,
         block: Box<BoundNode>,
+        else_block: Option<Box<BoundNode>>,
     },
     FunctionDeclaration {
         identifier: String,

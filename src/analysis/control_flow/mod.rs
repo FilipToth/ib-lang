@@ -37,8 +37,12 @@ fn scan_for_functions_recursive(
         BoundNodeKind::IfStatement {
             condition: _,
             block,
+            else_block
         } => {
             scan_for_functions_recursive(block, errors, functions);
+            if let Some(e) = else_block {
+                scan_for_functions_recursive(e, errors, functions)
+            }
         }
         BoundNodeKind::FunctionDeclaration {
             identifier: _,

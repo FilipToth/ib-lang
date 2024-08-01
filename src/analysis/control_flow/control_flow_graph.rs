@@ -17,6 +17,17 @@ pub struct ControlFlowNode {
     graph_id: String,
 }
 
+pub struct ControlFlowSpan {
+    first: Rc<RefCell<ControlFlowNode>>,
+    last: Rc<RefCell<ControlFlowNode>>,
+}
+
+impl ControlFlowSpan {
+    pub fn new(first: Rc<RefCell<ControlFlowNode>>, last: Rc<RefCell<ControlFlowNode>>) -> ControlFlowSpan {
+        ControlFlowSpan { first: first, last: last }
+    }
+}
+
 impl ControlFlowNode {
     fn new(counter: Rc<RefCell<u64>>, label: String) -> ControlFlowNode {
         let mut count = counter.borrow_mut();
@@ -102,8 +113,8 @@ fn walk(
     prev: Option<Rc<RefCell<ControlFlowNode>>>,
     end_node: Rc<RefCell<ControlFlowNode>>,
     counter: Rc<RefCell<u64>>,
-) -> Rc<RefCell<ControlFlowNode>> {
-    let node = match &node.kind {
+) -> ControlFlowSpan {
+    let (next, last) = match &node.kind {
         BoundNodeKind::Block { children } => {
             let block = ControlFlowNode::new(counter.clone(), node.to_string());
             let block_ptr = Rc::new(RefCell::new(block));
@@ -116,10 +127,13 @@ fn walk(
                     end_node.clone(),
                     counter.clone(),
                 );
-                new_prev = child_node.clone();
+
+                let last = child_node.last.clone();
+                new_prev = last;
             }
 
-            block_ptr
+            // new prev is last
+            (block_ptr.clone(), new_prev)
         }
         BoundNodeKind::ReturnStatement { expr: _ } => {
             let mut new_node = ControlFlowNode::new(counter, node.to_string());
@@ -127,30 +141,39 @@ fn walk(
             new_node.next = Some(end_node);
             new_node.ret_type = Some(node.node_type.clone());
 
-            Rc::new(RefCell::new(new_node))
+            let node_ref = Rc::new(RefCell::new(new_node));
+            (node_ref.clone(), node_ref)
         }
         BoundNodeKind::IfStatement {
             condition: _,
             block,
+            else_block
         } => {
-            let mut node = ControlFlowNode::new(counter.clone(), node.to_string());
+            let mut if_node = ControlFlowNode::new(counter.clone(), node.to_string());
 
-            let on_condition = walk(&block, None, end_node, counter);
-            node.on_condition = Some(on_condition.clone());
+            let on_condition_span = walk(&block, None, end_node.clone(), counter.clone());
+            if_node.on_condition = Some(on_condition_span.first.clone());
 
-            Rc::new(RefCell::new(node))
+            let if_node_ref = Rc::new(RefCell::new(if_node));
+            let last_node = match else_block {
+                Some(e) => walk(&e, Some(if_node_ref.clone()), end_node, counter).last,
+                None => if_node_ref.clone(),
+            };
+
+            (if_node_ref, last_node)
         }
         _ => {
             let node = ControlFlowNode::new(counter, node.to_string());
-            Rc::new(RefCell::new(node))
+            let node_ref = Rc::new(RefCell::new(node));
+            (node_ref.clone(), node_ref)
         }
     };
 
     if let Some(prev_ptr) = prev {
-        prev_ptr.borrow_mut().next = Some(node.clone());
+        prev_ptr.borrow_mut().next = Some(next.clone());
     }
 
-    node
+    ControlFlowSpan::new(next, last)
 }
 
 pub fn contruct_graph(func: FuncControlFlow) -> Rc<RefCell<ControlFlowNode>> {

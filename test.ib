@@ -1,10 +1,10 @@
-FUNCTION my_func(num: Int)
-    x = num / 5
-    IF x == 0 THEN
-        output num
-        return
+FUNCTION my_func(num: Int) -> Int
+    IF num == 0 THEN
+        x = num + 2
+    ELSE
+        z = 3
+        output z
     END IF
 
-    y = x + 1
-    return
+    return 3
 END FUNCTION
