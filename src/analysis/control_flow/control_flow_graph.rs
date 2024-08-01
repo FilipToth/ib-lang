@@ -23,8 +23,14 @@ pub struct ControlFlowSpan {
 }
 
 impl ControlFlowSpan {
-    pub fn new(first: Rc<RefCell<ControlFlowNode>>, last: Rc<RefCell<ControlFlowNode>>) -> ControlFlowSpan {
-        ControlFlowSpan { first: first, last: last }
+    pub fn new(
+        first: Rc<RefCell<ControlFlowNode>>,
+        last: Rc<RefCell<ControlFlowNode>>,
+    ) -> ControlFlowSpan {
+        ControlFlowSpan {
+            first: first,
+            last: last,
+        }
     }
 }
 
@@ -92,7 +98,10 @@ impl ControlFlowNode {
                 .borrow_mut()
                 .dot_recursive(nodes, connections, conns_condition);
 
-            connections.push((node_id.clone(), next_id));
+            let conn = (node_id.clone(), next_id);
+            if !connections.contains(&conn) {
+                connections.push(conn);
+            }
         }
 
         if let Some(on_cond) = &self.on_condition {
@@ -101,7 +110,10 @@ impl ControlFlowNode {
                     .borrow_mut()
                     .dot_recursive(nodes, connections, conns_condition);
 
-            conns_condition.push((node_id.clone(), on_cond_id));
+            let conn = (node_id.clone(), on_cond_id);
+            if !conns_condition.contains(&conn) {
+                conns_condition.push(conn);
+            }
         }
 
         return node_id;
@@ -147,20 +159,38 @@ fn walk(
         BoundNodeKind::IfStatement {
             condition: _,
             block,
-            else_block
+            else_block,
         } => {
             let mut if_node = ControlFlowNode::new(counter.clone(), node.to_string());
+            let end_if_node = ControlFlowNode::new(counter.clone(), "end if".to_string());
+            let end_if_ref = Rc::new(RefCell::new(end_if_node));
 
             let on_condition_span = walk(&block, None, end_node.clone(), counter.clone());
-            if_node.on_condition = Some(on_condition_span.first.clone());
+            if_node.on_condition = Some(on_condition_span.first);
 
-            let if_node_ref = Rc::new(RefCell::new(if_node));
-            let last_node = match else_block {
-                Some(e) => walk(&e, Some(if_node_ref.clone()), end_node, counter).last,
-                None => if_node_ref.clone(),
+            let mut on_cond_last = on_condition_span.last.borrow_mut();
+            if let None = on_cond_last.next {
+                // this path doesn't explicitly return,
+                // thus we connect it to the end if
+                on_cond_last.next = Some(end_if_ref.clone());
+            }
+
+            match else_block {
+                Some(e) => {
+                    let span = walk(&e, None, end_node.clone(), counter.clone());
+                    if_node.next = Some(span.first);
+
+                    let mut last = span.last.borrow_mut();
+                    if let None = last.next {
+                        // again, this should be connected to end if
+                        last.next = Some(end_if_ref.clone());
+                    }
+                }
+                None => if_node.next = Some(end_if_ref.clone()),
             };
 
-            (if_node_ref, last_node)
+            let if_ref = Rc::new(RefCell::new(if_node));
+            (if_ref, end_if_ref)
         }
         _ => {
             let node = ControlFlowNode::new(counter, node.to_string());

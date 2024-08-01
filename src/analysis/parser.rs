@@ -147,12 +147,10 @@ fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<Sy
         None => return None,
     };
 
-    let else_block = match subtokens.nth(0){
-        Some(e) => {
-            match parse(Pairs::single(e), errors) {
-                Some(e) => Some(Box::new(e)),
-                None => return None,
-            }
+    let else_block = match subtokens.nth(0) {
+        Some(e) => match parse(Pairs::single(e), errors) {
+            Some(e) => Some(Box::new(e)),
+            None => return None,
         },
         None => None,
     };
@@ -160,7 +158,7 @@ fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<Sy
     let if_kind = SyntaxKind::IfStatement {
         condition: Box::new(condition),
         block: Box::new(block),
-        else_block: else_block
+        else_block: else_block,
     };
 
     let node = SyntaxToken::new(if_kind, &statement);

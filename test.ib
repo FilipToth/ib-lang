@@ -1,9 +1,13 @@
 FUNCTION my_func(num: Int) -> Int
     IF num == 0 THEN
-        x = num + 2
+        IF num == 1 THEN
+            x = num + 2
+        ELSE
+            return 2
+        END IF
     ELSE
-        z = 3
-        output z
+        y = 1 + 2
+        return 1
     END IF
 
     return 3

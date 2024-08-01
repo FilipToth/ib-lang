@@ -137,13 +137,11 @@ fn bind_if_statement(
     };
 
     let else_block = match else_next {
-        Some(e) => {
-            match bind(e, scope, errors) {
-                Some(e) => Some(Box::new(e)),
-                None => return None
-            }
+        Some(e) => match bind(e, scope, errors) {
+            Some(e) => Some(Box::new(e)),
+            None => return None,
         },
-        None => None
+        None => None,
     };
 
     let kind = BoundNodeKind::IfStatement {
@@ -471,9 +469,18 @@ pub fn bind(
         SyntaxKind::Block { children } => bind_block(&children, scope, true, errors, loc),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
         SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, loc),
-        SyntaxKind::IfStatement { condition, block, else_block } => {
-            bind_if_statement(&condition, &block, else_block.as_deref(), scope, errors, loc)
-        }
+        SyntaxKind::IfStatement {
+            condition,
+            block,
+            else_block,
+        } => bind_if_statement(
+            &condition,
+            &block,
+            else_block.as_deref(),
+            scope,
+            errors,
+            loc,
+        ),
         SyntaxKind::FunctionDeclaration {
             identifier,
             params,
