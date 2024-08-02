@@ -235,21 +235,21 @@ fn bind_params(
             None => return None,
         };
 
-        let bound_param = BoundParameter {
-            identifier: identifier.clone(),
-            param_type: param_type.clone(),
-        };
-
         // declare in scope
         let symbol = scope
             .borrow_mut()
-            .assign_variable(identifier.clone(), param_type);
+            .assign_variable(identifier.clone(), param_type.clone());
 
         if symbol.is_none() {
             let kind = ErrorKind::ParamMismatchedTypes(identifier);
             errors.add(kind, loc.line, loc.col);
             return None;
         }
+
+        let bound_param = BoundParameter {
+            symbol: symbol.unwrap(),
+            param_type: param_type.clone(),
+        };
 
         parameters.push(bound_param);
     }

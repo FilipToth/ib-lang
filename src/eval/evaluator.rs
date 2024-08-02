@@ -245,6 +245,17 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             EvalValue::void()
         },
         BoundNodeKind::BoundCallExpression { symbol, args } => {
+            let num_params = symbol.parameters.len();
+            for index in 0..num_params {
+                let param = &symbol.parameters[index];
+                let arg = &args[index];
+
+                let symbol = &param.symbol;
+                let value = eval_rec(arg, heap);
+                heap.assign_var(symbol, value);
+            }
+
+            // no need to clear arguments after executing the block
             let body = heap.get_func(symbol);
             let ret_value = eval_rec(&body, heap);
 

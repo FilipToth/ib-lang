@@ -114,6 +114,6 @@ pub enum BoundNodeKind {
 
 #[derive(Debug, Clone)]
 pub struct BoundParameter {
-    pub identifier: String,
+    pub symbol: VariableSymbol,
     pub param_type: TypeKind,
 }
