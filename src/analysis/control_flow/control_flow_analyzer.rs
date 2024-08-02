@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, mem, rc::Rc};
 
 use crate::analysis::{
     binding::types::TypeKind,
@@ -54,6 +54,12 @@ fn analyze_func_rec(
 
         analyze_func_rec(next_ref, loc, func_ret_type, errors);
     } else {
+        let void = TypeKind::Void;
+        if func_ret_type == &void {
+            // skip if it's a void function
+            return;
+        }
+
         // report error
         let kind = ErrorKind::NotAllCodePathsReturn;
         errors.add(kind, loc.line, loc.col);

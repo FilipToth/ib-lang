@@ -1,8 +1,9 @@
-x = not (2 + 1 == 3)
-if x then
-    output 1
-else
-    output 2
-end if
+FUNCTION my_func() -> Int
+    IF true == true THEN
+        return 3 + 1
+    END IF
 
-output x
+    return 0
+END FUNCTION
+
+output my_func()

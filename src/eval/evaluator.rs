@@ -1,9 +1,9 @@
-use std::{collections::HashMap, mem};
+use std::{collections::HashMap, mem, rc::Rc};
 
 use crate::analysis::{
     binding::{
         bound_node::{BoundNode, BoundNodeKind},
-        symbols::VariableSymbol,
+        symbols::{FunctionSymbol, VariableSymbol},
     },
     operator::Operator,
 };
@@ -13,12 +13,14 @@ pub struct EvalHeap {
     // memory, no need for us to make
     // our own heap
     variables: HashMap<u64, EvalValue>,
+    functions: HashMap<u64, Rc<BoundNode>>
 }
 
 impl EvalHeap {
     fn new() -> EvalHeap {
         EvalHeap {
             variables: HashMap::new(),
+            functions: HashMap::new(),
         }
     }
 
@@ -32,6 +34,17 @@ impl EvalHeap {
         let value = &self.variables[id];
         value.clone()
     }
+
+    fn declare_func(&mut self, symbol: &FunctionSymbol, body: Rc<BoundNode>) {
+        let id = symbol.symbol_id;
+        self.functions.insert(id, body);
+    }
+
+    fn get_func(&self, symbol: &FunctionSymbol) -> Rc<BoundNode> {
+        let id = &symbol.symbol_id;
+        let body = &self.functions[id];
+        body.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +53,9 @@ pub enum EvalValue {
     Int(i32),
     Bool(bool),
     String(String),
+    // used to return in
+    // the eval rec function
+    Return(Box<EvalValue>),
 }
 
 impl EvalValue {
@@ -65,6 +81,7 @@ impl EvalValue {
             EvalValue::Int(val) => val.to_string(),
             EvalValue::Bool(val) => val.to_string(),
             EvalValue::String(val) => val.clone(),
+            EvalValue::Return(_) => unreachable!(),
         }
     }
 
@@ -138,7 +155,8 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                 EvalValue::String(lhs) => {
                     let rhs = rhs.force_get_string();
                     EvalValue::Bool(rhs == lhs)
-                }
+                },
+                EvalValue::Return(_) => unreachable!()
             }
         }
         _ => {
@@ -165,7 +183,10 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
         BoundNodeKind::Module { block } => eval_rec(&block, heap),
         BoundNodeKind::Block { children } => {
             for child in children.iter() {
-                eval_rec(child, heap);
+                let val = eval_rec(child, heap);
+                if let EvalValue::Return(_) = &val {
+                    return val;
+                }
             }
 
             EvalValue::void()
@@ -194,19 +215,46 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
 
             EvalValue::void()
         }
-        BoundNodeKind::ReturnStatement { expr } => todo!(),
+        BoundNodeKind::ReturnStatement { expr } => {
+            // create special return value
+            let val = if let Some(expr) = expr {
+                eval_rec(&expr, heap)
+            } else {
+                EvalValue::void()
+            };
+
+            EvalValue::Return(Box::new(val))
+        },
         BoundNodeKind::IfStatement { condition, block, else_block } => {
             let cond_value = eval_rec(&condition, heap).force_get_bool();
-            if cond_value {
-                eval_rec(&block, heap);
+            let value = if cond_value {
+                eval_rec(&block, heap)
             } else if let Some(else_block) = else_block {
-                eval_rec(else_block, heap);
-            }
+                eval_rec(else_block, heap)
+            } else {
+                EvalValue::void()
+            };
 
+            match &value {
+                EvalValue::Return(_) => value,
+                _ => EvalValue::void()
+            }
+        },
+        BoundNodeKind::FunctionDeclaration { symbol, block } => {
+            heap.declare_func(symbol, block.clone());
             EvalValue::void()
         },
-        BoundNodeKind::FunctionDeclaration { symbol, block } => todo!(),
-        BoundNodeKind::BoundCallExpression { symbol, args } => todo!(),
+        BoundNodeKind::BoundCallExpression { symbol, args } => {
+            let body = heap.get_func(symbol);
+            let ret_value = eval_rec(&body, heap);
+
+            // unwrap from return
+            let EvalValue::Return(ret_value) = ret_value else {
+                unreachable!();
+            };
+
+            ret_value.as_ref().clone()
+        },
     };
 
     val
