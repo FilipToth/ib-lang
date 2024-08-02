@@ -1,2 +1,8 @@
 x = not (2 + 1 == 3)
+if x then
+    output 1
+else
+    output 2
+end if
+
 output x

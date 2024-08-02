@@ -194,7 +194,19 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
 
             EvalValue::void()
         }
-        _ => unreachable!(),
+        BoundNodeKind::ReturnStatement { expr } => todo!(),
+        BoundNodeKind::IfStatement { condition, block, else_block } => {
+            let cond_value = eval_rec(&condition, heap).force_get_bool();
+            if cond_value {
+                eval_rec(&block, heap);
+            } else if let Some(else_block) = else_block {
+                eval_rec(else_block, heap);
+            }
+
+            EvalValue::void()
+        },
+        BoundNodeKind::FunctionDeclaration { symbol, block } => todo!(),
+        BoundNodeKind::BoundCallExpression { symbol, args } => todo!(),
     };
 
     val
