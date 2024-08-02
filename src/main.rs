@@ -8,12 +8,22 @@ extern crate pest;
 
 use std::fs;
 
+use eval::eval;
+
 mod analysis;
+mod eval;
 
 fn parse_file() {
     let contents = fs::read_to_string("test.ib").unwrap();
-    let bag = analysis::analyze(contents);
-    bag.report();
+    let result = analysis::analyze(contents);
+    result.errors.report();
+
+    let Some(root) = &result.root else {
+        return;
+    };
+
+    // evaluate
+    eval(root)
 }
 
 fn main() {

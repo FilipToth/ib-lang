@@ -5,6 +5,7 @@ use super::{error_bag::ErrorBag, syntax::syntax_token::SyntaxToken};
 pub mod binder;
 pub mod bound_node;
 mod bound_scope;
+pub mod symbols;
 pub mod types;
 
 pub fn bind_root(root: &SyntaxToken, errors: &mut ErrorBag) -> Option<bound_node::BoundNode> {

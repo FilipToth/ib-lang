@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::analysis::{operator::Operator, CodeLocation};
 
-use super::types::TypeKind;
+use super::{symbols::{FunctionSymbol, VariableSymbol}, types::TypeKind};
 
 #[derive(Debug)]
 pub struct BoundNode {
@@ -39,12 +39,10 @@ impl BoundNode {
                 else_block: _,
             } => format!("if {}", &condition.to_string()),
             BoundNodeKind::FunctionDeclaration {
-                identifier,
-                params: _,
-                ret_type,
+                symbol,
                 block: _,
             } => {
-                format!("function {}(...) -> {}", identifier, &ret_type.to_string())
+                format!("function {}(...) -> {}", symbol.identifier, symbol.ret_type.to_string())
             }
             BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
                 format!("{} {} {}", lhs.to_string(), op.to_string(), rhs.to_string())
@@ -52,14 +50,14 @@ impl BoundNode {
             BoundNodeKind::UnaryExpression { op, rhs } => {
                 format!("{}{}", op.to_string(), rhs.to_string())
             }
-            BoundNodeKind::AssignmentExpression { identifier, value } => {
-                format!("{} = {}", identifier, value.to_string())
+            BoundNodeKind::AssignmentExpression { symbol, value } => {
+                format!("{} = {}", symbol.identifier, value.to_string())
             }
             BoundNodeKind::BoundCallExpression {
-                identifier,
+                symbol,
                 args: _,
-            } => format!("{}(...)", identifier),
-            BoundNodeKind::ReferenceExpression(id) => id.clone(),
+            } => format!("{}(...)", symbol.identifier),
+            BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
         }
@@ -86,9 +84,7 @@ pub enum BoundNodeKind {
         else_block: Option<Box<BoundNode>>,
     },
     FunctionDeclaration {
-        identifier: String,
-        params: Vec<BoundParameter>,
-        ret_type: TypeKind,
+        symbol: FunctionSymbol,
         block: Rc<BoundNode>,
     },
     BinaryExpression {
@@ -101,14 +97,14 @@ pub enum BoundNodeKind {
         rhs: Box<BoundNode>,
     },
     AssignmentExpression {
-        identifier: String,
+        symbol: VariableSymbol,
         value: Box<BoundNode>,
     },
     BoundCallExpression {
-        identifier: String,
+        symbol: FunctionSymbol,
         args: Box<Vec<BoundNode>>,
     },
-    ReferenceExpression(String),
+    ReferenceExpression(VariableSymbol),
     NumberLiteral(i32),
     BooleanLiteral(bool),
 }

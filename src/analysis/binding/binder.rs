@@ -198,21 +198,23 @@ fn bind_function_declaration(
         None => return None,
     };
 
-    let success = scope
-        .borrow_mut()
-        .declare_function(identifier.clone(), params.clone());
+    let symbol =
+        scope
+            .borrow_mut()
+            .declare_function(identifier.clone(), params.clone(), ret_type.clone());
 
-    if !success {
-        let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
-        errors.add(kind, loc.line, loc.col);
-        return None;
-    }
-
-    let kind = BoundNodeKind::FunctionDeclaration {
-        identifier: identifier,
-        params: params,
-        ret_type,
-        block: Rc::new(block),
+    let kind = match symbol {
+        Some(s) => {
+            BoundNodeKind::FunctionDeclaration {
+                symbol: s,
+                block: Rc::new(block),
+            }
+        },
+        None => {
+            let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
+            errors.add(kind, loc.line, loc.col);
+            return None;
+        }
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, loc);
@@ -241,11 +243,11 @@ fn bind_params(
         };
 
         // declare in scope
-        let success = scope
+        let symbol = scope
             .borrow_mut()
             .assign_variable(identifier.clone(), param_type);
 
-        if !success {
+        if symbol.is_none() {
             let kind = ErrorKind::ParamMismatchedTypes(identifier);
             errors.add(kind, loc.line, loc.col);
             return None;
@@ -354,18 +356,21 @@ fn bind_assignment_expression(
     };
 
     let node_type = value.node_type.clone();
-    let success = scope
+    let symbol = scope
         .borrow_mut()
         .assign_variable(identifier.clone(), node_type.clone());
 
-    if !success {
-        errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
-        return None;
-    }
-
-    let kind = BoundNodeKind::AssignmentExpression {
-        identifier: identifier,
-        value: Box::new(value),
+    let kind = match symbol {
+        Some(s) => {
+            BoundNodeKind::AssignmentExpression {
+                symbol: s,
+                value: Box::new(value),
+            }
+        },
+        None => {
+            errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
+            return None;
+        }
     };
 
     let node = BoundNode::new(kind, node_type, loc);
@@ -384,8 +389,8 @@ fn bind_call_expression(
     };
 
     let identifier = id.clone();
-    let params = match scope.borrow().get_function(identifier.clone()) {
-        Some(def) => def.parameters,
+    let symbol = match scope.borrow().get_function(identifier.clone()) {
+        Some(sym) => sym,
         None => {
             let kind = ErrorKind::CannotFindFunction(identifier);
             errors.add(kind, loc.line, loc.col);
@@ -393,8 +398,10 @@ fn bind_call_expression(
         }
     };
 
-    // check if params match args
+    let params = &symbol.parameters;
     let num_params = params.len();
+
+    // check if params match args
     if num_params != args.len() {
         let kind = ErrorKind::MismatchedNumberOfArgs {
             id: identifier.clone(),
@@ -431,7 +438,7 @@ fn bind_call_expression(
     }
 
     let kind = BoundNodeKind::BoundCallExpression {
-        identifier: identifier,
+        symbol: symbol,
         args: Box::new(bound_args),
     };
 
@@ -445,16 +452,17 @@ fn bind_reference_expression(
     errors: &mut ErrorBag,
     loc: CodeLocation,
 ) -> Option<BoundNode> {
-    let ref_type = match scope.borrow().get_variable(identifier.clone()) {
-        Some(def) => def.var_type,
+    let symbol = match scope.borrow().get_variable(identifier.clone()) {
+        Some(def) => def,
         None => {
             errors.add(ErrorKind::CannotFindValue(identifier), loc.line, loc.col);
             return None;
         }
     };
 
-    let kind = BoundNodeKind::ReferenceExpression(identifier);
-    let node = BoundNode::new(kind, ref_type, loc);
+    let var_type = symbol.var_type.clone();
+    let kind = BoundNodeKind::ReferenceExpression(symbol);
+    let node = BoundNode::new(kind, var_type, loc);
     Some(node)
 }
 

@@ -45,14 +45,12 @@ fn scan_for_functions_recursive(
             }
         }
         BoundNodeKind::FunctionDeclaration {
-            identifier: _,
-            params: _,
-            ret_type,
+            symbol,
             block,
         } => {
             let func = FuncControlFlow {
                 block: block.clone(),
-                ret_type: ret_type.clone(),
+                ret_type: symbol.ret_type.clone(),
                 loc: node.loc.clone(),
             };
 

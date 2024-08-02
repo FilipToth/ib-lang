@@ -1,14 +1,2 @@
-FUNCTION my_func(num: Int) -> Int
-    IF num == 0 THEN
-        IF num == 1 THEN
-            x = num + 2
-        ELSE
-            return 2
-        END IF
-    ELSE
-        y = 1 + 2
-        return 1
-    END IF
-
-    return 3
-END FUNCTION
+x = 2
+output x
