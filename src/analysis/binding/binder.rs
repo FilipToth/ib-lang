@@ -204,11 +204,9 @@ fn bind_function_declaration(
             .declare_function(identifier.clone(), params.clone(), ret_type.clone());
 
     let kind = match symbol {
-        Some(s) => {
-            BoundNodeKind::FunctionDeclaration {
-                symbol: s,
-                block: Rc::new(block),
-            }
+        Some(s) => BoundNodeKind::FunctionDeclaration {
+            symbol: s,
+            block: Rc::new(block),
         },
         None => {
             let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
@@ -361,11 +359,9 @@ fn bind_assignment_expression(
         .assign_variable(identifier.clone(), node_type.clone());
 
     let kind = match symbol {
-        Some(s) => {
-            BoundNodeKind::AssignmentExpression {
-                symbol: s,
-                value: Box::new(value),
-            }
+        Some(s) => BoundNodeKind::AssignmentExpression {
+            symbol: s,
+            value: Box::new(value),
         },
         None => {
             errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);

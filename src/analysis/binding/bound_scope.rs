@@ -38,7 +38,11 @@ impl BoundScope {
         }
     }
 
-    pub fn assign_variable(&mut self, identifier: String, var_type: TypeKind) -> Option<VariableSymbol> {
+    pub fn assign_variable(
+        &mut self,
+        identifier: String,
+        var_type: TypeKind,
+    ) -> Option<VariableSymbol> {
         let existing = self.get_variable(identifier.clone());
         match existing {
             Some(symbol) => {
@@ -47,7 +51,7 @@ impl BoundScope {
                 } else {
                     None
                 }
-            },
+            }
             None => {
                 let mut sym_scope = self.symbol_scope.borrow_mut();
                 let symbol = sym_scope.alloc_variable(identifier, var_type);

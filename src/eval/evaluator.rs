@@ -1,17 +1,25 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
-use crate::analysis::binding::{bound_node::{BoundNode, BoundNodeKind}, symbols::VariableSymbol};
+use crate::analysis::{
+    binding::{
+        bound_node::{BoundNode, BoundNodeKind},
+        symbols::VariableSymbol,
+    },
+    operator::Operator,
+};
 
 pub struct EvalHeap {
     // just use rust's heap to manage
     // memory, no need for us to make
     // our own heap
-    variables: HashMap<u64, EvalValue>
+    variables: HashMap<u64, EvalValue>,
 }
 
 impl EvalHeap {
     fn new() -> EvalHeap {
-        EvalHeap { variables: HashMap::new() }
+        EvalHeap {
+            variables: HashMap::new(),
+        }
     }
 
     fn assign_var(&mut self, symbol: &VariableSymbol, val: EvalValue) {
@@ -27,44 +35,127 @@ impl EvalHeap {
 }
 
 #[derive(Debug, Clone)]
-pub struct EvalValue {
-    // yes, this is INCREDIBLY
-    // memory inefficient, but
-    // it's what you get for now
-    is_void: bool,
-    int_val: Option<i32>,
-    bool_val: Option<bool>,
-    string_val: Option<String>,
+pub enum EvalValue {
+    Void,
+    Int(i32),
+    Bool(bool),
+    String(String),
 }
 
 impl EvalValue {
     fn void() -> EvalValue {
-        EvalValue { is_void: true, int_val: None, bool_val: None, string_val: None }
+        EvalValue::Void
     }
 
     fn int(val: i32) -> EvalValue {
-        EvalValue { is_void: false, int_val: Some(val), bool_val: None, string_val: None }
+        EvalValue::Int(val)
     }
 
     fn bool(val: bool) -> EvalValue {
-        EvalValue { is_void: false, int_val: None, bool_val: Some(val), string_val: None }
+        EvalValue::Bool(val)
     }
 
     fn string(val: String) -> EvalValue {
-        EvalValue { is_void: false, int_val: None, bool_val: None, string_val: Some(val) }
+        EvalValue::String(val)
     }
 
     pub fn to_string(&self) -> String {
-        if self.is_void {
-            "void".to_string()
-        } else if let Some(val) = self.int_val {
-            val.to_string()
-        } else if let Some(val) = self.bool_val {
-            val.to_string()
-        } else if let Some(val) = &self.string_val {
-            val.clone()
-        } else {
+        match self {
+            EvalValue::Void => "void".to_string(),
+            EvalValue::Int(val) => val.to_string(),
+            EvalValue::Bool(val) => val.to_string(),
+            EvalValue::String(val) => val.clone(),
+        }
+    }
+
+    fn force_get_int(&self) -> i32 {
+        let EvalValue::Int(val) = self else {
             unreachable!()
+        };
+
+        val.clone()
+    }
+
+    fn force_get_bool(&self) -> bool {
+        let EvalValue::Bool(val) = self else {
+            unreachable!()
+        };
+
+        val.clone()
+    }
+
+    fn force_get_string(&self) -> String {
+        let EvalValue::String(val) = self else {
+            unreachable!()
+        };
+
+        val.clone()
+    }
+}
+
+fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue {
+    match op {
+        Operator::Addition => {
+            // addition is only defined on integers
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            EvalValue::int(lhs + rhs)
+        }
+        Operator::Subtraction => {
+            // subtraction is only defined on integers
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            EvalValue::int(lhs - rhs)
+        }
+        Operator::Multiplication => {
+            // multiplication is only defined on integers
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            EvalValue::int(lhs * rhs)
+        }
+        Operator::Division => {
+            // division is only defined on integers
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            EvalValue::int(lhs / rhs)
+        }
+        Operator::Equality => {
+            // check if same variant
+            if mem::discriminant(&lhs) != mem::discriminant(&rhs) {
+                unreachable!();
+            }
+
+            match lhs {
+                EvalValue::Void => unreachable!(),
+                EvalValue::Int(lhs) => {
+                    let rhs = rhs.force_get_int();
+                    EvalValue::Bool(rhs == lhs)
+                }
+                EvalValue::Bool(lhs) => {
+                    let rhs = rhs.force_get_bool();
+                    EvalValue::Bool(rhs == lhs)
+                }
+                EvalValue::String(lhs) => {
+                    let rhs = rhs.force_get_string();
+                    EvalValue::Bool(rhs == lhs)
+                }
+            }
+        }
+        _ => {
+            unreachable!("Not a binary operator")
+        }
+    }
+}
+
+fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
+    match op {
+        Operator::Not => {
+            // only defined on bools
+            let rhs = rhs_val.force_get_bool();
+            EvalValue::Bool(!rhs)
+        }
+        _ => {
+            unreachable!("Not a unary operator")
         }
     }
 }
@@ -78,16 +169,23 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             }
 
             EvalValue::void()
-        },
+        }
         BoundNodeKind::AssignmentExpression { symbol, value } => {
             let value = eval_rec(&value, heap);
             heap.assign_var(symbol, value.clone());
 
             value
-        },
-        BoundNodeKind::ReferenceExpression(reference) => {
-            heap.get_var(&reference)
-        },
+        }
+        BoundNodeKind::ReferenceExpression(reference) => heap.get_var(&reference),
+        BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
+            let lhs_val = eval_rec(&lhs, heap);
+            let rhs_val = eval_rec(&rhs, heap);
+            eval_binary_expr(lhs_val, op, rhs_val)
+        }
+        BoundNodeKind::UnaryExpression { op, rhs } => {
+            let rhs_val = eval_rec(&rhs, heap);
+            eval_unary_expr(rhs_val, op)
+        }
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
         BoundNodeKind::OutputStatement { expr } => {
@@ -95,7 +193,7 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             println!("{}", value.to_string());
 
             EvalValue::void()
-        },
+        }
         _ => unreachable!(),
     };
 

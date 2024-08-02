@@ -2,7 +2,10 @@ use std::rc::Rc;
 
 use crate::analysis::{operator::Operator, CodeLocation};
 
-use super::{symbols::{FunctionSymbol, VariableSymbol}, types::TypeKind};
+use super::{
+    symbols::{FunctionSymbol, VariableSymbol},
+    types::TypeKind,
+};
 
 #[derive(Debug)]
 pub struct BoundNode {
@@ -38,11 +41,12 @@ impl BoundNode {
                 block: _,
                 else_block: _,
             } => format!("if {}", &condition.to_string()),
-            BoundNodeKind::FunctionDeclaration {
-                symbol,
-                block: _,
-            } => {
-                format!("function {}(...) -> {}", symbol.identifier, symbol.ret_type.to_string())
+            BoundNodeKind::FunctionDeclaration { symbol, block: _ } => {
+                format!(
+                    "function {}(...) -> {}",
+                    symbol.identifier,
+                    symbol.ret_type.to_string()
+                )
             }
             BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
                 format!("{} {} {}", lhs.to_string(), op.to_string(), rhs.to_string())
@@ -53,10 +57,9 @@ impl BoundNode {
             BoundNodeKind::AssignmentExpression { symbol, value } => {
                 format!("{} = {}", symbol.identifier, value.to_string())
             }
-            BoundNodeKind::BoundCallExpression {
-                symbol,
-                args: _,
-            } => format!("{}(...)", symbol.identifier),
+            BoundNodeKind::BoundCallExpression { symbol, args: _ } => {
+                format!("{}(...)", symbol.identifier)
+            }
             BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),

@@ -41,7 +41,7 @@ binary_operator = _{ addition | subtraction | multiplication | division | equali
     equality = { "==" }
 
 unary_operator = _{ not }
-    not = { "not" }
+    not = { "not" | "NOT" }
 
 atom_types = _{ assignment_expression | literal_expression | call_expression | reference_expression }
     assignment_expression = { reference_expression ~ assignment ~ expression }
