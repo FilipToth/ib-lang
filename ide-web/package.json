@@ -1,0 +1,56 @@
+{
+  "name": "ide-web",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@codingame/monaco-vscode-editor-api": "^8.0.1",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.105",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "monaco-languageclient": "^8.8.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-monaco-editor": "^0.56.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-ws-jsonrpc": "^3.3.2",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "fmt": "npx eslint src/* --fix"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react": "^7.35.0",
+    "globals": "^15.9.0",
+    "typescript-eslint": "^8.0.1"
+  }
+}
