@@ -1,0 +1,16 @@
+{
+    "name": "ib-lazar-parser",
+    "version": "0.1.0",
+    "type": "module",
+    "devDependencies": {
+        "@lezer/generator": "^1.0.0",
+        "mocha": "^9.0.1"
+    },
+    "dependencies": {
+        "@lezer/lr": "^1.0.0"
+    },
+    "scripts": {
+        "prepare": "lezer-generator src/ib.grammar -o src/parser.js",
+        "test": "mocha test/test.js"
+    }
+}
