@@ -1,6 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { coolGlow } from 'thememirror'
 import ib from './ibSupport';
+import ibCompletions from './autocomplete';
 
 const Editor = () => {
     const ibSupport = ib();
