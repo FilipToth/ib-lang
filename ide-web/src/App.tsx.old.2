@@ -1,0 +1,67 @@
+import { useEffect, useRef } from 'react';
+import './App.css';
+import * as monaco from 'monaco-editor'
+import { initServices } from 'monaco-languageclient/vscode/services';
+import getThemeServiceOverride from '@codingame/monaco-vscode-theme-service-override';
+import getTextmateServiceOverride from '@codingame/monaco-vscode-textmate-service-override';
+import { useWorkerFactory } from 'monaco-editor-wrapper/workerFactory';
+import { configureMonacoWorkers, runClient } from './editor';
+
+/* const configureMonacoWorkers = () => {
+    useWorkerFactory({
+        ignoreMapping: true,
+        workerLoaders: {
+            editorWorkerService: () => new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url), { type: 'module' }),
+        }
+    });
+}; */
+
+function App() {
+/*     const editorRef = useRef(null);
+
+    const setup = async () => {
+        configureMonacoWorkers();
+
+        await initServices({
+            serviceConfig: {
+                userServices: {
+                    ...getThemeServiceOverride(),
+                    ...getTextmateServiceOverride(),
+                },
+                debugLogging: true,
+            }
+        });
+
+        // register the JSON language with Monaco
+        monaco.languages.register({
+            id: 'ib',
+            extensions: ['.ib'],
+            aliases: ['IB', 'ib'],
+            mimetypes: ['application/json']
+        });
+
+        monaco.editor.create(editorRef.current!, {
+            value: 'x = 0',
+            language: 'ib',
+            automaticLayout: true,
+            wordBasedSuggestions: 'off'
+        });
+    };
+
+    useEffect(() => {
+        setup();
+    }, []); */
+
+    useEffect(() => {
+        configureMonacoWorkers();
+        runClient();
+    });
+
+    return (
+        <div>
+            <div className='monaco-editor-root'></div>
+        </div>
+    );
+}
+
+export default App;

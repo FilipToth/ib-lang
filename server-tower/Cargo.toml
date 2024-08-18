@@ -1,0 +1,21 @@
+[package]
+name = "server-tower"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde_json = "1.0"
+serde = "1.0"
+tokio = { version = "1.17", features = ["full"] }
+tower-lsp = "0.20.0"
+tokio-util = { version = "0.7", features = ["codec"] }
+tracing-subscriber = "0.3.18"
+
+[dev-dependencies]
+async-tungstenite = { version = "0.22", features = ["tokio-runtime"] }
+tracing-subscriber = "0.3"
+tokio = { version = "1.17", features = ["io-util", "io-std", "macros", "rt-multi-thread"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+ws_stream_tungstenite = { version = "0.10", features = ["tokio_io"] }

@@ -1,3 +1,8 @@
+.editor {
+  width: 100vw;
+  height: 100vh;
+}
+
 .App {
   text-align: center;
 }

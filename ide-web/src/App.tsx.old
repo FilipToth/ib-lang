@@ -1,0 +1,49 @@
+import './App.css';
+import { useWorkerFactory } from 'monaco-editor-wrapper/workerFactory'
+import { MonacoEditorReactComp } from '@typefox/monaco-editor-react';
+import { createUserConfig } from './config';
+import { RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay } from '@codingame/monaco-vscode-files-service-override';
+import * as vscode from 'vscode';
+
+const configureMonacoWorkers = () => {
+    useWorkerFactory({
+        ignoreMapping: true,
+        workerLoaders: {
+            editorWorkerService: () => new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url), { type: 'module' }),
+        }
+    });
+};
+
+const setup = () => {
+
+};
+
+function App() {
+    configureMonacoWorkers();
+
+    const code = 'print(12)';
+    const uriText = '/workspace/m.py';
+    const config = createUserConfig('/workspace', code, uriText);
+
+    const uri = vscode.Uri.parse(uriText);
+    const fsProvider = new RegisteredFileSystemProvider(false);
+
+    const file = new RegisteredMemoryFile(uri, code);
+    fsProvider.registerFile(file);
+
+    registerFileSystemOverlay(1, fsProvider);
+
+    return (
+        <div>
+            <MonacoEditorReactComp
+                userConfig={config}
+                onLoad={setup}
+                style={{
+                    height: '100vh'
+                }}
+            />
+        </div>
+    );
+}
+
+export default App;
