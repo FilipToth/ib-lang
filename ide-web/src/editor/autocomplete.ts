@@ -1,11 +1,40 @@
 import { CompletionContext, completeFromList } from "@codemirror/autocomplete";
+import { syntaxTree } from "@codemirror/language";
+import { SyntaxNode } from "@lezer/common";
+import { EditorState } from "@uiw/react-codemirror";
+
+interface Symbol {
+    name: string,
+    type: string
+}
+
+const resolveSymbols = (root: SyntaxNode, state: EditorState) => {
+    const symbols: Symbol[] = [];
+
+    console.log(root.lastChild);
+    root.getChildren("Atom").forEach((node) => {
+        const token = node.firstChild;
+        if (token?.name != "Identifier")
+            return;
+
+        const text = state.sliceDoc(token.from, token.to);
+        symbols.push({ name: text, type: "variable" });
+    });
+
+    return symbols;
+};
 
 const ibCompletions = (context: CompletionContext) => {
     let word = context.matchBefore(/\w*/)
     if (word?.from == word?.to && !context.explicit)
-        return null
+        return null;
 
-    console.log(word?.text);
+    const tree = syntaxTree(context.state);
+    const symbols = resolveSymbols(tree.topNode, context.state);
+
+    const symbolOptions = symbols.map((symbol) => {
+        return { label: symbol.name, type: symbol.type };
+    });
 
     return {
         from: word?.from,
@@ -22,6 +51,7 @@ const ibCompletions = (context: CompletionContext) => {
             {label: "Int", type: "type"},
             {label: "String", type: "type"},
             {label: "Boolean", type: "type"},
+            ...symbolOptions
         ]
     }
 };
