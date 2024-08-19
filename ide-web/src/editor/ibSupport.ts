@@ -2,7 +2,6 @@ import { parser } from './parser'
 import { LRLanguage, LanguageSupport, foldNodeProp, foldInside, indentNodeProp } from '@codemirror/language'
 import { styleTags, tags as t } from '@lezer/highlight'
 import ibCompletions from './autocomplete';
-import { completeFromList } from '@codemirror/autocomplete';
 
 const LANG_DEF = LRLanguage.define({
     parser: parser.configure({
@@ -27,14 +26,16 @@ const LANG_DEF = LRLanguage.define({
         ]
     }),
     languageData: {
-        autocomplete: ibCompletions(),
         commentTokens: { line: '#' },
     }
 });
 
 const ib = () => {
-    console.log(LANG_DEF.data)
-    const support = new LanguageSupport(LANG_DEF);
+    const ibAutocomplete = LANG_DEF.data.of({
+        autocomplete: ibCompletions
+    });
+
+    const support = new LanguageSupport(LANG_DEF, [ibAutocomplete]);
     return support;
 };
 
