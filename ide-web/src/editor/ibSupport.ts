@@ -12,7 +12,8 @@ const LANG_DEF = LRLanguage.define({
                 TypeAnnotation: t.typeName,
                 String: t.string,
                 Number: t.number,
-                Operator: t.operator,
+                MiscOperator: t.operator,
+                AssignmentOperator: t.operator,
                 LineComment: t.lineComment,
                 "( )": t.paren,
 

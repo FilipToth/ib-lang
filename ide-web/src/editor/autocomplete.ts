@@ -10,25 +10,69 @@ interface Symbol {
 }
 
 const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | undefined) => {
-    const root = tree.topNode;
     const nodeBefore = tree.resolveInner(context.pos, -1);
 
-    logTree(root, context);
+    logTree(tree.topNode, context);
+
+    const scopes: SyntaxNode[] = [];
+    getScopesRecursive(nodeBefore, scopes);
 
     const symbols: Symbol[] = [];
-    root.getChildren("Atom").forEach((node) => {
-        const token = node.firstChild;
-        if (token?.name != "Identifier")
+    for (const scope of scopes) {
+        if (scope.firstChild == null)
+            continue;
+
+        resolveSymbolsInScope(scope.firstChild, context, symbols);
+    }
+
+    const resolvedSymbols: Symbol[] = [];
+    symbols.forEach((symbol) => {
+        if (symbol.name == word)
             return;
 
-        const text = context.state.sliceDoc(token.from, token.to);
-        if (text == word)
-            return;
-
-        symbols.push({ name: text, type: "variable" });
+        resolvedSymbols.push(symbol);
     });
 
-    return symbols;
+    return resolvedSymbols;
+};
+
+const getScopesRecursive = (node: SyntaxNode, scopes: SyntaxNode[]) => {
+    if (node.name == "Block")
+        scopes.push(node);
+
+    if (node.parent == null)
+        return;
+
+    getScopesRecursive(node.parent, scopes);
+};
+
+const resolveSymbolsInScope = (scopeChild: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+    // a scope will always contain atoms, the first
+    // child of the atom is the actual node
+    let identifier = null;
+    let kind = null;
+
+    const node = scopeChild.firstChild!;
+    if (node.name == "VariableAssignment") {
+        const identifierNode = node.getChild("Identifier");
+        identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+
+        kind = "variable";
+    } else if (node.name == "FunctionDeclaration") {
+        const identifierNode = node.getChild("Identifier");
+        identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+
+        kind = "function";
+    }
+
+    if (identifier != null && kind != null) {
+        symbols.push({ name: identifier, type: kind });
+    }
+
+    if (scopeChild.nextSibling == null)
+        return;
+
+    resolveSymbolsInScope(scopeChild.nextSibling, context, symbols);
 };
 
 const ibCompletions = (context: CompletionContext) => {

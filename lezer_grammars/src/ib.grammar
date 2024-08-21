@@ -1,4 +1,4 @@
-@top Program { Atom* }
+@top Program { Block }
 
 @skip { space | LineComment }
 
@@ -7,6 +7,7 @@ Atom {
   FunctionDeclaration |
   OutputStatement |
   ReturnStatement |
+  VariableAssignment |
   ExpressionStatement
 }
 
@@ -15,6 +16,8 @@ FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword 
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }
+
+VariableAssignment { Identifier AssignmentOperator Expression }
 
 Block { Atom* }
 
@@ -26,7 +29,7 @@ Expression {
   Boolean |
   String |
   Number |
-  Operator |
+  MiscOperator |
   TypeAnnotation |
   NotKeyword
 }
@@ -58,7 +61,9 @@ TypeAnnotation { @specialize<Identifier,
 
   LineComment { "#" ![\n]* }
 
-  Operator { "+" | "-" | "*" | "/" | "=" | "==" }
+  MiscOperator { "+" | "-" | "*" | "/" | "==" }
+
+  AssignmentOperator { "=" }
 
   space { $[ \t\n\r]+ }
 
