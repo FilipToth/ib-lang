@@ -12,8 +12,6 @@ interface Symbol {
 const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | undefined) => {
     const nodeBefore = tree.resolveInner(context.pos, -1);
 
-    logTree(tree.topNode, context);
-
     const scopes: SyntaxNode[] = [];
     getScopesRecursive(nodeBefore, scopes);
 
@@ -22,6 +20,7 @@ const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | u
         if (scope.firstChild == null)
             continue;
 
+        checkForParameters(scope, context, symbols);
         resolveSymbolsInScope(scope.firstChild, context, symbols);
     }
 
@@ -74,6 +73,33 @@ const resolveSymbolsInScope = (scopeChild: SyntaxNode, context: CompletionContex
 
     resolveSymbolsInScope(scopeChild.nextSibling, context, symbols);
 };
+
+const checkForParameters = (block: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+    // the parameter list will always be the
+    // prev sibling to the block in a function
+    // declaration
+
+    const prev = block.prevSibling;
+    if (prev == null || prev.name != "ParameterList")
+        return;
+
+    checkForParametersRecursive(prev.firstChild!, context, symbols);
+};
+
+const checkForParametersRecursive = (param: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+    if (param.name == "Parameter") {
+        const identifierNode = param.getChild("Identifier");
+        const identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+
+        const symbol: Symbol = { name: identifier, type: "variable" };
+        symbols.push(symbol);
+    }
+
+    if (param.nextSibling == null)
+        return;
+
+    checkForParametersRecursive(param.nextSibling, context, symbols);
+}
 
 const ibCompletions = (context: CompletionContext) => {
     let word = context.matchBefore(/\w*/)
