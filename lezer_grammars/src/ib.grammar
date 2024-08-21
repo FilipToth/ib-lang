@@ -25,7 +25,8 @@ Parameter { Identifier ":" TypeAnnotation }
 ParameterList { "(" (Parameter ("," Parameter)*)? ")" }
 
 Expression {
-  Identifier |
+  CallExpression |
+  ReferenceEpxression |
   Boolean |
   String |
   Number |
@@ -33,6 +34,9 @@ Expression {
   TypeAnnotation |
   NotKeyword
 }
+
+ReferenceEpxression { Identifier }
+CallExpression { Identifier "(" (Atom*)? ")" }
 
 Boolean { @specialize<Identifier, "true" | "false"> }
 

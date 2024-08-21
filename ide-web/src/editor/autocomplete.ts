@@ -48,20 +48,20 @@ const getScopesRecursive = (node: SyntaxNode, scopes: SyntaxNode[]) => {
 const resolveSymbolsInScope = (scopeChild: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
     // a scope will always contain atoms, the first
     // child of the atom is the actual node
-    let identifier = null;
+    const node = scopeChild.firstChild;
+    if (node == null)
+        return;
+
+    const identifierNode = node.getChild("Identifier");
+    const identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+
     let kind = null;
-
-    const node = scopeChild.firstChild!;
     if (node.name == "VariableAssignment") {
-        const identifierNode = node.getChild("Identifier");
-        identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
-
         kind = "variable";
     } else if (node.name == "FunctionDeclaration") {
-        const identifierNode = node.getChild("Identifier");
-        identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
-
         kind = "function";
+    } else {
+        return;
     }
 
     if (identifier != null && kind != null) {
