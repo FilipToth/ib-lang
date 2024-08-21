@@ -3,6 +3,7 @@ import { coolGlow } from 'thememirror'
 import ib from './ibSupport';
 import { indentLess, indentMore, indentWithTab } from '@codemirror/commands';
 import { acceptCompletion, completionStatus } from '@codemirror/autocomplete';
+import { indentUnit } from '@codemirror/language';
 
 const Editor = () => {
     const ibSupport = ib();
@@ -23,7 +24,7 @@ const Editor = () => {
         <CodeMirror
             height='100vh'
             theme={coolGlow}
-            extensions={[ ibSupport, keyExtension ]}
+            extensions={[ ibSupport, keyExtension, indentUnit.of("    ") ]}
         />
     );
 };

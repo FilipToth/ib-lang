@@ -1,23 +1,30 @@
 import { CompletionContext, completeFromList } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
-import { SyntaxNode } from "@lezer/common";
+import { SyntaxNode, Tree } from "@lezer/common";
 import { EditorState } from "@uiw/react-codemirror";
+import logTree from "./logTree";
 
 interface Symbol {
     name: string,
     type: string
 }
 
-const resolveSymbols = (root: SyntaxNode, state: EditorState) => {
-    const symbols: Symbol[] = [];
+const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | undefined) => {
+    const root = tree.topNode;
+    const nodeBefore = tree.resolveInner(context.pos, -1);
 
-    console.log(root.lastChild);
+    logTree(root, context);
+
+    const symbols: Symbol[] = [];
     root.getChildren("Atom").forEach((node) => {
         const token = node.firstChild;
         if (token?.name != "Identifier")
             return;
 
-        const text = state.sliceDoc(token.from, token.to);
+        const text = context.state.sliceDoc(token.from, token.to);
+        if (text == word)
+            return;
+
         symbols.push({ name: text, type: "variable" });
     });
 
@@ -30,7 +37,7 @@ const ibCompletions = (context: CompletionContext) => {
         return null;
 
     const tree = syntaxTree(context.state);
-    const symbols = resolveSymbols(tree.topNode, context.state);
+    const symbols = resolveSymbols(tree, context, word?.text);
 
     const symbolOptions = symbols.map((symbol) => {
         return { label: symbol.name, type: symbol.type };

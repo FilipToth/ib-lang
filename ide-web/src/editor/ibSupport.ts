@@ -9,13 +9,21 @@ const LANG_DEF = LRLanguage.define({
             styleTags({
                 Identifier: t.variableName,
                 Boolean: t.bool,
-                Keyword: t.keyword,
                 TypeAnnotation: t.typeName,
                 String: t.string,
                 Number: t.number,
                 Operator: t.operator,
                 LineComment: t.lineComment,
-                "( )": t.paren
+                "( )": t.paren,
+
+                IfKeyword: t.keyword,
+                ThenKeyword: t.keyword,
+                EndKeyword: t.keyword,
+                ElseKeyword: t.keyword,
+                OutputKeyword: t.keyword,
+                FunctionKeyword: t.keyword,
+                ReturnKeyword: t.keyword,
+                NotKeyword: t.keyword,
             }),
             indentNodeProp.add({
                 Application: (context) => context.column(context.node.from)

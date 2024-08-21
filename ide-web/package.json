@@ -6,6 +6,7 @@
     "@codemirror/autocomplete": "^6.18.0",
     "@codemirror/commands": "^6.6.0",
     "@codemirror/language": "^6.10.2",
+    "@codemirror/text": "^0.19.6",
     "@codemirror/view": "^6.32.0",
     "@lezer/common": "^1.2.1",
     "@lezer/highlight": "^1.0.0",
