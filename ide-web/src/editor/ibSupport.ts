@@ -30,7 +30,8 @@ const LANG_DEF = LRLanguage.define({
                 NotKeyword: t.keyword,
             }),
             indentNodeProp.add({
-                Application: (context) => context.column(context.node.from)
+                Application: (context) => context.column(context.node.from),
+                Block: (context) => context.column(context.node.from) + context.unit
             }),
             foldNodeProp.add({
                 Application: foldInside

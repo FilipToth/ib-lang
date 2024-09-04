@@ -1,5 +1,5 @@
 [package]
-name = "ib-lang"
+name = "ibc"
 version = "0.1.0"
 authors = ["Filip Toth <filip.toth@accelley.com>"]
 
