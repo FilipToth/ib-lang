@@ -8,6 +8,11 @@ use crate::analysis::{
     operator::Operator,
 };
 
+pub struct EvalInfo<'a> {
+    heap: &'a mut EvalHeap,
+    output: &'a mut String
+}
+
 pub struct EvalHeap {
     // just use rust's heap to manage
     // memory, no need for us to make
@@ -178,12 +183,12 @@ fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
     }
 }
 
-fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
+fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
     let val = match &node.kind {
-        BoundNodeKind::Module { block } => eval_rec(&block, heap),
+        BoundNodeKind::Module { block } => eval_rec(&block, info),
         BoundNodeKind::Block { children } => {
             for child in children.iter() {
-                let val = eval_rec(child, heap);
+                let val = eval_rec(child, info);
                 if let EvalValue::Return(_) = &val {
                     return val;
                 }
@@ -192,33 +197,35 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             EvalValue::void()
         }
         BoundNodeKind::AssignmentExpression { symbol, value } => {
-            let value = eval_rec(&value, heap);
-            heap.assign_var(symbol, value.clone());
+            let value = eval_rec(&value, info);
+            info.heap.assign_var(symbol, value.clone());
 
             value
         }
-        BoundNodeKind::ReferenceExpression(reference) => heap.get_var(&reference),
+        BoundNodeKind::ReferenceExpression(reference) => info.heap.get_var(&reference),
         BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
-            let lhs_val = eval_rec(&lhs, heap);
-            let rhs_val = eval_rec(&rhs, heap);
+            let lhs_val = eval_rec(&lhs, info);
+            let rhs_val = eval_rec(&rhs, info);
             eval_binary_expr(lhs_val, op, rhs_val)
         }
         BoundNodeKind::UnaryExpression { op, rhs } => {
-            let rhs_val = eval_rec(&rhs, heap);
+            let rhs_val = eval_rec(&rhs, info);
             eval_unary_expr(rhs_val, op)
         }
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
         BoundNodeKind::OutputStatement { expr } => {
-            let value = eval_rec(&expr, heap);
-            println!("{}", value.to_string());
+            let value = eval_rec(&expr, info);
+
+            let value = format!("{}\n", value.to_string());
+            String::push_str(info.output, &value);
 
             EvalValue::void()
         }
         BoundNodeKind::ReturnStatement { expr } => {
             // create special return value
             let val = if let Some(expr) = expr {
-                eval_rec(&expr, heap)
+                eval_rec(&expr, info)
             } else {
                 EvalValue::void()
             };
@@ -226,11 +233,11 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             EvalValue::Return(Box::new(val))
         },
         BoundNodeKind::IfStatement { condition, block, else_block } => {
-            let cond_value = eval_rec(&condition, heap).force_get_bool();
+            let cond_value = eval_rec(&condition, info).force_get_bool();
             let value = if cond_value {
-                eval_rec(&block, heap)
+                eval_rec(&block, info)
             } else if let Some(else_block) = else_block {
-                eval_rec(else_block, heap)
+                eval_rec(else_block, info)
             } else {
                 EvalValue::void()
             };
@@ -241,7 +248,7 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
             }
         },
         BoundNodeKind::FunctionDeclaration { symbol, block } => {
-            heap.declare_func(symbol, block.clone());
+            info.heap.declare_func(symbol, block.clone());
             EvalValue::void()
         },
         BoundNodeKind::BoundCallExpression { symbol, args } => {
@@ -251,13 +258,13 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
                 let arg = &args[index];
 
                 let symbol = &param.symbol;
-                let value = eval_rec(arg, heap);
-                heap.assign_var(symbol, value);
+                let value = eval_rec(arg, info);
+                info.heap.assign_var(symbol, value);
             }
 
             // no need to clear arguments after executing the block
-            let body = heap.get_func(symbol);
-            let ret_value = eval_rec(&body, heap);
+            let body = info.heap.get_func(symbol);
+            let ret_value = eval_rec(&body, info);
 
             // unwrap from return
             let EvalValue::Return(ret_value) = ret_value else {
@@ -271,7 +278,12 @@ fn eval_rec(node: &BoundNode, heap: &mut EvalHeap) -> EvalValue {
     val
 }
 
-pub fn eval(root: &BoundNode) {
+pub fn eval(root: &BoundNode, output: &mut String) {
     let mut heap = EvalHeap::new();
-    eval_rec(root, &mut heap);
+    let mut info = EvalInfo {
+        heap: &mut heap,
+        output: output
+    };
+
+    eval_rec(root, &mut info);
 }
