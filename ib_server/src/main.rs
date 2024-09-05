@@ -1,6 +1,8 @@
 use axum::{routing::post, Json, Router};
 use serde::Serialize;
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
+use tower_http::cors::{Any, CorsLayer};
 
 extern crate ibc;
 
@@ -21,9 +23,13 @@ impl RunResult {
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/", post(root));
+    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
 
-    let listener = TcpListener::bind("localhost:8080").await.unwrap();
+    let app = Router::new()
+        .route("/", post(root))
+        .layer(ServiceBuilder::new().layer(cors));
+
+    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
