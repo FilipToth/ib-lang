@@ -23,7 +23,8 @@ fn parse_file() {
     };
 
     // evaluate
-    eval(root)
+    let output = eval(root);
+    println!("{}", output);
 }
 
 fn main() {

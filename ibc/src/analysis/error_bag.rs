@@ -99,7 +99,7 @@ impl Error {
 }
 
 pub struct ErrorBag {
-    errors: Vec<Error>,
+    pub errors: Vec<Error>,
 }
 
 impl ErrorBag {

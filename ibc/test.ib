@@ -6,4 +6,5 @@ FUNCTION my_func(num: Int) -> Int
     return 0
 END FUNCTION
 
-output my_func(2)
+output my_func(1)
+output 10
