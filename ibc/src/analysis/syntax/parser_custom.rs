@@ -1,7 +1,7 @@
 use std::{cell::RefCell, iter::Peekable, rc::Rc, slice::Iter};
 
-use super::lexer::{SyntaxToken, SyntaxTokenKind};
-type LexerTokens<'a> = Rc<RefCell<Peekable<Iter<'a, SyntaxToken>>>>;
+use super::lexer::{LexerToken, LexerTokenKind};
+type LexerTokens<'a> = Rc<RefCell<Peekable<Iter<'a, LexerToken>>>>;
 
 pub struct ParsedToken {
     pub kind: ParsedTokenKind,
@@ -36,64 +36,24 @@ pub enum ParsedTokenKind {
     },
 }
 
-fn parse_expression(rc_tokens: LexerTokens) -> Option<ParsedToken> {
-    // binary or unary, reference or literal
+fn parse_binary_expression(rc_tokens: LexerTokens, parent_precedence: usize) -> Option<ParsedToken> {
     let mut tokens = rc_tokens.borrow_mut();
+    let next_peek = tokens.next();
 
-    let first = tokens.peek();
-    let Some(first) = first else {
+    let Some(next_peek) = next_peek else {
         return None;
     };
 
-    match first.kind {
-        SyntaxTokenKind::BangToken => {
-            // unary operator
-        }
-        _ => {
-            // check second, if operator, then binary, else reference...
-            let first = tokens.next().unwrap();
-            let second = tokens.peek();
-
-            let Some(second) = second else {
-                // reference or litera
-                return None;
-            };
-
-            match second.kind {
-                SyntaxTokenKind::PlusToken
-                | SyntaxTokenKind::MinusToken
-                | SyntaxTokenKind::StarToken
-                | SyntaxTokenKind::SlashToken => {
-                    // binary expression
-                    parse_binary_expression(rc_tokens.clone());
-                }
-                _ => {
-                    // reference or literal
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn parse_binary_expression(rc_tokens: LexerTokens) -> Option<ParsedToken> {
-    let mut tokens = rc_tokens.borrow_mut();
-    let next = tokens.next();
-
-    let Some(next) = next else {
-        return None;
-    };
-
-    let unary_precedence = next.kind.unary_operator_precedence();
-    if unary_precedence != 0 {
+    let unary_precedence = next_peek.kind.unary_operator_precedence();
+    let mut lhs = if unary_precedence != 0 {
         // unary expression
+        let next = tokens.next().unwrap();
         let operator = match parse_operator(next) {
             Some(o) => o,
             None => return None,
         };
 
-        let rhs = match parse_expression(rc_tokens.clone()) {
+        let rhs = match parse_binary_expression(rc_tokens.clone(), 0) {
             Some(r) => r,
             None => return None,
         };
@@ -104,18 +64,68 @@ fn parse_binary_expression(rc_tokens: LexerTokens) -> Option<ParsedToken> {
         };
 
         let token = ParsedToken::new(unary_kind);
-        return Some(token);
+        Some(token)
+    } else {
+        parse_primary_expression(rc_tokens.clone())
+    };
+
+    while lhs.is_some() {
+        let precedence = next_peek.kind.binary_operator_precedence();
+        if precedence == 0 || precedence <= parent_precedence {
+            break;
+        }
+
+        let operator_token = match tokens.next() {
+            Some(t) => t,
+            None => return None
+        };
+
+        let operator = match parse_operator(operator_token) {
+            Some(o) => o,
+            None => return None
+        };
+
+        let rhs = match parse_binary_expression(rc_tokens.clone(), precedence) {
+            Some(r) => r,
+            None => return None,
+        };
+
+        let lhs_owned = match lhs.take() {
+            Some(l) => l,
+            None => return None,
+        };
+
+        let bin_expr_kind = ParsedTokenKind::BinaryExpression { lhs: Box::new(lhs_owned), op: operator, rhs: Box::new(rhs) };
+        let bin_expr = ParsedToken::new(bin_expr_kind);
+        lhs = Some(bin_expr);
     }
 
     None
 }
 
-fn parse_operator(token: &SyntaxToken) -> Option<Operator> {
+fn parse_primary_expression(rc_tokens: LexerTokens) -> Option<ParsedToken> {
+    let mut tokens = rc_tokens.borrow_mut();
+    let next = match tokens.next() {
+        Some(n) => n,
+        None => return None
+    };
+
+    let kind = match &next.kind {
+        LexerTokenKind::IdentifierToken(id) => ParsedTokenKind::ReferenceExpression(id.clone()),
+        LexerTokenKind::IntegerLiteralToken(val) => ParsedTokenKind::IntegerLiteralExpression(val.clone()),
+        _ => return None
+    };
+
+    let token = ParsedToken::new(kind);
+    Some(token)
+}
+
+fn parse_operator(token: &LexerToken) -> Option<Operator> {
     match token.kind {
-        SyntaxTokenKind::PlusToken => Some(Operator::Addition),
-        SyntaxTokenKind::MinusToken => Some(Operator::Subtraction),
-        SyntaxTokenKind::StarToken => Some(Operator::Multiplication),
-        SyntaxTokenKind::SlashToken => Some(Operator::Division),
+        LexerTokenKind::PlusToken => Some(Operator::Addition),
+        LexerTokenKind::MinusToken => Some(Operator::Subtraction),
+        LexerTokenKind::StarToken => Some(Operator::Multiplication),
+        LexerTokenKind::SlashToken => Some(Operator::Division),
         _ => None,
     }
 }
@@ -127,10 +137,10 @@ fn parse_statement(rc_tokens: LexerTokens) -> Option<ParsedToken> {
     let Some(peek) = peek else { return None };
 
     match peek.kind {
-        SyntaxTokenKind::OutputKeyword => {}
-        SyntaxTokenKind::IfKeyword => {}
-        SyntaxTokenKind::FunctionKeyword => {}
-        SyntaxTokenKind::IdentifierToken(_) | SyntaxTokenKind::IntegerToken(_) => {
+        LexerTokenKind::OutputKeyword => {}
+        LexerTokenKind::IfKeyword => {}
+        LexerTokenKind::FunctionKeyword => {}
+        LexerTokenKind::IdentifierToken(_) | LexerTokenKind::IntegerLiteralToken(_) => {
             // parse expression
         }
         _ => unreachable!(),
@@ -149,7 +159,7 @@ fn parse_global_scope(rc_tokens: LexerTokens) {
     }
 }
 
-pub fn parse_tokens(tokens: Vec<SyntaxToken>) {
+pub fn parse_tokens(tokens: Vec<LexerToken>) {
     let mut iter = tokens.iter().peekable();
     parse_global_scope(Rc::new(RefCell::new(iter)));
 }

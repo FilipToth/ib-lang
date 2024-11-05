@@ -2,7 +2,7 @@ use std::{iter::Peekable, str::Chars, vec};
 
 #[derive(Debug)]
 pub struct LexerToken {
-    kind: LexerTokenKind,
+    pub kind: LexerTokenKind,
 }
 
 impl LexerToken {
@@ -17,6 +17,7 @@ pub enum LexerTokenKind {
     MinusToken,
     StarToken,
     SlashToken,
+    BangToken,
     EqualsToken,
     ArrowToken,
     EqualsEqualsToken,
@@ -140,6 +141,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             }
             '*' => LexerTokenKind::StarToken,
             '/' => LexerTokenKind::SlashToken,
+            '!' => LexerTokenKind::BangToken,
             '=' => {
                 let next_peek = chars.peek();
                 match next_peek {
