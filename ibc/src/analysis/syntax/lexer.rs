@@ -1,24 +1,28 @@
-use std::{str::Chars, vec};
+use std::{iter::Peekable, str::Chars, vec};
 
 #[derive(Debug)]
-pub struct SyntaxToken {
-    pub kind: SyntaxTokenKind,
+pub struct LexerToken {
+    kind: LexerTokenKind,
 }
 
-impl SyntaxToken {
-    fn new(kind: SyntaxTokenKind) -> SyntaxToken {
-        SyntaxToken { kind: kind }
+impl LexerToken {
+    fn new(kind: LexerTokenKind) -> LexerToken {
+        LexerToken { kind: kind }
     }
 }
 
 #[derive(Debug)]
-pub enum SyntaxTokenKind {
+pub enum LexerTokenKind {
     PlusToken,
     MinusToken,
     StarToken,
     SlashToken,
-    BangToken,
-    IntegerToken(i64),
+    EqualsToken,
+    ArrowToken,
+    EqualsEqualsToken,
+    OpenParenthesisToken,
+    CloseParenthesisToken,
+    IntegerLiteralToken(i64),
     IdentifierToken(String),
 
     IfKeyword,
@@ -30,52 +34,51 @@ pub enum SyntaxTokenKind {
     FunctionKeyword,
 }
 
-impl SyntaxTokenKind {
+impl LexerTokenKind {
     pub fn unary_operator_precedence(&self) -> usize {
         match self {
-            SyntaxTokenKind::PlusToken => 1,
-            SyntaxTokenKind::MinusToken => 1,
-            SyntaxTokenKind::BangToken => 1,
+            LexerTokenKind::PlusToken => 1,
+            LexerTokenKind::MinusToken => 1,
+            LexerTokenKind::BangToken => 1,
             _ => 0,
         }
     }
 
     pub fn binary_operator_precedence(&self) -> usize {
         match self {
-            SyntaxTokenKind::StarToken => 2,
-            SyntaxTokenKind::SlashToken => 2,
+            LexerTokenKind::StarToken => 2,
+            LexerTokenKind::SlashToken => 2,
 
-            SyntaxTokenKind::PlusToken => 1,
-            SyntaxTokenKind::MinusToken => 1,
+            LexerTokenKind::PlusToken => 1,
+            LexerTokenKind::MinusToken => 1,
 
             _ => 0,
         }
     }
 }
 
-fn lex_identifier_or_keyword(value: String) -> SyntaxToken {
-    let kind = match value.as_str() {
-        "if" => SyntaxTokenKind::IfKeyword,
-        "then" => SyntaxTokenKind::ThenKeyword,
-        "end" => SyntaxTokenKind::EndKeyword,
-        "else" => SyntaxTokenKind::ElseKeyword,
-        "output" => SyntaxTokenKind::OutputKeyword,
-        "return" => SyntaxTokenKind::ReturnKeyword,
-        "function" => SyntaxTokenKind::FunctionKeyword,
-        _ => SyntaxTokenKind::IdentifierToken(value),
-    };
-
-    SyntaxToken::new(kind)
+fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
+    match value.to_lowercase().as_str() {
+        "if" => LexerTokenKind::IfKeyword,
+        "then" => LexerTokenKind::ThenKeyword,
+        "end" => LexerTokenKind::EndKeyword,
+        "else" => LexerTokenKind::ElseKeyword,
+        "output" => LexerTokenKind::OutputKeyword,
+        "return" => LexerTokenKind::ReturnKeyword,
+        "function" => LexerTokenKind::FunctionKeyword,
+        _ => LexerTokenKind::IdentifierToken(value),
+    }
 }
 
-fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
+fn lex_rolling(iter: &mut Peekable<Chars>, current: char) -> LexerTokenKind {
     let mut value = current.to_string();
     let is_numeric = current.is_numeric();
 
     loop {
-        match iter.next() {
+        let peek = iter.peek();
+        match peek {
             Some(next) => {
-                if !next.is_alphanumeric() {
+                if !(next.is_alphanumeric() || *next == '_') {
                     break;
                 }
 
@@ -87,7 +90,8 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
                     break;
                 }
 
-                value.push(next);
+                value.push(*next);
+                iter.next();
             }
             None => {
                 break;
@@ -99,8 +103,7 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
         let int_value = value.parse();
         match int_value {
             Ok(v) => {
-                let kind = SyntaxTokenKind::IntegerToken(v);
-                return SyntaxToken::new(kind);
+                return LexerTokenKind::IntegerLiteralToken(v);
             }
             Err(_) => unreachable!(),
         }
@@ -109,9 +112,9 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
     lex_identifier_or_keyword(value)
 }
 
-pub fn lex(content: String) -> Vec<SyntaxToken> {
-    let mut tokens: Vec<SyntaxToken> = vec![];
-    let mut chars = content.chars();
+pub fn lex(content: String) -> Vec<LexerToken> {
+    let mut tokens: Vec<LexerToken> = vec![];
+    let mut chars = content.chars().peekable();
 
     let mut current_value: Option<String> = None;
     loop {
@@ -120,21 +123,48 @@ pub fn lex(content: String) -> Vec<SyntaxToken> {
             None => break,
         };
 
-        let token = match current {
-            '+' => SyntaxToken::new(SyntaxTokenKind::PlusToken),
-            '-' => SyntaxToken::new(SyntaxTokenKind::MinusToken),
-            '*' => SyntaxToken::new(SyntaxTokenKind::StarToken),
-            '/' => SyntaxToken::new(SyntaxTokenKind::SlashToken),
-            '!' => SyntaxToken::new(SyntaxTokenKind::BangToken),
+        let kind = match current {
+            '+' => LexerTokenKind::PlusToken,
+            '-' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some(n) => match n {
+                        '>' => {
+                            chars.next();
+                            LexerTokenKind::ArrowToken
+                        }
+                        _ => continue,
+                    },
+                    None => LexerTokenKind::MinusToken,
+                }
+            }
+            '*' => LexerTokenKind::StarToken,
+            '/' => LexerTokenKind::SlashToken,
+            '=' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some(n) => match n {
+                        '=' => {
+                            chars.next();
+                            LexerTokenKind::EqualsEqualsToken
+                        }
+                        _ => continue,
+                    },
+                    None => LexerTokenKind::EqualsToken,
+                }
+            }
+            '(' => LexerTokenKind::OpenParenthesisToken,
+            ')' => LexerTokenKind::CloseParenthesisToken,
             ' ' => continue,
             _ => lex_rolling(&mut chars, current),
         };
 
+        let token = LexerToken::new(kind);
         tokens.push(token);
     }
 
     if let Some(ref mut c) = current_value {
-        let identifier = SyntaxToken::new(SyntaxTokenKind::IdentifierToken(c.clone()));
+        let identifier = LexerToken::new(LexerTokenKind::IdentifierToken(c.clone()));
         tokens.push(identifier);
     }
 
