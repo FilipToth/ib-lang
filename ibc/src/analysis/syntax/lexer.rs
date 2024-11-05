@@ -2,7 +2,7 @@ use std::{str::Chars, vec};
 
 #[derive(Debug)]
 pub struct SyntaxToken {
-    kind: SyntaxTokenKind
+    pub kind: SyntaxTokenKind,
 }
 
 impl SyntaxToken {
@@ -17,6 +17,7 @@ pub enum SyntaxTokenKind {
     MinusToken,
     StarToken,
     SlashToken,
+    BangToken,
     IntegerToken(i64),
     IdentifierToken(String),
 
@@ -29,6 +30,29 @@ pub enum SyntaxTokenKind {
     FunctionKeyword,
 }
 
+impl SyntaxTokenKind {
+    pub fn unary_operator_precedence(&self) -> usize {
+        match self {
+            SyntaxTokenKind::PlusToken => 1,
+            SyntaxTokenKind::MinusToken => 1,
+            SyntaxTokenKind::BangToken => 1,
+            _ => 0,
+        }
+    }
+
+    pub fn binary_operator_precedence(&self) -> usize {
+        match self {
+            SyntaxTokenKind::StarToken => 2,
+            SyntaxTokenKind::SlashToken => 2,
+
+            SyntaxTokenKind::PlusToken => 1,
+            SyntaxTokenKind::MinusToken => 1,
+
+            _ => 0,
+        }
+    }
+}
+
 fn lex_identifier_or_keyword(value: String) -> SyntaxToken {
     let kind = match value.as_str() {
         "if" => SyntaxTokenKind::IfKeyword,
@@ -38,10 +62,10 @@ fn lex_identifier_or_keyword(value: String) -> SyntaxToken {
         "output" => SyntaxTokenKind::OutputKeyword,
         "return" => SyntaxTokenKind::ReturnKeyword,
         "function" => SyntaxTokenKind::FunctionKeyword,
-        _ => SyntaxTokenKind::IdentifierToken(value)
+        _ => SyntaxTokenKind::IdentifierToken(value),
     };
 
-    SyntaxToken::new(kind) 
+    SyntaxToken::new(kind)
 }
 
 fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
@@ -64,8 +88,10 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
                 }
 
                 value.push(next);
-            },
-            None => { break; }
+            }
+            None => {
+                break;
+            }
         };
     }
 
@@ -75,8 +101,8 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
             Ok(v) => {
                 let kind = SyntaxTokenKind::IntegerToken(v);
                 return SyntaxToken::new(kind);
-            },
-            Err(_) => unreachable!()
+            }
+            Err(_) => unreachable!(),
         }
     }
 
@@ -91,7 +117,7 @@ pub fn lex(content: String) -> Vec<SyntaxToken> {
     loop {
         let current = match chars.next() {
             Some(c) => c,
-            None => break
+            None => break,
         };
 
         let token = match current {
@@ -99,10 +125,9 @@ pub fn lex(content: String) -> Vec<SyntaxToken> {
             '-' => SyntaxToken::new(SyntaxTokenKind::MinusToken),
             '*' => SyntaxToken::new(SyntaxTokenKind::StarToken),
             '/' => SyntaxToken::new(SyntaxTokenKind::SlashToken),
+            '!' => SyntaxToken::new(SyntaxTokenKind::BangToken),
             ' ' => continue,
-            _ => {
-                lex_rolling(&mut chars, current)
-            }
+            _ => lex_rolling(&mut chars, current),
         };
 
         tokens.push(token);
