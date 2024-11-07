@@ -41,6 +41,9 @@ pub enum ParsedTokenKind {
         op: Operator,
         rhs: Box<ParsedToken>,
     },
+    ParenthesizedExpression {
+        inner: Box<ParsedToken>
+    }
 }
 
 struct Parser<'a> {
@@ -58,7 +61,7 @@ impl<'a> Parser<'a> {
             None => return None
         };
     
-        let mut lhs = if unary_precedence != 0 {
+        let mut lhs = if unary_precedence != 0 && unary_precedence >= parent_precedence {
             // unary expression
             let next = self.tokens.next().unwrap();    
             let operator = match self.parse_operator(next) {
@@ -66,7 +69,7 @@ impl<'a> Parser<'a> {
                 None => return None,
             };
     
-            let rhs = match self.parse_binary_expression(0) {
+            let rhs = match self.parse_binary_expression(unary_precedence) {
                 Some(r) => r,
                 None => return None,
             };
@@ -82,23 +85,17 @@ impl<'a> Parser<'a> {
             self.parse_primary_expression()
         };
 
-        // println!("lhs: {:?}", lhs);
-    
         while let Some(lhs_token) = lhs.take() {
             let precedence = match self.tokens.peek() {
-                Some(t) => {
-                    // println!("Peeking for token precedence {:?}", t);
-                    t.kind.binary_operator_precedence()
-                },
+                Some(t) => t.kind.binary_operator_precedence(),
                 None => {
                     lhs = Some(lhs_token);
                     break;
                 },
             };
 
-            // println!("Binary precedence {:?}", precedence);
-
             if precedence == 0 || precedence <= parent_precedence {
+                lhs = Some(lhs_token);
                 break;
             }
     
@@ -130,6 +127,10 @@ impl<'a> Parser<'a> {
             Some(n) => n,
             None => return None
         };
+
+        if let LexerTokenKind::OpenParenthesisToken = &next.kind {
+            return self.parse_parenthesis_expression();
+        }
     
         let kind = match &next.kind {
             LexerTokenKind::IdentifierToken(id) => ParsedTokenKind::ReferenceExpression(id.clone()),
@@ -140,6 +141,23 @@ impl<'a> Parser<'a> {
         let token = ParsedToken::new(kind);
         Some(token)
     }
+
+    fn parse_parenthesis_expression(&mut self) -> Option<ParsedToken> {
+        match self.parse_binary_expression(0) {
+            Some(expr) => {
+                let right_paren = self.tokens.next();
+                match right_paren {
+                    Some(_) => {
+                        let kind = ParsedTokenKind::ParenthesizedExpression { inner: Box::new(expr) };
+                        let token = ParsedToken::new(kind);
+                        Some(token)
+                    },
+                    None => None
+                }
+            },
+            None => None,
+        }
+    }
     
     fn parse_operator(&self, token: &LexerToken) -> Option<Operator> {
         match token.kind {
@@ -147,6 +165,8 @@ impl<'a> Parser<'a> {
             LexerTokenKind::MinusToken => Some(Operator::Subtraction),
             LexerTokenKind::StarToken => Some(Operator::Multiplication),
             LexerTokenKind::SlashToken => Some(Operator::Division),
+            LexerTokenKind::EqualsEqualsToken => Some(Operator::Equality),
+            LexerTokenKind::BangToken => Some(Operator::Not),
             _ => None,
         }
     }

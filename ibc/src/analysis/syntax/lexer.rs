@@ -38,20 +38,22 @@ pub enum LexerTokenKind {
 impl LexerTokenKind {
     pub fn unary_operator_precedence(&self) -> usize {
         match self {
-            LexerTokenKind::PlusToken => 1,
-            LexerTokenKind::MinusToken => 1,
-            LexerTokenKind::BangToken => 1,
+            LexerTokenKind::PlusToken => 4,
+            LexerTokenKind::MinusToken => 4,
+            LexerTokenKind::BangToken => 4,
             _ => 0,
         }
     }
 
     pub fn binary_operator_precedence(&self) -> usize {
         match self {
-            LexerTokenKind::StarToken => 2,
-            LexerTokenKind::SlashToken => 2,
+            LexerTokenKind::StarToken => 3,
+            LexerTokenKind::SlashToken => 3,
 
-            LexerTokenKind::PlusToken => 1,
-            LexerTokenKind::MinusToken => 1,
+            LexerTokenKind::PlusToken => 2,
+            LexerTokenKind::MinusToken => 2,
+
+            LexerTokenKind::EqualsEqualsToken => 1,
 
             _ => 0,
         }
