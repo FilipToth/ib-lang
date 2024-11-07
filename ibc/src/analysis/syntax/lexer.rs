@@ -138,7 +138,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                             chars.next();
                             LexerTokenKind::ArrowToken
                         }
-                        _ => continue,
+                        _ => LexerTokenKind::MinusToken,
                     },
                     None => LexerTokenKind::MinusToken,
                 }
@@ -154,7 +154,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                             chars.next();
                             LexerTokenKind::EqualsEqualsToken
                         }
-                        _ => continue,
+                        _ => LexerTokenKind::EqualsToken,
                     },
                     None => LexerTokenKind::EqualsToken,
                 }

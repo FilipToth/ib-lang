@@ -45,6 +45,10 @@ pub enum ParsedTokenKind {
         identifier: String,
         args: Vec<ParsedToken>,
     },
+    AssignmentExpression {
+        identifier: String,
+        value: Box<ParsedToken>,
+    },
     ParenthesizedExpression {
         inner: Box<ParsedToken>,
     },
@@ -161,7 +165,9 @@ impl<'a> Parser<'a> {
                 // check if kind is valid
                 match &p.kind {
                     LexerTokenKind::OpenParenthesisToken => self.parse_parenthesis_expression(),
-                    LexerTokenKind::IdentifierToken(_) => self.parse_reference_or_call(),
+                    LexerTokenKind::IdentifierToken(_) => {
+                        self.parse_reference_or_call_or_assignment()
+                    }
                     LexerTokenKind::IntegerLiteralToken(val) => {
                         // consume token
                         self.tokens.next();
@@ -177,7 +183,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_reference_or_call(&mut self) -> Option<ParsedToken> {
+    fn parse_reference_or_call_or_assignment(&mut self) -> Option<ParsedToken> {
         let identifier = match self.parse_identifier() {
             Some(i) => i,
             None => return None,
@@ -193,6 +199,7 @@ impl<'a> Parser<'a> {
 
         match peek.kind {
             LexerTokenKind::OpenParenthesisToken => {
+                // call expression
                 let arguments = match self.parse_argument_list() {
                     Some(a) => a,
                     None => return None,
@@ -201,6 +208,22 @@ impl<'a> Parser<'a> {
                 let kind = ParsedTokenKind::CallExpression {
                     identifier: identifier,
                     args: arguments,
+                };
+
+                let token = ParsedToken::new(kind);
+                Some(token)
+            }
+            LexerTokenKind::EqualsToken => {
+                // assignment expression
+                let _equals = self.tokens.next();
+                let value = match self.parse_expression() {
+                    Some(e) => e,
+                    None => return None,
+                };
+
+                let kind = ParsedTokenKind::AssignmentExpression {
+                    identifier: identifier,
+                    value: Box::new(value),
                 };
 
                 let token = ParsedToken::new(kind);
