@@ -1,13 +1,19 @@
-use std::{iter::Peekable, str::Chars, vec};
+use std::{iter::Peekable, str::Chars, usize, vec};
+
+use crate::analysis::CodeLocation;
 
 #[derive(Debug)]
 pub struct LexerToken {
     pub kind: LexerTokenKind,
+    pub loc: CodeLocation,
 }
 
 impl LexerToken {
-    fn new(kind: LexerTokenKind) -> LexerToken {
-        LexerToken { kind: kind }
+    fn new(kind: LexerTokenKind, loc: CodeLocation) -> LexerToken {
+        LexerToken {
+            kind: kind,
+            loc: loc,
+        }
     }
 }
 
@@ -79,7 +85,7 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
     }
 }
 
-fn lex_rolling(iter: &mut Peekable<Chars>, current: char) -> LexerTokenKind {
+fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize) -> LexerTokenKind {
     let mut value = current.to_string();
     let is_numeric = current.is_numeric();
 
@@ -99,6 +105,7 @@ fn lex_rolling(iter: &mut Peekable<Chars>, current: char) -> LexerTokenKind {
                     break;
                 }
 
+                *column += 1;
                 value.push(*next);
                 iter.next();
             }
@@ -125,12 +132,17 @@ pub fn lex(content: String) -> Vec<LexerToken> {
     let mut tokens: Vec<LexerToken> = vec![];
     let mut chars = content.chars().peekable();
 
-    let mut current_value: Option<String> = None;
+    let mut line: usize = 0;
+    let mut column: usize = 0;
+
     loop {
         let current = match chars.next() {
             Some(c) => c,
             None => break,
         };
+
+        let loc = CodeLocation::new(line, column);
+        column += 1;
 
         let kind = match current {
             '+' => LexerTokenKind::PlusToken,
@@ -168,18 +180,17 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             ',' => LexerTokenKind::CommaToken,
             ':' => LexerTokenKind::ColonToken,
             ' ' => continue,
-            '\n' => continue,
+            '\n' => {
+                line += 1;
+                column = 0;
+                continue;
+            }
             '\r' => continue,
-            _ => lex_rolling(&mut chars, current),
+            _ => lex_rolling(&mut chars, current, &mut column),
         };
 
-        let token = LexerToken::new(kind);
+        let token = LexerToken::new(kind, loc);
         tokens.push(token);
-    }
-
-    if let Some(ref mut c) = current_value {
-        let identifier = LexerToken::new(LexerTokenKind::IdentifierToken(c.clone()));
-        tokens.push(identifier);
     }
 
     tokens

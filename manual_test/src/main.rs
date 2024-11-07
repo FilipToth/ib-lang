@@ -12,5 +12,6 @@ fn main() {
 
     println!("");
 
-    ibc::analysis::syntax::parser_custom::parse_tokens(tokens);
+    let result = ibc::analysis::syntax::parser::parse(tokens);
+    println!("{:#?}", result);
 }

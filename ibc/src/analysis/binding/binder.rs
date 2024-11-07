@@ -157,7 +157,7 @@ fn bind_if_statement(
 fn bind_function_declaration(
     identifier: &SyntaxToken,
     params: &SyntaxToken,
-    ret_type: String,
+    ret_type: &Option<String>,
     block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
@@ -469,32 +469,30 @@ pub fn bind(
 ) -> Option<BoundNode> {
     let loc = token.loc.clone();
     match &token.kind {
-        SyntaxKind::Module { block } => bind_module(&block, scope, errors, loc),
-        SyntaxKind::Block { children } => bind_block(&children, scope, true, errors, loc),
+        SyntaxKind::Scope { subtokens } => bind_block(&subtokens, scope, true, errors, loc),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
         SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, loc),
         SyntaxKind::IfStatement {
             condition,
-            block,
-            else_block,
+            body,
         } => bind_if_statement(
             &condition,
-            &block,
-            else_block.as_deref(),
+            &body,
+            None,
             scope,
             errors,
             loc,
         ),
         SyntaxKind::FunctionDeclaration {
             identifier,
-            params,
-            ret_type,
-            block,
+            parameters,
+            return_type,
+            body,
         } => bind_function_declaration(
             &identifier,
-            &params,
-            ret_type.to_string(),
-            &block,
+            &parameters,
+            return_type,
+            &body,
             scope,
             errors,
             loc,
