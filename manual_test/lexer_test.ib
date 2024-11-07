@@ -1,1 +1,6 @@
-abced = (1213 - 1) * (3 == 0)
+function test(num: Type, idk: Type) -> Number
+    output num
+    output idk + 3
+
+    idk * 4
+end

@@ -164,6 +164,8 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             ',' => LexerTokenKind::CommaToken,
             ':' => LexerTokenKind::ColonToken,
             ' ' => continue,
+            '\n' => continue,
+            '\r' => continue,
             _ => lex_rolling(&mut chars, current),
         };
 
