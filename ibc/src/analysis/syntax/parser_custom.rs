@@ -41,6 +41,10 @@ pub enum ParsedTokenKind {
         op: Operator,
         rhs: Box<ParsedToken>,
     },
+    CallExpression {
+        identifier: String,
+        args: Vec<ParsedToken>,
+    },
     ParenthesizedExpression {
         inner: Box<ParsedToken>,
     },
@@ -58,6 +62,7 @@ pub enum ParsedTokenKind {
     FunctionDeclaration {
         identifier: String,
         parameters: Vec<ParsedToken>,
+        return_type: Option<String>,
         body: Box<ParsedToken>,
     },
 }
@@ -139,6 +144,7 @@ impl<'a> Parser<'a> {
                 op: operator,
                 rhs: Box::new(rhs),
             };
+
             let bin_expr = ParsedToken::new(bin_expr_kind);
             lhs = Some(bin_expr);
         }
@@ -147,39 +153,108 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary_expression(&mut self) -> Option<ParsedToken> {
-        // do not consume token yet, check if
-        // peek is valid for consumption
         match self.tokens.peek() {
             Some(p) => {
                 // check if kind is valid
                 match &p.kind {
-                    LexerTokenKind::OpenParenthesisToken
-                    | LexerTokenKind::IdentifierToken(_)
-                    | LexerTokenKind::IntegerLiteralToken(_) => {}
+                    LexerTokenKind::OpenParenthesisToken => self.parse_parenthesis_expression(),
+                    LexerTokenKind::IdentifierToken(_) => self.parse_reference_or_call(),
+                    LexerTokenKind::IntegerLiteralToken(val) => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = ParsedTokenKind::IntegerLiteralExpression(val.clone());
+                        let token = ParsedToken::new(kind);
+                        Some(token)
+                    }
                     _ => return None,
                 }
             }
             None => return None,
+        }
+    }
+
+    fn parse_reference_or_call(&mut self) -> Option<ParsedToken> {
+        let identifier = match self.parse_identifier() {
+            Some(i) => i,
+            None => return None,
         };
 
-        let next = self.tokens.next().unwrap();
-        if let LexerTokenKind::OpenParenthesisToken = &next.kind {
-            return self.parse_parenthesis_expression();
+        let reference_kind = ParsedTokenKind::ReferenceExpression(identifier.clone());
+        let reference = ParsedToken::new(reference_kind);
+
+        let peek = match self.tokens.peek() {
+            Some(p) => p,
+            None => return Some(reference),
+        };
+
+        match peek.kind {
+            LexerTokenKind::OpenParenthesisToken => {
+                let arguments = match self.parse_argument_list() {
+                    Some(a) => a,
+                    None => return None,
+                };
+
+                let kind = ParsedTokenKind::CallExpression {
+                    identifier: identifier,
+                    args: arguments,
+                };
+
+                let token = ParsedToken::new(kind);
+                Some(token)
+            }
+            _ => Some(reference),
+        }
+    }
+
+    fn parse_argument_list(&mut self) -> Option<Vec<ParsedToken>> {
+        let _open_paren = self.tokens.next();
+
+        let mut args: Vec<ParsedToken> = Vec::new();
+        let mut prev_comma = false;
+
+        loop {
+            let peek = match self.tokens.peek() {
+                Some(p) => p,
+                None => return None,
+            };
+
+            if let LexerTokenKind::CloseParenthesisToken = peek.kind {
+                if prev_comma {
+                    return None;
+                }
+
+                break;
+            }
+
+            let expr = match self.parse_expression() {
+                Some(e) => e,
+                None => return None,
+            };
+
+            let peek = match self.tokens.peek() {
+                Some(p) => p,
+                None => return None,
+            };
+
+            prev_comma = false;
+            match peek.kind {
+                LexerTokenKind::CommaToken => {
+                    prev_comma = true;
+                    self.tokens.next();
+                }
+                LexerTokenKind::CloseParenthesisToken => {}
+                _ => return None,
+            };
+
+            args.push(expr);
         }
 
-        let kind = match &next.kind {
-            LexerTokenKind::IdentifierToken(id) => ParsedTokenKind::ReferenceExpression(id.clone()),
-            LexerTokenKind::IntegerLiteralToken(val) => {
-                ParsedTokenKind::IntegerLiteralExpression(val.clone())
-            }
-            _ => return None,
-        };
-
-        let token = ParsedToken::new(kind);
-        Some(token)
+        Some(args)
     }
 
     fn parse_parenthesis_expression(&mut self) -> Option<ParsedToken> {
+        let _left_paren = self.tokens.next();
         match self.parse_expression() {
             Some(expr) => {
                 let right_paren = self.tokens.next();
@@ -271,6 +346,15 @@ impl<'a> Parser<'a> {
             None => return None,
         };
 
+        let mut return_type: Option<String> = None;
+        if self.expect_next_token_peek(LexerTokenKind::ArrowToken) {
+            let _arrow = self.tokens.next();
+            match self.parse_identifier() {
+                Some(i) => return_type = Some(i.clone()),
+                None => return None,
+            };
+        }
+
         // body
         let body = match self.parse_scope() {
             Some(b) => b,
@@ -289,6 +373,7 @@ impl<'a> Parser<'a> {
         let kind = ParsedTokenKind::FunctionDeclaration {
             identifier: identifier,
             parameters: parameters,
+            return_type: return_type,
             body: Box::new(body),
         };
 
@@ -297,17 +382,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_parameter_list(&mut self) -> Option<Vec<ParsedToken>> {
-        match self.tokens.next() {
-            Some(t) => match &t.kind {
-                LexerTokenKind::OpenParenthesisToken => {}
-                _ => return None,
-            },
-            None => return None,
-        };
+        if !self.expect_next_token(LexerTokenKind::OpenParenthesisToken) {
+            return None;
+        }
 
         let mut params: Vec<ParsedToken> = Vec::new();
         let mut prev_comma = false;
-        for i in 0.. {
+
+        loop {
             let peek = match self.tokens.peek() {
                 Some(t) => t,
                 None => return None,
@@ -345,8 +427,8 @@ impl<'a> Parser<'a> {
                 None => return None,
             };
 
-            let peek = self.tokens.peek();
-            match peek {
+            prev_comma = false;
+            match self.tokens.peek() {
                 Some(t) => match t.kind {
                     LexerTokenKind::CommaToken => {
                         prev_comma = true;
@@ -354,7 +436,6 @@ impl<'a> Parser<'a> {
                     }
                     LexerTokenKind::CloseParenthesisToken => {}
                     _ => {
-                        prev_comma = false;
                         // expected comma
                         return None;
                     }
@@ -414,6 +495,19 @@ impl<'a> Parser<'a> {
 
     fn expect_next_token(&mut self, kind: LexerTokenKind) -> bool {
         match self.tokens.next() {
+            Some(t) => {
+                if t.kind == kind {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
+    }
+
+    fn expect_next_token_peek(&mut self, kind: LexerTokenKind) -> bool {
+        match self.tokens.peek() {
             Some(t) => {
                 if t.kind == kind {
                     true
