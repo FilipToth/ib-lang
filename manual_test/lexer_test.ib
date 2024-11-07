@@ -1,6 +1,3 @@
-function test(num: Type, idk: Type) -> Number
+if num == false then
     output num
-    output idk + 3
-
-    idk * 4
 end

@@ -32,6 +32,7 @@ pub enum ParsedTokenKind {
     },
     ReferenceExpression(String),
     IntegerLiteralExpression(i64),
+    BooleanLiteralExpression(bool),
     BinaryExpression {
         lhs: Box<ParsedToken>,
         op: Operator,
@@ -173,6 +174,22 @@ impl<'a> Parser<'a> {
                         self.tokens.next();
 
                         let kind = ParsedTokenKind::IntegerLiteralExpression(val.clone());
+                        let token = ParsedToken::new(kind);
+                        Some(token)
+                    },
+                    LexerTokenKind::TrueKeyword => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = ParsedTokenKind::BooleanLiteralExpression(true);
+                        let token = ParsedToken::new(kind);
+                        Some(token)
+                    },
+                    LexerTokenKind::FalseKeyword => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = ParsedTokenKind::BooleanLiteralExpression(false);
                         let token = ParsedToken::new(kind);
                         Some(token)
                     }

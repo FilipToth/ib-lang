@@ -35,6 +35,8 @@ pub enum LexerTokenKind {
     OutputKeyword,
     ReturnKeyword,
     FunctionKeyword,
+    TrueKeyword,
+    FalseKeyword,
 }
 
 impl LexerTokenKind {
@@ -71,6 +73,8 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
         "output" => LexerTokenKind::OutputKeyword,
         "return" => LexerTokenKind::ReturnKeyword,
         "function" => LexerTokenKind::FunctionKeyword,
+        "true" => LexerTokenKind::TrueKeyword,
+        "false" => LexerTokenKind::FalseKeyword,
         _ => LexerTokenKind::IdentifierToken(value),
     }
 }
