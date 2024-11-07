@@ -11,7 +11,7 @@ impl LexerToken {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LexerTokenKind {
     PlusToken,
     MinusToken,
@@ -23,6 +23,8 @@ pub enum LexerTokenKind {
     EqualsEqualsToken,
     OpenParenthesisToken,
     CloseParenthesisToken,
+    CommaToken,
+    ColonToken,
     IntegerLiteralToken(i64),
     IdentifierToken(String),
 
@@ -159,6 +161,8 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             }
             '(' => LexerTokenKind::OpenParenthesisToken,
             ')' => LexerTokenKind::CloseParenthesisToken,
+            ',' => LexerTokenKind::CommaToken,
+            ':' => LexerTokenKind::ColonToken,
             ' ' => continue,
             _ => lex_rolling(&mut chars, current),
         };

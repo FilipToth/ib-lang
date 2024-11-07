@@ -1,1 +1,1 @@
-if 1 then output 1 end
+function myfunc(num: Type) output 1 end

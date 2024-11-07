@@ -51,6 +51,15 @@ pub enum ParsedTokenKind {
         condition: Box<ParsedToken>,
         body: Box<ParsedToken>,
     },
+    Parameter {
+        identifier: String,
+        type_annotation: String,
+    },
+    FunctionDeclaration {
+        identifier: String,
+        parameters: Vec<ParsedToken>,
+        body: Box<ParsedToken>,
+    },
 }
 
 struct Parser<'a> {
@@ -224,13 +233,9 @@ impl<'a> Parser<'a> {
         };
 
         // then keyword
-        match self.tokens.next() {
-            Some(n) => match &n.kind {
-                LexerTokenKind::ThenKeyword => {}
-                _ => return None,
-            },
-            None => return None,
-        };
+        if !self.expect_next_token(LexerTokenKind::ThenKeyword) {
+            return None;
+        }
 
         let body = match self.parse_scope() {
             Some(b) => b,
@@ -238,13 +243,9 @@ impl<'a> Parser<'a> {
         };
 
         // end keyword
-        match self.tokens.next() {
-            Some(n) => match &n.kind {
-                LexerTokenKind::EndKeyword => {}
-                _ => return None,
-            },
-            None => return None,
-        };
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            return None;
+        }
 
         let kind = ParsedTokenKind::IfStatement {
             condition: Box::new(condition),
@@ -255,6 +256,124 @@ impl<'a> Parser<'a> {
         Some(token)
     }
 
+    fn parse_function_declaration(&mut self) -> Option<ParsedToken> {
+        let _keyword = self.tokens.next();
+
+        // identifier
+        let identifier = match self.parse_identifier() {
+            Some(i) => i,
+            None => return None,
+        };
+
+        // parameter list
+        let parameters = match self.parse_parameter_list() {
+            Some(p) => p,
+            None => return None,
+        };
+
+        // body
+        let body = match self.parse_scope() {
+            Some(b) => b,
+            None => return None,
+        };
+
+        // end keyword
+        match self.tokens.next() {
+            Some(t) => match &t.kind {
+                LexerTokenKind::EndKeyword => {}
+                _ => return None,
+            },
+            None => return None,
+        };
+
+        let kind = ParsedTokenKind::FunctionDeclaration {
+            identifier: identifier,
+            parameters: parameters,
+            body: Box::new(body),
+        };
+
+        let token = ParsedToken::new(kind);
+        Some(token)
+    }
+
+    fn parse_parameter_list(&mut self) -> Option<Vec<ParsedToken>> {
+        match self.tokens.next() {
+            Some(t) => match &t.kind {
+                LexerTokenKind::OpenParenthesisToken => {}
+                _ => return None,
+            },
+            None => return None,
+        };
+
+        let mut params: Vec<ParsedToken> = Vec::new();
+        let mut prev_comma = false;
+        for i in 0.. {
+            let peek = match self.tokens.peek() {
+                Some(t) => t,
+                None => return None,
+            };
+
+            match peek.kind {
+                LexerTokenKind::CloseParenthesisToken => {
+                    if prev_comma {
+                        // comma, but no further
+                        // params provided
+                        return None;
+                    }
+
+                    self.tokens.next();
+                    break;
+                }
+                LexerTokenKind::IdentifierToken(_) => {}
+                _ => {
+                    // expected identifier
+                    return None;
+                }
+            };
+
+            let identifier = match self.parse_identifier() {
+                Some(i) => i,
+                None => return None,
+            };
+
+            if !self.expect_next_token(LexerTokenKind::ColonToken) {
+                return None;
+            }
+
+            let type_annotation = match self.parse_identifier() {
+                Some(i) => i,
+                None => return None,
+            };
+
+            let peek = self.tokens.peek();
+            match peek {
+                Some(t) => match t.kind {
+                    LexerTokenKind::CommaToken => {
+                        prev_comma = true;
+                        self.tokens.next();
+                    }
+                    LexerTokenKind::CloseParenthesisToken => {}
+                    _ => {
+                        prev_comma = false;
+                        // expected comma
+                        return None;
+                    }
+                },
+                None => {}
+            };
+
+            let kind = ParsedTokenKind::Parameter {
+                identifier: identifier,
+                type_annotation: type_annotation,
+            };
+
+            let token = ParsedToken::new(kind);
+            params.push(token);
+        }
+
+        Some(params)
+    }
+
     fn parse_statement(&mut self) -> Option<ParsedToken> {
         let peek = self.tokens.peek();
 
@@ -262,7 +381,7 @@ impl<'a> Parser<'a> {
         match peek.kind {
             LexerTokenKind::OutputKeyword => self.parse_output_statement(),
             LexerTokenKind::IfKeyword => self.parse_if_statement(),
-            LexerTokenKind::FunctionKeyword => None,
+            LexerTokenKind::FunctionKeyword => self.parse_function_declaration(),
             _ => self.parse_expression(),
         }
     }
@@ -281,6 +400,29 @@ impl<'a> Parser<'a> {
 
         let token = ParsedToken::new(scope_kind);
         Some(token)
+    }
+
+    fn parse_identifier(&mut self) -> Option<String> {
+        match self.tokens.next() {
+            Some(t) => match &t.kind {
+                LexerTokenKind::IdentifierToken(id) => Some(id.clone()),
+                _ => return None,
+            },
+            None => return None,
+        }
+    }
+
+    fn expect_next_token(&mut self, kind: LexerTokenKind) -> bool {
+        match self.tokens.next() {
+            Some(t) => {
+                if t.kind == kind {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
     }
 }
 
