@@ -1,1 +1,1 @@
-test(1, 2, (12 + 32) * 3 == 0)
+output 1 return

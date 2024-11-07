@@ -65,6 +65,9 @@ pub enum ParsedTokenKind {
         return_type: Option<String>,
         body: Box<ParsedToken>,
     },
+    ReturnStatement {
+        expr: Option<Box<ParsedToken>>,
+    },
 }
 
 struct Parser<'a> {
@@ -331,6 +334,18 @@ impl<'a> Parser<'a> {
         Some(token)
     }
 
+    fn parse_return_statement(&mut self) -> Option<ParsedToken> {
+        let _keyword = self.tokens.next();
+        let expr = match self.parse_expression() {
+            Some(e) => Some(Box::new(e)),
+            None => None,
+        };
+
+        let kind = ParsedTokenKind::ReturnStatement { expr: expr };
+        let token = ParsedToken::new(kind);
+        Some(token)
+    }
+
     fn parse_function_declaration(&mut self) -> Option<ParsedToken> {
         let _keyword = self.tokens.next();
 
@@ -462,6 +477,7 @@ impl<'a> Parser<'a> {
         match peek.kind {
             LexerTokenKind::OutputKeyword => self.parse_output_statement(),
             LexerTokenKind::IfKeyword => self.parse_if_statement(),
+            LexerTokenKind::ReturnKeyword => self.parse_return_statement(),
             LexerTokenKind::FunctionKeyword => self.parse_function_declaration(),
             _ => self.parse_expression(),
         }
