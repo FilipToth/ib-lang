@@ -1,5 +1,7 @@
 use std::fs;
 
+use ibc::analysis::error_bag::ErrorBag;
+
 extern crate ibc;
 
 fn main() {
@@ -14,4 +16,12 @@ fn main() {
 
     let result = ibc::analysis::syntax::parser::parse(tokens);
     println!("{:#?}", result);
+
+    let mut error_bag = ErrorBag::new();
+    let bound = ibc::analysis::binding::bind_root(&result.unwrap(), &mut error_bag);
+    println!("{:#?}", bound);
+
+    for error in error_bag.errors {
+        println!("err: {}", error.format());
+    }
 }

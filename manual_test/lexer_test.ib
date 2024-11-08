@@ -1,3 +1,2 @@
-if num == false then
-    output num
-end
+output my_func()
+output 1

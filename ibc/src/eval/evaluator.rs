@@ -55,7 +55,7 @@ impl EvalHeap {
 #[derive(Debug, Clone)]
 pub enum EvalValue {
     Void,
-    Int(i32),
+    Int(i64),
     Bool(bool),
     String(String),
     // used to return in
@@ -68,7 +68,7 @@ impl EvalValue {
         EvalValue::Void
     }
 
-    fn int(val: i32) -> EvalValue {
+    fn int(val: i64) -> EvalValue {
         EvalValue::Int(val)
     }
 
@@ -90,7 +90,7 @@ impl EvalValue {
         }
     }
 
-    fn force_get_int(&self) -> i32 {
+    fn force_get_int(&self) -> i64 {
         let EvalValue::Int(val) = self else {
             unreachable!()
         };
@@ -270,12 +270,11 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             let body = info.heap.get_func(symbol);
             let ret_value = eval_rec(&body, info);
 
-            // unwrap from return
-            let EvalValue::Return(ret_value) = ret_value else {
-                unreachable!();
-            };
-
-            ret_value.as_ref().clone()
+            match ret_value {
+                EvalValue::Void => EvalValue::void(),
+                EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
+                _ => unreachable!(),
+            }
         }
     };
 

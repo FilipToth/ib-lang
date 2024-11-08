@@ -2,7 +2,10 @@ use std::{iter::Peekable, slice::Iter};
 
 use crate::analysis::{operator::Operator, CodeLocation};
 
-use super::{lexer::{LexerToken, LexerTokenKind}, syntax_token::{SyntaxKind, SyntaxToken}};
+use super::{
+    lexer::{LexerToken, LexerTokenKind},
+    syntax_token::{SyntaxKind, SyntaxToken},
+};
 
 type LexerTokens<'a> = Peekable<Iter<'a, LexerToken>>;
 
@@ -157,6 +160,9 @@ impl<'a> Parser<'a> {
                     None => return None,
                 };
 
+                let peek_after_call = self.tokens.peek();
+                println!("peek after call: {:?}", peek_after_call);
+
                 let kind = SyntaxKind::CallExpression {
                     identifier: identifier,
                     args: arguments,
@@ -198,6 +204,7 @@ impl<'a> Parser<'a> {
             };
 
             if let LexerTokenKind::CloseParenthesisToken = peek.kind {
+                self.tokens.next();
                 if prev_comma {
                     return None;
                 }
