@@ -14,10 +14,10 @@ fn main() {
 
     println!("");
 
-    let result = ibc::analysis::syntax::parser::parse(tokens);
+    let mut error_bag = ErrorBag::new();
+    let result = ibc::analysis::syntax::parser::parse(tokens, &mut error_bag);
     println!("{:#?}", result);
 
-    let mut error_bag = ErrorBag::new();
     let bound = ibc::analysis::binding::bind_root(&result.unwrap(), &mut error_bag);
     println!("{:#?}", bound);
 

@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars, usize, vec};
+use std::{fmt, iter::Peekable, str::Chars, usize, vec};
 
 use crate::analysis::CodeLocation;
 
@@ -67,6 +67,12 @@ impl LexerTokenKind {
 
             _ => 0,
         }
+    }
+}
+
+impl fmt::Display for LexerTokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

@@ -1,6 +1,17 @@
 use super::{binding::types::TypeKind, operator::Operator};
 
 pub enum ErrorKind {
+    // Parsing Errors
+    ExpectedToken(String),
+    ExpectedScope,
+    UnknownOperator(String),
+    ExpectedPrimaryExpressionGot(String),
+    ExpectedPrimaryExpression,
+    UnclosedParenthesisExpression,
+    ExpectedArgument,
+    ExpectedParameter,
+
+    // Binding Errors
     FailedParsing,
     NumberParsing,
     AssignMismatchedTypes,
@@ -43,6 +54,15 @@ pub enum ErrorKind {
 impl ErrorKind {
     pub fn format(&self) -> String {
         match self {
+            Self::ExpectedToken(token) => format!("Expected token: {}", token),
+            Self::ExpectedScope => "Expected scope".to_string(),
+            Self::UnknownOperator(op) => format!("{} is not an operator", op),
+            Self::ExpectedPrimaryExpressionGot(token) => format!("Expected a primary expression, got: {}", token),
+            Self::ExpectedPrimaryExpression => "Expected a primary expression".to_string(),
+            Self::UnclosedParenthesisExpression => "Unclosed parenthesis expression".to_string(),
+            Self::ExpectedArgument => "Expected an argument".to_string(),
+            Self::ExpectedParameter => "Expected a parameter".to_string(),
+
             Self::FailedParsing => "Failed parsing".to_string(),
             Self::NumberParsing => "Cannot parse number".to_string(),
             Self::AssignMismatchedTypes => "Mismatched types in assign expression".to_string(),

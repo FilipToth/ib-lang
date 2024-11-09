@@ -8,5 +8,5 @@ use super::error_bag::ErrorBag;
 
 pub fn parse(content: String, errors: &mut ErrorBag) -> Option<SyntaxToken> {
     let tokens = lexer::lex(content);
-    parser::parse(tokens)
+    parser::parse(tokens, errors)
 }

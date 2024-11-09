@@ -4,8 +4,6 @@ pub mod error_bag;
 pub mod operator;
 pub mod syntax;
 
-use pest::iterators::Pair;
-
 use self::binding::bound_node::BoundNode;
 use self::error_bag::{ErrorBag, ErrorKind};
 
