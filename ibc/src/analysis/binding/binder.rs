@@ -423,12 +423,13 @@ fn bind_call_expression(
         bound_args.push(bound_arg);
     }
 
+    let ret_type = symbol.ret_type.clone();
     let kind = BoundNodeKind::BoundCallExpression {
         symbol: symbol,
         args: Box::new(bound_args),
     };
 
-    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    let node = BoundNode::new(kind, ret_type, loc);
     Some(node)
 }
 

@@ -37,12 +37,14 @@ async fn root(body: String) -> Json<RunResult> {
     let result = ibc::analysis::analyze(body);
 
     let mut diagnostics: Vec<String> = vec![];
-    let Some(root) = result.root else {
-        let errors = result.errors.errors;
-        for error in errors {
-            diagnostics.push(error.format())
-        }
+    let errors = result.errors.errors;
 
+    for error in errors {
+        println!("err: {}", error.format());
+        diagnostics.push(error.format())
+    }
+
+    let Some(root) = result.root else {
         let result = RunResult::new(diagnostics, "".to_string());
         return Json(result);
     };

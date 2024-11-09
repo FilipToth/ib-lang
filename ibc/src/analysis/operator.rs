@@ -82,6 +82,7 @@ impl Operator {
                         lhs: lhs_type,
                         rhs: rhs_type,
                     };
+
                     errors.add(err, loc.line, loc.col);
                     return None;
                 }

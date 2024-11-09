@@ -1,2 +1,5 @@
-output my_func()
-output 1
+function my_fun(num: Int) -> Int
+    return num * 2
+end
+
+my_fun(1)
