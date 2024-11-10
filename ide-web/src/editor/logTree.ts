@@ -1,11 +1,15 @@
 import { SyntaxNode } from "@lezer/common";
 
 interface Node {
-    name: string,
-    children: Array<Node>
+    name: string;
+    children: Array<Node>;
 }
 
-const logTreeInternal = (syntaxNode: SyntaxNode, indent: number, prev: Node) => {
+const logTreeInternal = (
+    syntaxNode: SyntaxNode,
+    indent: number,
+    prev: Node
+) => {
     const node: Node = { name: syntaxNode.name, children: [] };
 
     if (syntaxNode.nextSibling != null)
@@ -15,7 +19,7 @@ const logTreeInternal = (syntaxNode: SyntaxNode, indent: number, prev: Node) => 
         logTreeInternal(syntaxNode.firstChild, indent + 4, node);
 
     prev.children.push(node);
-}
+};
 
 const logTree = (root: SyntaxNode) => {
     const node: Node = { name: "Root", children: [] };

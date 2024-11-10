@@ -1,7 +1,14 @@
-import { parser } from './parser'
-import { LRLanguage, LanguageSupport, foldNodeProp, foldInside, indentNodeProp } from '@codemirror/language'
-import { Tag, styleTags, tags as t } from '@lezer/highlight'
-import ibCompletions from './autocomplete';
+import { parser } from "./parser";
+import {
+    LRLanguage,
+    LanguageSupport,
+    foldNodeProp,
+    foldInside,
+    indentNodeProp,
+} from "@codemirror/language";
+import { styleTags, tags as t } from "@lezer/highlight";
+import ibCompletions from "./autocomplete";
+import ibLinter from "./lint";
 
 const LANG_DEF = LRLanguage.define({
     parser: parser.configure({
@@ -31,24 +38,25 @@ const LANG_DEF = LRLanguage.define({
             }),
             indentNodeProp.add({
                 Application: (context) => context.column(context.node.from),
-                Block: (context) => context.column(context.node.from) + context.unit
+                Block: (context) =>
+                    context.column(context.node.from) + context.unit,
             }),
             foldNodeProp.add({
-                Application: foldInside
+                Application: foldInside,
             }),
-        ]
+        ],
     }),
     languageData: {
-        commentTokens: { line: '#' },
-    }
+        commentTokens: { line: "#" },
+    },
 });
 
 const ib = () => {
     const ibAutocomplete = LANG_DEF.data.of({
-        autocomplete: ibCompletions
+        autocomplete: ibCompletions,
     });
 
-    const support = new LanguageSupport(LANG_DEF, [ibAutocomplete]);
+    const support = new LanguageSupport(LANG_DEF, [ibAutocomplete, ibLinter]);
     return support;
 };
 

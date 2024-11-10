@@ -103,9 +103,9 @@ impl ErrorKind {
 }
 
 pub struct Error {
-    kind: ErrorKind,
-    line: usize,
-    column: usize,
+    pub kind: ErrorKind,
+    pub line: usize,
+    pub column: usize,
 }
 
 impl Error {
