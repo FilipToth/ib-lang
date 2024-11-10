@@ -6,7 +6,5 @@ pub fn eval(root: &BoundNode) -> String {
     let mut output = String::from("");
     evaluator::eval(root, &mut output);
 
-    output
-        .trim()
-        .to_string()
+    output.trim().to_string()
 }

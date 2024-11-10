@@ -1,23 +1,37 @@
-use std::{str::Chars, vec};
+use std::{fmt, iter::Peekable, str::Chars, usize, vec};
+
+use crate::analysis::CodeLocation;
 
 #[derive(Debug)]
-pub struct SyntaxToken {
-    kind: SyntaxTokenKind
+pub struct LexerToken {
+    pub kind: LexerTokenKind,
+    pub loc: CodeLocation,
 }
 
-impl SyntaxToken {
-    fn new(kind: SyntaxTokenKind) -> SyntaxToken {
-        SyntaxToken { kind: kind }
+impl LexerToken {
+    fn new(kind: LexerTokenKind, loc: CodeLocation) -> LexerToken {
+        LexerToken {
+            kind: kind,
+            loc: loc,
+        }
     }
 }
 
-#[derive(Debug)]
-pub enum SyntaxTokenKind {
+#[derive(Debug, PartialEq, Eq)]
+pub enum LexerTokenKind {
     PlusToken,
     MinusToken,
     StarToken,
     SlashToken,
-    IntegerToken(i64),
+    BangToken,
+    EqualsToken,
+    ArrowToken,
+    EqualsEqualsToken,
+    OpenParenthesisToken,
+    CloseParenthesisToken,
+    CommaToken,
+    ColonToken,
+    IntegerLiteralToken(i64),
     IdentifierToken(String),
 
     IfKeyword,
@@ -27,31 +41,65 @@ pub enum SyntaxTokenKind {
     OutputKeyword,
     ReturnKeyword,
     FunctionKeyword,
+    TrueKeyword,
+    FalseKeyword,
 }
 
-fn lex_identifier_or_keyword(value: String) -> SyntaxToken {
-    let kind = match value.as_str() {
-        "if" => SyntaxTokenKind::IfKeyword,
-        "then" => SyntaxTokenKind::ThenKeyword,
-        "end" => SyntaxTokenKind::EndKeyword,
-        "else" => SyntaxTokenKind::ElseKeyword,
-        "output" => SyntaxTokenKind::OutputKeyword,
-        "return" => SyntaxTokenKind::ReturnKeyword,
-        "function" => SyntaxTokenKind::FunctionKeyword,
-        _ => SyntaxTokenKind::IdentifierToken(value)
-    };
+impl LexerTokenKind {
+    pub fn unary_operator_precedence(&self) -> usize {
+        match self {
+            LexerTokenKind::PlusToken => 4,
+            LexerTokenKind::MinusToken => 4,
+            LexerTokenKind::BangToken => 4,
+            _ => 0,
+        }
+    }
 
-    SyntaxToken::new(kind) 
+    pub fn binary_operator_precedence(&self) -> usize {
+        match self {
+            LexerTokenKind::StarToken => 3,
+            LexerTokenKind::SlashToken => 3,
+
+            LexerTokenKind::PlusToken => 2,
+            LexerTokenKind::MinusToken => 2,
+
+            LexerTokenKind::EqualsEqualsToken => 1,
+
+            _ => 0,
+        }
+    }
 }
 
-fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
+impl fmt::Display for LexerTokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
+    match value.to_lowercase().as_str() {
+        "if" => LexerTokenKind::IfKeyword,
+        "then" => LexerTokenKind::ThenKeyword,
+        "end" => LexerTokenKind::EndKeyword,
+        "else" => LexerTokenKind::ElseKeyword,
+        "output" => LexerTokenKind::OutputKeyword,
+        "return" => LexerTokenKind::ReturnKeyword,
+        "function" => LexerTokenKind::FunctionKeyword,
+        "true" => LexerTokenKind::TrueKeyword,
+        "false" => LexerTokenKind::FalseKeyword,
+        _ => LexerTokenKind::IdentifierToken(value),
+    }
+}
+
+fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize) -> LexerTokenKind {
     let mut value = current.to_string();
     let is_numeric = current.is_numeric();
 
     loop {
-        match iter.next() {
+        let peek = iter.peek();
+        match peek {
             Some(next) => {
-                if !next.is_alphanumeric() {
+                if !(next.is_alphanumeric() || *next == '_') {
                     break;
                 }
 
@@ -63,9 +111,13 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
                     break;
                 }
 
-                value.push(next);
-            },
-            None => { break; }
+                *column += 1;
+                value.push(*next);
+                iter.next();
+            }
+            None => {
+                break;
+            }
         };
     }
 
@@ -73,44 +125,78 @@ fn lex_rolling(iter: &mut Chars, current: char) -> SyntaxToken {
         let int_value = value.parse();
         match int_value {
             Ok(v) => {
-                let kind = SyntaxTokenKind::IntegerToken(v);
-                return SyntaxToken::new(kind);
-            },
-            Err(_) => unreachable!()
+                return LexerTokenKind::IntegerLiteralToken(v);
+            }
+            Err(_) => unreachable!(),
         }
     }
 
     lex_identifier_or_keyword(value)
 }
 
-pub fn lex(content: String) -> Vec<SyntaxToken> {
-    let mut tokens: Vec<SyntaxToken> = vec![];
-    let mut chars = content.chars();
+pub fn lex(content: String) -> Vec<LexerToken> {
+    let mut tokens: Vec<LexerToken> = vec![];
+    let mut chars = content.chars().peekable();
 
-    let mut current_value: Option<String> = None;
+    let mut line: usize = 0;
+    let mut column: usize = 0;
+
     loop {
         let current = match chars.next() {
             Some(c) => c,
-            None => break
+            None => break,
         };
 
-        let token = match current {
-            '+' => SyntaxToken::new(SyntaxTokenKind::PlusToken),
-            '-' => SyntaxToken::new(SyntaxTokenKind::MinusToken),
-            '*' => SyntaxToken::new(SyntaxTokenKind::StarToken),
-            '/' => SyntaxToken::new(SyntaxTokenKind::SlashToken),
-            ' ' => continue,
-            _ => {
-                lex_rolling(&mut chars, current)
+        let loc = CodeLocation::new(line, column);
+        column += 1;
+
+        let kind = match current {
+            '+' => LexerTokenKind::PlusToken,
+            '-' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some(n) => match n {
+                        '>' => {
+                            chars.next();
+                            LexerTokenKind::ArrowToken
+                        }
+                        _ => LexerTokenKind::MinusToken,
+                    },
+                    None => LexerTokenKind::MinusToken,
+                }
             }
+            '*' => LexerTokenKind::StarToken,
+            '/' => LexerTokenKind::SlashToken,
+            '!' => LexerTokenKind::BangToken,
+            '=' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some(n) => match n {
+                        '=' => {
+                            chars.next();
+                            LexerTokenKind::EqualsEqualsToken
+                        }
+                        _ => LexerTokenKind::EqualsToken,
+                    },
+                    None => LexerTokenKind::EqualsToken,
+                }
+            }
+            '(' => LexerTokenKind::OpenParenthesisToken,
+            ')' => LexerTokenKind::CloseParenthesisToken,
+            ',' => LexerTokenKind::CommaToken,
+            ':' => LexerTokenKind::ColonToken,
+            ' ' => continue,
+            '\n' => {
+                line += 1;
+                column = 0;
+                continue;
+            }
+            '\r' => continue,
+            _ => lex_rolling(&mut chars, current, &mut column),
         };
 
+        let token = LexerToken::new(kind, loc);
         tokens.push(token);
-    }
-
-    if let Some(ref mut c) = current_value {
-        let identifier = SyntaxToken::new(SyntaxTokenKind::IdentifierToken(c.clone()));
-        tokens.push(identifier);
     }
 
     tokens
