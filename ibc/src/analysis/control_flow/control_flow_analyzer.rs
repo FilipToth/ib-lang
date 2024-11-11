@@ -1,4 +1,4 @@
-use std::{cell::RefCell, mem, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::{
     binding::types::TypeKind,

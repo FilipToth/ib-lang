@@ -4,12 +4,8 @@ pub mod error_bag;
 pub mod operator;
 pub mod syntax;
 
-use pest::iterators::Pair;
-
 use self::binding::bound_node::BoundNode;
 use self::error_bag::{ErrorBag, ErrorKind};
-use self::syntax::parser;
-use self::syntax::parser::Rule;
 
 #[derive(Debug, Clone)]
 pub struct CodeLocation {
@@ -23,11 +19,6 @@ impl CodeLocation {
             line: line,
             col: col,
         }
-    }
-
-    pub fn from_pair(rule: &Pair<Rule>) -> CodeLocation {
-        let (line, col) = rule.line_col();
-        CodeLocation::new(line, col)
     }
 }
 
@@ -55,7 +46,7 @@ impl AnalysisResult {
 pub fn analyze(contents: String) -> AnalysisResult {
     // parsing
     let mut bag = ErrorBag::new();
-    let root = match parser::parse_contents(contents, &mut bag) {
+    let root = match syntax::parse(contents, &mut bag) {
         Some(root) => root,
         None => {
             bag.add(ErrorKind::FailedParsing, 0, 0);

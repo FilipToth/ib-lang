@@ -108,7 +108,7 @@ pub enum BoundNodeKind {
         args: Box<Vec<BoundNode>>,
     },
     ReferenceExpression(VariableSymbol),
-    NumberLiteral(i32),
+    NumberLiteral(i64),
     BooleanLiteral(bool),
 }
 

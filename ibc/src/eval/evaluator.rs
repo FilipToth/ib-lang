@@ -10,7 +10,7 @@ use crate::analysis::{
 
 pub struct EvalInfo<'a> {
     heap: &'a mut EvalHeap,
-    output: &'a mut String
+    output: &'a mut String,
 }
 
 pub struct EvalHeap {
@@ -18,7 +18,7 @@ pub struct EvalHeap {
     // memory, no need for us to make
     // our own heap
     variables: HashMap<u64, EvalValue>,
-    functions: HashMap<u64, Rc<BoundNode>>
+    functions: HashMap<u64, Rc<BoundNode>>,
 }
 
 impl EvalHeap {
@@ -55,7 +55,7 @@ impl EvalHeap {
 #[derive(Debug, Clone)]
 pub enum EvalValue {
     Void,
-    Int(i32),
+    Int(i64),
     Bool(bool),
     String(String),
     // used to return in
@@ -68,7 +68,7 @@ impl EvalValue {
         EvalValue::Void
     }
 
-    fn int(val: i32) -> EvalValue {
+    fn int(val: i64) -> EvalValue {
         EvalValue::Int(val)
     }
 
@@ -90,7 +90,7 @@ impl EvalValue {
         }
     }
 
-    fn force_get_int(&self) -> i32 {
+    fn force_get_int(&self) -> i64 {
         let EvalValue::Int(val) = self else {
             unreachable!()
         };
@@ -160,8 +160,8 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                 EvalValue::String(lhs) => {
                     let rhs = rhs.force_get_string();
                     EvalValue::Bool(rhs == lhs)
-                },
-                EvalValue::Return(_) => unreachable!()
+                }
+                EvalValue::Return(_) => unreachable!(),
             }
         }
         _ => {
@@ -231,8 +231,12 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             };
 
             EvalValue::Return(Box::new(val))
-        },
-        BoundNodeKind::IfStatement { condition, block, else_block } => {
+        }
+        BoundNodeKind::IfStatement {
+            condition,
+            block,
+            else_block,
+        } => {
             let cond_value = eval_rec(&condition, info).force_get_bool();
             let value = if cond_value {
                 eval_rec(&block, info)
@@ -244,13 +248,13 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
 
             match &value {
                 EvalValue::Return(_) => value,
-                _ => EvalValue::void()
+                _ => EvalValue::void(),
             }
-        },
+        }
         BoundNodeKind::FunctionDeclaration { symbol, block } => {
             info.heap.declare_func(symbol, block.clone());
             EvalValue::void()
-        },
+        }
         BoundNodeKind::BoundCallExpression { symbol, args } => {
             let num_params = symbol.parameters.len();
             for index in 0..num_params {
@@ -266,13 +270,12 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             let body = info.heap.get_func(symbol);
             let ret_value = eval_rec(&body, info);
 
-            // unwrap from return
-            let EvalValue::Return(ret_value) = ret_value else {
-                unreachable!();
-            };
-
-            ret_value.as_ref().clone()
-        },
+            match ret_value {
+                EvalValue::Void => EvalValue::void(),
+                EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
+                _ => unreachable!(),
+            }
+        }
     };
 
     val
@@ -282,7 +285,7 @@ pub fn eval(root: &BoundNode, output: &mut String) {
     let mut heap = EvalHeap::new();
     let mut info = EvalInfo {
         heap: &mut heap,
-        output: output
+        output: output,
     };
 
     eval_rec(root, &mut info);

@@ -5,11 +5,15 @@ import { EditorState } from "@uiw/react-codemirror";
 import logTree from "./logTree";
 
 interface Symbol {
-    name: string,
-    type: string
+    name: string;
+    type: string;
 }
 
-const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | undefined) => {
+const resolveSymbols = (
+    tree: Tree,
+    context: CompletionContext,
+    word: string | undefined
+) => {
     const nodeBefore = tree.resolveInner(context.pos, -1);
 
     const scopes: SyntaxNode[] = [];
@@ -17,8 +21,7 @@ const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | u
 
     const symbols: Symbol[] = [];
     for (const scope of scopes) {
-        if (scope.firstChild == null)
-            continue;
+        if (scope.firstChild == null) continue;
 
         checkForParameters(scope, context, symbols);
         resolveSymbolsInScope(scope.firstChild, context, symbols);
@@ -26,8 +29,7 @@ const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | u
 
     const resolvedSymbols: Symbol[] = [];
     symbols.forEach((symbol) => {
-        if (symbol.name == word)
-            return;
+        if (symbol.name == word) return;
 
         resolvedSymbols.push(symbol);
     });
@@ -36,24 +38,28 @@ const resolveSymbols = (tree: Tree, context: CompletionContext, word: string | u
 };
 
 const getScopesRecursive = (node: SyntaxNode, scopes: SyntaxNode[]) => {
-    if (node.name == "Block")
-        scopes.push(node);
+    if (node.name == "Block") scopes.push(node);
 
-    if (node.parent == null)
-        return;
+    if (node.parent == null) return;
 
     getScopesRecursive(node.parent, scopes);
 };
 
-const resolveSymbolsInScope = (scopeChild: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+const resolveSymbolsInScope = (
+    scopeChild: SyntaxNode,
+    context: CompletionContext,
+    symbols: Symbol[]
+) => {
     // a scope will always contain atoms, the first
     // child of the atom is the actual node
     const node = scopeChild.firstChild;
-    if (node == null)
-        return;
+    if (node == null) return;
 
     const identifierNode = node.getChild("Identifier");
-    const identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+    const identifier = context.state.sliceDoc(
+        identifierNode?.from,
+        identifierNode?.to
+    );
 
     let kind = null;
     if (node.name == "VariableAssignment") {
@@ -68,43 +74,50 @@ const resolveSymbolsInScope = (scopeChild: SyntaxNode, context: CompletionContex
         symbols.push({ name: identifier, type: kind });
     }
 
-    if (scopeChild.nextSibling == null)
-        return;
+    if (scopeChild.nextSibling == null) return;
 
     resolveSymbolsInScope(scopeChild.nextSibling, context, symbols);
 };
 
-const checkForParameters = (block: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+const checkForParameters = (
+    block: SyntaxNode,
+    context: CompletionContext,
+    symbols: Symbol[]
+) => {
     // the parameter list will always be the
     // prev sibling to the block in a function
     // declaration
 
     const prev = block.prevSibling;
-    if (prev == null || prev.name != "ParameterList")
-        return;
+    if (prev == null || prev.name != "ParameterList") return;
 
     checkForParametersRecursive(prev.firstChild!, context, symbols);
 };
 
-const checkForParametersRecursive = (param: SyntaxNode, context: CompletionContext, symbols: Symbol[]) => {
+const checkForParametersRecursive = (
+    param: SyntaxNode,
+    context: CompletionContext,
+    symbols: Symbol[]
+) => {
     if (param.name == "Parameter") {
         const identifierNode = param.getChild("Identifier");
-        const identifier = context.state.sliceDoc(identifierNode?.from, identifierNode?.to);
+        const identifier = context.state.sliceDoc(
+            identifierNode?.from,
+            identifierNode?.to
+        );
 
         const symbol: Symbol = { name: identifier, type: "variable" };
         symbols.push(symbol);
     }
 
-    if (param.nextSibling == null)
-        return;
+    if (param.nextSibling == null) return;
 
     checkForParametersRecursive(param.nextSibling, context, symbols);
-}
+};
 
 const ibCompletions = (context: CompletionContext) => {
-    let word = context.matchBefore(/\w*/)
-    if (word?.from == word?.to && !context.explicit)
-        return null;
+    let word = context.matchBefore(/\w*/);
+    if (word?.from == word?.to && !context.explicit) return null;
 
     const tree = syntaxTree(context.state);
     const symbols = resolveSymbols(tree, context, word?.text);
@@ -116,21 +129,21 @@ const ibCompletions = (context: CompletionContext) => {
     return {
         from: word?.from,
         options: [
-            {label: "if", type: "keyword"},
-            {label: "then", type: "keyword"},
-            {label: "end", type: "keyword"},
-            {label: "else", type: "keyword"},
-            {label: "output", type: "keyword"},
-            {label: "function", type: "keyword"},
-            {label: "return", type: "keyword"},
-            {label: "not", type: "keyword"},
-            {label: "Void", type: "type"},
-            {label: "Int", type: "type"},
-            {label: "String", type: "type"},
-            {label: "Boolean", type: "type"},
-            ...symbolOptions
-        ]
-    }
+            { label: "if", type: "keyword" },
+            { label: "then", type: "keyword" },
+            { label: "end", type: "keyword" },
+            { label: "else", type: "keyword" },
+            { label: "output", type: "keyword" },
+            { label: "function", type: "keyword" },
+            { label: "return", type: "keyword" },
+            { label: "not", type: "keyword" },
+            { label: "Void", type: "type" },
+            { label: "Int", type: "type" },
+            { label: "String", type: "type" },
+            { label: "Boolean", type: "type" },
+            ...symbolOptions,
+        ],
+    };
 };
 
 export default ibCompletions;

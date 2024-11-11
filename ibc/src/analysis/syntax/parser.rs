@@ -1,8 +1,4 @@
-use pest::{
-    iterators::{Pair, Pairs},
-    pratt_parser::PrattParser,
-    Parser,
-};
+use std::{iter::Peekable, slice::Iter};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -10,492 +6,638 @@ use crate::analysis::{
     CodeLocation,
 };
 
-use super::syntax_token::{ParameterSyntax, SyntaxKind, SyntaxToken};
+use super::{
+    lexer::{LexerToken, LexerTokenKind},
+    syntax_token::{SyntaxKind, SyntaxToken},
+};
 
-#[derive(Parser)]
-#[grammar = "analysis/syntax/grammar.pest"]
-struct IbParser;
+type LexerTokens<'a> = Peekable<Iter<'a, LexerToken>>;
 
-fn parse_module(module: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = module.clone().into_inner();
-    let block = subtokens.nth(0).unwrap();
-
-    let block = match parse(Pairs::single(block), errors) {
-        Some(b) => b,
-        None => return None,
-    };
-
-    let module_kind = SyntaxKind::Module {
-        block: Box::new(block),
-    };
-
-    let node = SyntaxToken::new(module_kind, &module);
-    Some(node)
+struct Parser<'a> {
+    tokens: LexerTokens<'a>,
 }
 
-fn parse_block(block: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let subtokens = block.clone().into_inner();
-
-    let mut tokens: Vec<SyntaxToken> = Vec::new();
-    for subtoken in subtokens {
-        let subtoken = match parse(Pairs::single(subtoken), errors) {
-            Some(t) => t,
-            None => return None,
-        };
-
-        tokens.push(subtoken);
+impl<'a> Parser<'a> {
+    fn new(tokens: LexerTokens<'a>) -> Self {
+        Parser { tokens: tokens }
     }
 
-    let block_kind = SyntaxKind::Block {
-        children: Box::new(tokens),
-    };
-
-    let node = SyntaxToken::new(block_kind, &block);
-    Some(node)
-}
-
-fn parse_if_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = statement.clone().into_inner();
-
-    let condition = match subtokens.nth(0) {
-        Some(c) => parse(Pairs::single(c), errors),
-        None => return None,
-    };
-
-    let condition = match condition {
-        Some(t) => t,
-        None => return None,
-    };
-
-    let block = subtokens.nth(0).unwrap();
-    let block = match parse(Pairs::single(block), errors) {
-        Some(b) => b,
-        None => return None,
-    };
-
-    let else_block = match subtokens.nth(0) {
-        Some(e) => match parse(Pairs::single(e), errors) {
-            Some(e) => Some(Box::new(e)),
-            None => return None,
-        },
-        None => None,
-    };
-
-    let if_kind = SyntaxKind::IfStatement {
-        condition: Box::new(condition),
-        block: Box::new(block),
-        else_block: else_block,
-    };
-
-    let node = SyntaxToken::new(if_kind, &statement);
-    Some(node)
-}
-
-fn parse_output_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = statement.clone().into_inner();
-
-    let expr = match subtokens.nth(0) {
-        Some(e) => parse(Pairs::single(e), errors),
-        None => return None,
-    };
-
-    let expr = match expr {
-        Some(t) => t,
-        None => return None,
-    };
-
-    let output_kind = SyntaxKind::OutputStatement {
-        expr: Box::new(expr),
-    };
-
-    let node = SyntaxToken::new(output_kind, &statement);
-    Some(node)
-}
-
-fn parse_return_statement(statement: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = statement.clone().into_inner();
-
-    let ret_expr = subtokens.nth(0);
-    let ret_expr = match ret_expr {
-        Some(e) => {
-            let ret_expr = match parse(Pairs::single(e), errors) {
-                Some(e) => e,
-                None => return None,
-            };
-
-            Some(Box::new(ret_expr))
-        }
-        None => None,
-    };
-
-    let kind = SyntaxKind::ReturnStatement { expr: ret_expr };
-    let node = SyntaxToken::new(kind, &statement);
-    Some(node)
-}
-
-fn parse_function_declaration(
-    declaration: Pair<Rule>,
-    errors: &mut ErrorBag,
-) -> Option<SyntaxToken> {
-    let mut subtokens = declaration.clone().into_inner();
-
-    let identifier = match subtokens.nth(0) {
-        Some(i) => parse(Pairs::single(i), errors),
-        None => return None,
-    };
-
-    let identifier = match identifier {
-        Some(i) => i,
-        None => return None,
-    };
-
-    let params = match subtokens.nth(0) {
-        Some(p) => parse(Pairs::single(p), errors),
-        None => return None,
-    };
-
-    let params = match params {
-        Some(p) => p,
-        None => return None,
-    };
-
-    let block_or_type = match subtokens.nth(0) {
-        Some(f) => parse(Pairs::single(f), errors),
-        None => return None,
-    };
-
-    let block_or_type = match block_or_type {
-        Some(f) => f,
-        None => return None,
-    };
-
-    let (type_annotation, block) = match block_or_type.kind {
-        SyntaxKind::FunctionTypeAnnotation(id) => {
-            let block = match subtokens.nth(0) {
-                Some(b) => parse(Pairs::single(b), errors),
-                None => return None,
-            };
-
-            let block = match block {
-                Some(b) => b,
-                None => return None,
-            };
-
-            (id, block)
-        }
-        _ => {
-            // must be a block
-            ("Void".to_string(), block_or_type)
-        }
-    };
-
-    let kind = SyntaxKind::FunctionDeclaration {
-        identifier: Box::new(identifier),
-        params: Box::new(params),
-        ret_type: type_annotation,
-        block: Box::new(block),
-    };
-
-    let node = SyntaxToken::new(kind, &declaration);
-    Some(node)
-}
-
-fn parse_func_type_annotation(annot: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = annot.clone().into_inner();
-    let identifier = match subtokens.nth(0) {
-        Some(i) => parse(Pairs::single(i), errors),
-        None => return None,
-    };
-
-    let identifier = match identifier {
-        Some(i) => i,
-        None => return None,
-    };
-
-    let SyntaxKind::IdentifierToken(id) = identifier.kind else {
-        return None;
-    };
-
-    let kind = SyntaxKind::FunctionTypeAnnotation(id);
-    let node = SyntaxToken::new(kind, &annot);
-    Some(node)
-}
-
-fn parse_parameter_list(params: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = params.clone().into_inner();
-    let num_subtokens = subtokens.len();
-    let num_params = num_subtokens / 2;
-
-    let mut parameters: Vec<ParameterSyntax> = Vec::new();
-    for _ in 0..num_params {
-        let identifier = match subtokens.nth(0) {
-            Some(i) => i,
-            None => return None,
-        };
-
-        let type_annotation = match subtokens.nth(0) {
-            Some(i) => i,
-            None => return None,
-        };
-
-        let loc = CodeLocation::from_pair(&identifier);
-        let param = ParameterSyntax {
-            identifier: String::from(identifier.as_str()),
-            type_annotation: String::from(type_annotation.as_str()),
-            location: loc,
-        };
-
-        parameters.push(param);
+    fn parse_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        self.parse_binary_expression(0, errors)
     }
 
-    let kind = SyntaxKind::ParameterList { params: parameters };
-    let node = SyntaxToken::new(kind, &params);
-    Some(node)
-}
-
-fn parse_assignment_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = expr.clone().into_inner();
-    let reference = match subtokens.nth(0) {
-        Some(i) => parse_reference_expression(i, errors),
-        None => return None,
-    };
-
-    let reference = match reference {
-        Some(t) => t,
-        None => return None,
-    };
-
-    let _assignment = subtokens.nth(0);
-
-    let value = match subtokens.nth(0) {
-        Some(v) => parse(Pairs::single(v), errors),
-        None => return None,
-    };
-
-    let value = match value {
-        Some(t) => t,
-        None => return None,
-    };
-
-    let assignment_kind = SyntaxKind::AssignmentExpression {
-        reference: Box::new(reference),
-        value: Box::new(value),
-    };
-
-    let node = SyntaxToken::new(assignment_kind, &expr);
-    Some(node)
-}
-
-fn parse_call_expression(expr: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let mut subtokens = expr.clone().into_inner();
-    let identifier = match subtokens.nth(0) {
-        Some(i) => parse(Pairs::single(i), errors),
-        None => return None,
-    };
-
-    let identifier = match identifier {
-        Some(i) => i,
-        None => return None,
-    };
-
-    let args = match subtokens.nth(0) {
-        Some(a) => a,
-        None => return None,
-    };
-
-    let args = match parse_args_list(args, errors) {
-        Some(a) => a,
-        None => return None,
-    };
-
-    let kind = SyntaxKind::CallExpression {
-        identifier: Box::new(identifier),
-        args: Box::new(args),
-    };
-
-    let node = SyntaxToken::new(kind, &expr);
-    Some(node)
-}
-
-fn parse_args_list(args: Pair<Rule>, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {
-    let subtokens = args.clone().into_inner();
-
-    let mut tokens: Vec<SyntaxToken> = Vec::new();
-    for subtoken in subtokens {
-        let parsed = parse(Pairs::single(subtoken), errors);
-        match parsed {
-            Some(t) => tokens.push(t),
+    fn parse_binary_expression(
+        &mut self,
+        parent_precedence: usize,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let unary_precedence = match self.tokens.peek() {
+            Some(t) => t.kind.unary_operator_precedence(),
             None => return None,
         };
-    }
 
-    Some(tokens)
-}
+        let mut lhs = if unary_precedence != 0 && unary_precedence >= parent_precedence {
+            // unary expression
+            let next = self.tokens.next().unwrap();
+            let next_loc = next.loc.clone();
 
-fn parse_reference_expression(
-    reference: Pair<Rule>,
-    _errors: &mut ErrorBag,
-) -> Option<SyntaxToken> {
-    let identifier = match reference.clone().into_inner().nth(0) {
-        Some(i) => String::from(i.as_str()),
-        None => return None,
-    };
-
-    let reference_kind = SyntaxKind::ReferenceExpression(identifier);
-    let node = SyntaxToken::new(reference_kind, &reference);
-    Some(node)
-}
-
-fn parse_identifier_token(identifier: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let identifier_token_kind = SyntaxKind::IdentifierToken(String::from(identifier.as_str()));
-    let node = SyntaxToken::new(identifier_token_kind, &identifier);
-    Some(node)
-}
-
-fn parse_literal_expression(literal: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let inner = match literal.clone().into_inner().nth(0) {
-        Some(i) => parse(Pairs::single(i), errors),
-        None => return None,
-    };
-
-    let inner = match inner {
-        Some(t) => t,
-        None => return None,
-    };
-
-    let literal_expr_kind = SyntaxKind::LiteralExpression(Box::new(inner));
-    let node = SyntaxToken::new(literal_expr_kind, &literal);
-    Some(node)
-}
-
-fn parse_number_token(pairs: Pair<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let (line, col) = pairs.line_col();
-    let num = match pairs.as_str().parse::<i32>() {
-        Ok(n) => n,
-        Err(_) => {
-            errors.add(ErrorKind::NumberParsing, line, col);
-            return None;
-        }
-    };
-
-    let number_token_kind = SyntaxKind::NumberToken(num);
-    let node = SyntaxToken::new(number_token_kind, &pairs);
-    Some(node)
-}
-
-fn parse_boolean_token(pairs: Pair<Rule>, _errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    let inner_text = pairs.as_str().to_lowercase();
-    let value = if inner_text == "true" {
-        true
-    } else if inner_text == "false" {
-        false
-    } else {
-        unreachable!()
-    };
-
-    let boolean_token_kind = SyntaxKind::BooleanToken(value);
-    let node = SyntaxToken::new(boolean_token_kind, &pairs);
-    Some(node)
-}
-
-fn parse(pairs: Pairs<Rule>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    PARSER
-        .map_primary(|primary| match primary.as_rule() {
-            Rule::module => parse_module(primary, errors),
-            Rule::block => parse_block(primary, errors),
-            Rule::expression_statement => parse(primary.into_inner(), errors),
-            Rule::if_statement => parse_if_statement(primary, errors),
-            Rule::output_statement => parse_output_statement(primary, errors),
-            Rule::return_statement => parse_return_statement(primary, errors),
-            Rule::function_declaration_statement => parse_function_declaration(primary, errors),
-            Rule::function_type_annotation => parse_func_type_annotation(primary, errors),
-            Rule::parameter_list => parse_parameter_list(primary, errors),
-            Rule::expression => parse(primary.into_inner(), errors),
-            Rule::assignment_expression => parse_assignment_expression(primary, errors),
-            Rule::call_expression => parse_call_expression(primary, errors),
-            Rule::reference_expression => parse_reference_expression(primary, errors),
-            Rule::literal_expression => parse_literal_expression(primary, errors),
-            Rule::number_token => parse_number_token(primary, errors),
-            Rule::boolean_token => parse_boolean_token(primary, errors),
-            Rule::identifier_token => parse_identifier_token(primary, errors),
-            rule => unreachable!("Unexpected parser rule type: {:?}", rule),
-        })
-        .map_infix(|lhs, op, rhs| {
-            let operator = match op.as_rule() {
-                Rule::addition => Operator::Addition,
-                Rule::subtraction => Operator::Subtraction,
-                Rule::multiplication => Operator::Multiplication,
-                Rule::division => Operator::Division,
-                Rule::equality => Operator::Equality,
-                _ => unreachable!(),
+            let operator = match self.parse_operator(next) {
+                Some(o) => o,
+                None => {
+                    let error_kind = ErrorKind::UnknownOperator(next.kind.to_string());
+                    errors.add(error_kind, next.loc.line, next.loc.col);
+                    return None;
+                }
             };
 
-            let lhs_token = match lhs {
-                Some(t) => t,
+            let rhs = match self.parse_binary_expression(unary_precedence, errors) {
+                Some(r) => r,
                 None => return None,
             };
 
-            let rhs_token = match rhs {
-                Some(t) => t,
-                None => return None,
-            };
-
-            let loc = lhs_token.loc.clone();
-            let expr_kind = SyntaxKind::BinaryExpression {
-                lhs: Box::new(lhs_token),
-                op: operator,
-                rhs: Box::new(rhs_token),
-            };
-
-            let node = SyntaxToken {
-                kind: expr_kind,
-                loc: loc,
-            };
-            Some(node)
-        })
-        .map_prefix(|op, rhs| {
-            let operator = match op.as_rule() {
-                Rule::not => Operator::Not,
-                _ => unreachable!(),
-            };
-
-            let rhs = match rhs {
-                Some(t) => t,
-                None => return None,
-            };
-
-            let expr_kind = SyntaxKind::UnaryExpression {
+            let unary_kind = SyntaxKind::UnaryExpression {
                 op: operator,
                 rhs: Box::new(rhs),
             };
 
-            let node = SyntaxToken::new(expr_kind, &op);
-            Some(node)
-        })
-        .parse(pairs)
-}
+            let token = SyntaxToken::new(unary_kind, next_loc);
+            Some(token)
+        } else {
+            self.parse_primary_expression(errors)
+        };
 
-lazy_static! {
-    static ref PARSER: PrattParser<Rule> = {
-        use pest::pratt_parser::{Op, Assoc::*};
-        use analysis::syntax::parser::Rule::*;
+        while let Some(lhs_token) = lhs.take() {
+            let precedence = match self.tokens.peek() {
+                Some(t) => t.kind.binary_operator_precedence(),
+                None => {
+                    lhs = Some(lhs_token);
+                    break;
+                }
+            };
 
-        // instantiate pratt parser and define
-        // operator precedences
-        PrattParser::new()
-            .op(Op::infix(equality, Left))
-            .op(Op::infix(addition, Left) | Op::infix(subtraction, Left))
-            .op(Op::infix(multiplication, Left) | Op::infix(division, Left))
-            .op(Op::prefix(not))
-    };
-}
+            if precedence == 0 || precedence <= parent_precedence {
+                lhs = Some(lhs_token);
+                break;
+            }
 
-pub fn parse_contents(contents: String, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-    match IbParser::parse(Rule::module, contents.as_str()) {
-        Ok(mut pairs) => {
-            println!("{:#?}", pairs.clone());
-            parse(Pairs::single(pairs.next().unwrap()), errors)
+            let operator_token = match self.tokens.next() {
+                Some(t) => t,
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("binary operator".to_string());
+                    errors.add(error_kind, lhs_token.loc.line, lhs_token.loc.col);
+                    break;
+                }
+            };
+
+            let operator = match self.parse_operator(operator_token) {
+                Some(o) => o,
+                None => {
+                    let error_kind = ErrorKind::UnknownOperator(operator_token.kind.to_string());
+                    errors.add(error_kind, operator_token.loc.line, operator_token.loc.col);
+                    return None;
+                }
+            };
+
+            let rhs = match self.parse_binary_expression(precedence, errors) {
+                Some(r) => r,
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                    errors.add(error_kind, operator_token.loc.line, operator_token.loc.col);
+                    return None;
+                }
+            };
+
+            let loc = lhs_token.loc.clone();
+            let bin_expr_kind = SyntaxKind::BinaryExpression {
+                lhs: Box::new(lhs_token),
+                op: operator,
+                rhs: Box::new(rhs),
+            };
+
+            let bin_expr = SyntaxToken::new(bin_expr_kind, loc);
+            lhs = Some(bin_expr);
         }
-        Err(_) => None,
+
+        lhs
     }
+
+    fn parse_primary_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        match self.tokens.peek() {
+            Some(p) => {
+                // check if kind is valid
+                let loc = p.loc.clone();
+                match &p.kind {
+                    LexerTokenKind::OpenParenthesisToken => {
+                        self.parse_parenthesis_expression(errors)
+                    }
+                    LexerTokenKind::IdentifierToken(_) => {
+                        self.parse_reference_or_call_or_assignment(errors)
+                    }
+                    LexerTokenKind::IntegerLiteralToken(val) => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = SyntaxKind::IntegerLiteralExpression(val.clone());
+                        let token = SyntaxToken::new(kind, loc);
+                        Some(token)
+                    }
+                    LexerTokenKind::TrueKeyword => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = SyntaxKind::BooleanLiteralExpression(true);
+                        let token = SyntaxToken::new(kind, loc);
+                        Some(token)
+                    }
+                    LexerTokenKind::FalseKeyword => {
+                        // consume token
+                        self.tokens.next();
+
+                        let kind = SyntaxKind::BooleanLiteralExpression(false);
+                        let token = SyntaxToken::new(kind, loc);
+                        Some(token)
+                    }
+                    _ => return None,
+                }
+            }
+            None => {
+                // TODO: Add location, use some sort of last parsed token location
+                let error_kind = ErrorKind::ExpectedPrimaryExpression;
+                errors.add(error_kind, 0, 0);
+                return None;
+            }
+        }
+    }
+
+    fn parse_reference_or_call_or_assignment(
+        &mut self,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        // theoretically shouldn't be none
+        let (identifier, loc) = match self.parse_identifier() {
+            Some(i) => i,
+            None => {
+                // TODO: Agains use some sort of last token loc
+                let error_kind = ErrorKind::ExpectedToken("identifier".to_string());
+                errors.add(error_kind, 0, 0);
+                return None;
+            }
+        };
+
+        let reference_kind = SyntaxKind::ReferenceExpression(identifier.clone());
+        let reference = SyntaxToken::new(reference_kind, loc.clone());
+
+        let peek = match self.tokens.peek() {
+            Some(p) => p,
+            None => return Some(reference),
+        };
+
+        match peek.kind {
+            LexerTokenKind::OpenParenthesisToken => {
+                // call expression
+                let arguments = match self.parse_argument_list(errors) {
+                    Some(a) => a,
+                    None => return None,
+                };
+
+                let kind = SyntaxKind::CallExpression {
+                    identifier: identifier,
+                    args: arguments,
+                };
+
+                let token = SyntaxToken::new(kind, loc.clone());
+                Some(token)
+            }
+            LexerTokenKind::EqualsToken => {
+                // assignment expression
+                let equals = self.tokens.next().unwrap();
+                let value = match self.parse_expression(errors) {
+                    Some(e) => e,
+                    None => {
+                        let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                        errors.add(error_kind, equals.loc.line, equals.loc.col);
+                        return None;
+                    }
+                };
+
+                let kind = SyntaxKind::AssignmentExpression {
+                    identifier: identifier,
+                    value: Box::new(value),
+                };
+
+                let token = SyntaxToken::new(kind, loc.clone());
+                Some(token)
+            }
+            _ => Some(reference),
+        }
+    }
+
+    fn parse_argument_list(&mut self, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {
+        let _open_paren = self.tokens.next();
+
+        let mut args: Vec<SyntaxToken> = Vec::new();
+        let mut prev_comma = false;
+
+        loop {
+            let peek = match self.tokens.peek() {
+                Some(p) => p,
+                None => return None,
+            };
+
+            if let LexerTokenKind::CloseParenthesisToken = peek.kind {
+                let peek_loc = peek.loc.clone();
+                self.tokens.next();
+
+                if prev_comma {
+                    let error_kind = ErrorKind::ExpectedArgument;
+                    errors.add(error_kind, peek_loc.line, peek_loc.col);
+                    return None;
+                }
+
+                break;
+            }
+
+            let expr = match self.parse_expression(errors) {
+                Some(e) => e,
+                None => return None,
+            };
+
+            let peek = match self.tokens.peek() {
+                Some(p) => p,
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("close parenthesis ')'".to_string());
+                    errors.add(error_kind, expr.loc.line, expr.loc.col);
+                    return None;
+                }
+            };
+
+            prev_comma = false;
+            match peek.kind {
+                LexerTokenKind::CommaToken => {
+                    prev_comma = true;
+                    self.tokens.next();
+                }
+                LexerTokenKind::CloseParenthesisToken => {}
+                _ => {
+                    let error_kind = ErrorKind::ExpectedToken("close parenthesis ')'".to_string());
+                    errors.add(error_kind, peek.loc.line, peek.loc.col);
+                    return None;
+                }
+            };
+
+            args.push(expr);
+        }
+
+        Some(args)
+    }
+
+    fn parse_parenthesis_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let _left_paren = self.tokens.next();
+        match self.parse_expression(errors) {
+            Some(expr) => {
+                let right_paren = self.tokens.next();
+                match right_paren {
+                    Some(_) => {
+                        let loc = expr.loc.clone();
+                        let kind = SyntaxKind::ParenthesizedExpression {
+                            inner: Box::new(expr),
+                        };
+
+                        let token = SyntaxToken::new(kind, loc);
+                        Some(token)
+                    }
+                    None => {
+                        let error_kind = ErrorKind::UnclosedParenthesisExpression;
+                        errors.add(error_kind, expr.loc.line, expr.loc.col);
+                        None
+                    }
+                }
+            }
+            None => None,
+        }
+    }
+
+    fn parse_operator(&self, token: &LexerToken) -> Option<Operator> {
+        match token.kind {
+            LexerTokenKind::PlusToken => Some(Operator::Addition),
+            LexerTokenKind::MinusToken => Some(Operator::Subtraction),
+            LexerTokenKind::StarToken => Some(Operator::Multiplication),
+            LexerTokenKind::SlashToken => Some(Operator::Division),
+            LexerTokenKind::EqualsEqualsToken => Some(Operator::Equality),
+            LexerTokenKind::BangToken => Some(Operator::Not),
+            _ => None,
+        }
+    }
+
+    fn parse_output_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let keyword = self.tokens.next().unwrap();
+
+        let expr = self.parse_expression(errors);
+        match expr {
+            Some(expr) => {
+                let kind = SyntaxKind::OutputStatement {
+                    expr: Box::new(expr),
+                };
+
+                let token = SyntaxToken::new(kind, keyword.loc.clone());
+                Some(token)
+            }
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                errors.add(error_kind, keyword.loc.line, keyword.loc.col);
+                return None;
+            }
+        }
+    }
+
+    fn parse_if_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let keyword = self.tokens.next().unwrap();
+        let condition = match self.parse_expression(errors) {
+            Some(c) => c,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("condition expression".to_string());
+                errors.add(error_kind, keyword.loc.line, keyword.loc.col);
+                return None;
+            }
+        };
+
+        // then keyword
+        if !self.expect_next_token(LexerTokenKind::ThenKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("then keyword".to_string());
+            errors.add(error_kind, condition.loc.line, condition.loc.col);
+            return None;
+        }
+
+        let body = match self.parse_scope(errors) {
+            Some(b) => b,
+            None => {
+                let error_kind = ErrorKind::ExpectedScope;
+                errors.add(error_kind, condition.loc.line, condition.loc.col);
+                return None;
+            }
+        };
+
+        // end keyword
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
+            errors.add(error_kind, condition.loc.line, condition.loc.col);
+            return None;
+        }
+
+        let kind = SyntaxKind::IfStatement {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        };
+
+        let token = SyntaxToken::new(kind, keyword.loc.clone());
+        Some(token)
+    }
+
+    fn parse_return_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let keyword = self.tokens.next().unwrap();
+        let expr = match self.parse_expression(errors) {
+            Some(e) => Some(Box::new(e)),
+            None => None,
+        };
+
+        let kind = SyntaxKind::ReturnStatement { expr: expr };
+        let token = SyntaxToken::new(kind, keyword.loc.clone());
+        Some(token)
+    }
+
+    fn parse_function_declaration(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let keyword = self.tokens.next().unwrap();
+
+        // identifier
+        let identifier = match self.parse_identifier() {
+            Some((i, _)) => i,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("identifier".to_string());
+                errors.add(error_kind, keyword.loc.line, keyword.loc.col);
+                return None;
+            }
+        };
+
+        // parameter list
+        let parameters = match self.parse_parameter_list(errors) {
+            Some(p) => p,
+            None => return None,
+        };
+
+        let mut return_type: Option<String> = None;
+        if self.expect_next_token_peek(LexerTokenKind::ArrowToken) {
+            let arrow = self.tokens.next().unwrap();
+            match self.parse_identifier() {
+                Some((i, _)) => return_type = Some(i.clone()),
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("identifier".to_string());
+                    errors.add(error_kind, arrow.loc.line, arrow.loc.col);
+                }
+            };
+        }
+
+        // body
+        let body = match self.parse_scope(errors) {
+            Some(b) => b,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("function body".to_string());
+                errors.add(error_kind, keyword.loc.line, keyword.loc.col);
+                return None;
+            }
+        };
+
+        // end keyword
+        match self.tokens.next() {
+            Some(t) => match &t.kind {
+                LexerTokenKind::EndKeyword => {}
+                _ => {
+                    let error_kind = ErrorKind::ExpectedToken("end".to_string());
+                    errors.add(error_kind, t.loc.line, t.loc.col);
+                    return None;
+                }
+            },
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("end".to_string());
+                errors.add(error_kind, keyword.loc.line, keyword.loc.col);
+                return None;
+            }
+        };
+
+        let kind = SyntaxKind::FunctionDeclaration {
+            identifier: identifier,
+            parameters: parameters,
+            return_type: return_type,
+            body: Box::new(body),
+        };
+
+        let token = SyntaxToken::new(kind, keyword.loc.clone());
+        Some(token)
+    }
+
+    fn parse_parameter_list(&mut self, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {
+        if !self.expect_next_token(LexerTokenKind::OpenParenthesisToken) {
+            // TODO: Use last token loc to report error
+            let error_kind = ErrorKind::ExpectedToken("open parenthesis '('".to_string());
+            errors.add(error_kind, 0, 0);
+            return None;
+        }
+
+        let mut params: Vec<SyntaxToken> = Vec::new();
+        let mut prev_comma = false;
+
+        loop {
+            let peek = match self.tokens.peek() {
+                Some(t) => t,
+                None => return None,
+            };
+
+            match peek.kind {
+                LexerTokenKind::CloseParenthesisToken => {
+                    if prev_comma {
+                        // comma, but no further
+                        // params provided
+                        let error_kind = ErrorKind::ExpectedParameter;
+                        errors.add(error_kind, peek.loc.line, peek.loc.col);
+                        return None;
+                    }
+
+                    self.tokens.next();
+                    break;
+                }
+                LexerTokenKind::IdentifierToken(_) => {}
+                _ => {
+                    // expected identifier
+                    let error_kind = ErrorKind::ExpectedToken("identifier".to_string());
+                    errors.add(error_kind, peek.loc.line, peek.loc.col);
+                    return None;
+                }
+            };
+
+            let (identifier, loc) = match self.parse_identifier() {
+                Some(i) => i,
+                None => return None,
+            };
+
+            if !self.expect_next_token(LexerTokenKind::ColonToken) {
+                let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
+                errors.add(error_kind, loc.line, loc.col);
+                return None;
+            }
+
+            let type_annotation = match self.parse_identifier() {
+                Some((i, _)) => i,
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
+                    errors.add(error_kind, loc.line, loc.col);
+                    return None;
+                }
+            };
+
+            prev_comma = false;
+            match self.tokens.peek() {
+                Some(t) => match t.kind {
+                    LexerTokenKind::CommaToken => {
+                        prev_comma = true;
+                        self.tokens.next();
+                    }
+                    LexerTokenKind::CloseParenthesisToken => {}
+                    _ => {
+                        // expected comma
+                        let error_kind = ErrorKind::ExpectedToken(
+                            "comma ',' or close parenthesis ')'".to_string(),
+                        );
+                        errors.add(error_kind, t.loc.line, t.loc.col);
+                        return None;
+                    }
+                },
+                None => {}
+            };
+
+            let kind = SyntaxKind::Parameter {
+                identifier: identifier,
+                type_annotation: type_annotation,
+            };
+
+            let token = SyntaxToken::new(kind, loc);
+            params.push(token);
+        }
+
+        Some(params)
+    }
+
+    fn parse_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let peek = self.tokens.peek();
+
+        let Some(peek) = peek else { return None };
+        match peek.kind {
+            LexerTokenKind::OutputKeyword => self.parse_output_statement(errors),
+            LexerTokenKind::IfKeyword => self.parse_if_statement(errors),
+            LexerTokenKind::ReturnKeyword => self.parse_return_statement(errors),
+            LexerTokenKind::FunctionKeyword => self.parse_function_declaration(errors),
+            _ => self.parse_expression(errors),
+        }
+    }
+
+    fn parse_scope(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let mut parsed: Vec<SyntaxToken> = Vec::new();
+        loop {
+            let statement = self.parse_statement(errors);
+            match statement {
+                Some(s) => parsed.push(s),
+                None => break,
+            };
+        }
+
+        let loc = match parsed.first() {
+            Some(f) => f.loc.clone(),
+            None => CodeLocation::new(0, 0),
+        };
+
+        let scope_kind = SyntaxKind::Scope { subtokens: parsed };
+        let token = SyntaxToken::new(scope_kind, loc);
+        Some(token)
+    }
+
+    fn parse_identifier(&mut self) -> Option<(String, CodeLocation)> {
+        match self.tokens.next() {
+            Some(t) => match &t.kind {
+                LexerTokenKind::IdentifierToken(id) => Some((id.clone(), t.loc.clone())),
+                _ => return None,
+            },
+            None => return None,
+        }
+    }
+
+    fn expect_next_token(&mut self, kind: LexerTokenKind) -> bool {
+        match self.tokens.next() {
+            Some(t) => {
+                if t.kind == kind {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
+    }
+
+    fn expect_next_token_peek(&mut self, kind: LexerTokenKind) -> bool {
+        match self.tokens.peek() {
+            Some(t) => {
+                if t.kind == kind {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
+    }
+}
+
+pub fn parse(tokens: Vec<LexerToken>, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+    let iter = tokens.iter().peekable();
+    let mut parser = Parser::new(iter);
+
+    parser.parse_scope(errors)
 }
