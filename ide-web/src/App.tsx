@@ -3,12 +3,13 @@ import './App.css';
 import Editor from './editor/Editor';
 import React, { ReactNode } from 'react';
 import LoginPage from 'pages/Login';
+import { auth } from 'services/firebase';
 
 const PrivateRouteHandler = () => {
     // check if authed
-    const loggedIn = false;
+    console.log(auth.currentUser);
     return <>
-        { !loggedIn
+        { auth.currentUser == null
             ? <Navigate to={"/login"} />
             : <Outlet />
         }
