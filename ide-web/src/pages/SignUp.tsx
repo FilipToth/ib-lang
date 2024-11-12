@@ -1,9 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import {
-    signInEmailPwd,
-    signInWithGithub,
-    signInWithGoogle,
-} from "services/auth";
+import { signUpEmailPwd } from "services/auth";
 import Button from "@mui/material/Button";
 import {
     Alert,
@@ -17,7 +13,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { auth } from "services/firebase";
 
-const LoginPage = () => {
+const SignupPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -29,7 +25,15 @@ const LoginPage = () => {
 
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
+    const [confirmPwd, setConfirmPwd] = useState("");
     const [dialog, setDialog] = useState<String | null>(null);
+
+    const showDialog = (msg: string) => {
+        setDialog(msg);
+        setTimeout(() => {
+            setDialog(null);
+        }, 3500);
+    };
 
     const emailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setEmail(e.target.value);
@@ -39,32 +43,21 @@ const LoginPage = () => {
         setPwd(e.target.value);
     };
 
-    const signIn = () => {
-        signInEmailPwd(email, pwd).then((credential) => {
-            if (credential == null) {
-                setDialog("Invalid email or password. Please try again.");
-                setTimeout(() => {
-                    setDialog(null);
-                }, 3500);
+    const confirmPwdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setConfirmPwd(e.target.value);
+    };
 
+    const signUp = () => {
+        if (pwd != confirmPwd) {
+            showDialog("Passwords do not match.");
+            return;
+        }
+
+        signUpEmailPwd(email, pwd).then((credential) => {
+            if (credential == null) {
+                showDialog("Sign up error. Please try again.");
                 return;
             }
-
-            navigate("/");
-        });
-    };
-
-    const signInGoogle = () => {
-        signInWithGoogle().then((credential) => {
-            if (credential == null) return;
-
-            navigate("/");
-        });
-    };
-
-    const signInGithub = () => {
-        signInWithGithub().then((credential) => {
-            if (credential == null) return;
 
             navigate("/");
         });
@@ -88,7 +81,7 @@ const LoginPage = () => {
                     sx={{ bgcolor: "background.paper", p: 3 }}
                 >
                     <Stack direction={"column"} spacing={2}>
-                        <Typography variant="h4">Sign In</Typography>
+                        <Typography variant="h4">Sign Up</Typography>
 
                         <TextField
                             label={"email"}
@@ -101,24 +94,19 @@ const LoginPage = () => {
                             type={"password"}
                             onChange={pwdChange}
                         />
+                        <TextField
+                            label={"confirm password"}
+                            variant={"outlined"}
+                            type={"password"}
+                            onChange={confirmPwdChange}
+                        />
 
-                        <Button variant="contained" onClick={signIn}>
-                            Sign In
+                        <Button variant="contained" onClick={signUp}>
+                            Sign Up
                         </Button>
-                        <Link align="center" href="/sign-up">
-                            No account yet? Sign up!
+                        <Link align="center" href="/login">
+                            Already have an account? Sign in!
                         </Link>
-
-                        <Typography align="center" variant="body1">
-                            or
-                        </Typography>
-
-                        <Button variant="outlined" onClick={signInGoogle}>
-                            Sign In With Google
-                        </Button>
-                        <Button variant="outlined" onClick={signInGithub}>
-                            Sign In With GitHub
-                        </Button>
                     </Stack>
                 </Card>
             </Stack>
@@ -126,4 +114,4 @@ const LoginPage = () => {
     );
 };
 
-export default LoginPage;
+export default SignupPage;

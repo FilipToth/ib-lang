@@ -14,6 +14,7 @@
     "@lezer/common": "^1.2.1",
     "@lezer/highlight": "^1.0.0",
     "@lezer/lr": "^1.0.0",
+    "@mui/icons-material": "^6.1.6",
     "@mui/material": "^6.1.6",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
