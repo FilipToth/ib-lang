@@ -7,8 +7,16 @@ import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
 import React, { useState } from "react";
 import { TopBar } from "components/TopBar";
-import { Box, Icon, Stack, SvgIcon, SxProps, Tab, Tabs, Typography } from "@mui/material";
-import ibIconPng from "assets/ib.png"
+import {
+    Box,
+    Icon,
+    Stack,
+    SvgIcon,
+    SxProps,
+    Tab,
+    Tabs,
+    Typography,
+} from "@mui/material";
 
 const Editor = () => {
     const [code, setCode] = useState("");
@@ -17,7 +25,7 @@ const Editor = () => {
     const changeTab = (_e: React.SyntheticEvent, val: number) => {
         setTabState(val);
     };
-    
+
     const ibSupport = ib();
     const keys = keymap.of([
         {
@@ -35,16 +43,26 @@ const Editor = () => {
     const tabHeight = 30;
     const tabStyle: SxProps = {
         height: tabHeight,
-        minHeight: tabHeight
-    }
+        minHeight: tabHeight,
+    };
 
-    const ibIcon = <Icon><img src={ibIconPng}></img></Icon>
+    const IbIcon = () => {
+        return (
+            <img
+                src="assets/ib.png"
+                style={{
+                    width: "24px",
+                    height: "24px",
+                    backgroundColor: "transparent",
+                }}
+            />
+        );
+    };
+
     return (
         <>
             <TopBar>
-                <Typography variant="h6">
-                    Code Editor
-                </Typography>
+                <Typography variant="h6">Code Editor</Typography>
             </TopBar>
             <div>
                 <OutputBar code={code} />
@@ -56,11 +74,18 @@ const Editor = () => {
                             variant="scrollable"
                             scrollButtons="auto"
                             sx={{
-                                ...tabStyle
+                                ...tabStyle,
                             }}
                         >
-                            {ibIcon}
-                            <Tab icon={ibIcon} label="test.ib" sx={tabStyle}/>
+                            <Tab
+                                icon={<IbIcon />}
+                                label="test.ib"
+                                iconPosition="start"
+                                sx={{
+                                    ...tabStyle,
+                                    gap: "8px",
+                                }}
+                            />
                         </Tabs>
                     </Box>
                     <CodeMirror
