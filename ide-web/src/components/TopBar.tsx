@@ -5,13 +5,15 @@ import {
     Typography,
     Menu,
     MenuItem,
+    Tabs,
+    Box,
 } from "@mui/material";
 import { AccountCircle, MenuRounded } from "@mui/icons-material";
-import React, { useState } from "react";
+import React, { ReactNode, useState } from "react";
 import { auth } from "services/firebase";
 import { useNavigate } from "react-router-dom";
 
-export const TopBar = () => {
+export const TopBar = ({ children }: { children: ReactNode}) => {
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -35,9 +37,8 @@ export const TopBar = () => {
                 <IconButton size="large">
                     <MenuRounded />
                 </IconButton>
-                <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                    Code Editor
-                </Typography>
+                {children}
+                <Box sx={{ flexGrow: 1 }}></Box>
                 <div>
                     <IconButton
                         size="large"
