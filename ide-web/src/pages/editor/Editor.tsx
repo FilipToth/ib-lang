@@ -7,16 +7,7 @@ import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
 import React, { useEffect, useState } from "react";
 import { TopBar } from "components/TopBar";
-import {
-    Box,
-    Icon,
-    Stack,
-    SvgIcon,
-    SxProps,
-    Tab,
-    Tabs,
-    Typography,
-} from "@mui/material";
+import { Box, Stack, SxProps, Tab, Tabs, Typography } from "@mui/material";
 import { IBFile, getFiles } from "services/server";
 
 export let currentFile: string | null = null;
@@ -27,6 +18,9 @@ const Editor = () => {
     const [files, setFiles] = useState<IBFile[]>([]);
 
     const changeTab = (_e: React.SyntheticEvent, val: number) => {
+        const currFile = files[tabState];
+        currFile.contents = code;
+
         const file = files[val];
         currentFile = file.filename;
 
