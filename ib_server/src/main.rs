@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{extract::Query, routing::post, Json, Router};
 use serde::Serialize;
 use tokio::net::TcpListener;
@@ -5,6 +7,8 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
 extern crate ibc;
+
+pub mod sync;
 
 #[derive(Serialize)]
 struct Diagnostic {
@@ -67,8 +71,21 @@ async fn execute(body: String) -> Json<RunResult> {
     Json(result)
 }
 
-async fn diagnostics(body: String) -> Json<Vec<Diagnostic>> {
-    let result = ibc::analysis::analyze(body);
+async fn diagnostics(query: Query<HashMap<String, String>>, body: String) -> Json<Vec<Diagnostic>> {
+    let result = ibc::analysis::analyze(body.clone());
+
+    // TODO: JWT verification
+    let file = match query.0.get("file") {
+        Some(f) => f.clone(),
+        None => return Json(Vec::new())
+    };
+
+    let uid = match query.0.get("uid") {
+        Some(u) => u.clone(),
+        None => return Json(Vec::new())
+    };
+
+    sync::sync_file(uid, file, body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let errors = result.errors.errors;

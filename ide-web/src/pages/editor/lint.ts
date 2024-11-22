@@ -14,7 +14,7 @@ const charOffset = (doc: Text, line: number, col: number) => {
 
 const ibLinter = linter(async (view) => {
     const doc = view.state.doc;
-    const ibDiagnostics = await runDiagnostics(doc.toString());
+    const ibDiagnostics = await runDiagnostics(doc.toString(), "myib.ib");
 
     const diagnostics = ibDiagnostics.map((d) => {
         console.log(`l: ${d.line}, c: ${d.col}`);
