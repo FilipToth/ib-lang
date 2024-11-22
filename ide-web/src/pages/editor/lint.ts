@@ -1,6 +1,7 @@
 import { Diagnostic, linter } from "@codemirror/lint";
 import { Text } from "@codemirror/text";
 import { runDiagnostics } from "services/server";
+import { currentFile } from "./Editor";
 
 const charOffset = (doc: Text, line: number, col: number) => {
     let offset = 0;
@@ -13,8 +14,10 @@ const charOffset = (doc: Text, line: number, col: number) => {
 };
 
 const ibLinter = linter(async (view) => {
+    if (currentFile == null) return [];
+
     const doc = view.state.doc;
-    const ibDiagnostics = await runDiagnostics(doc.toString(), "myib.ib");
+    const ibDiagnostics = await runDiagnostics(doc.toString(), currentFile);
 
     const diagnostics = ibDiagnostics.map((d) => {
         console.log(`l: ${d.line}, c: ${d.col}`);

@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use axum::{extract::Query, routing::post, Json, Router};
+use axum::{extract::Query, routing::{post, get}, Json, Router};
 use serde::Serialize;
+use sync::get_files;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -23,6 +24,12 @@ struct RunResult {
     output: String,
 }
 
+#[derive(Serialize, Debug)]
+pub struct IbFile {
+    pub filename: String,
+    pub contents: String
+}
+
 impl RunResult {
     fn new(diagnostics: Vec<Diagnostic>, output: String) -> RunResult {
         RunResult {
@@ -39,6 +46,7 @@ async fn main() {
     let app = Router::new()
         .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
+        .route("/files", get(files))
         .layer(ServiceBuilder::new().layer(cors));
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
@@ -101,4 +109,16 @@ async fn diagnostics(query: Query<HashMap<String, String>>, body: String) -> Jso
     }
 
     Json(diagnostics)
+}
+
+async fn files(query: Query<HashMap<String, String>>) -> Json<Vec<IbFile>> {
+    let uid = match query.0.get("uid") {
+        Some(u) => u.clone(),
+        None => return Json(Vec::new())
+    };
+
+    let files = get_files(uid);
+
+    println!("{:?}", files);
+    Json(files)
 }

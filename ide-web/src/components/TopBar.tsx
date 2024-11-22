@@ -13,7 +13,7 @@ import React, { ReactNode, useState } from "react";
 import { auth } from "services/firebase";
 import { useNavigate } from "react-router-dom";
 
-export const TopBar = ({ children }: { children: ReactNode}) => {
+export const TopBar = ({ children }: { children: ReactNode }) => {
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 

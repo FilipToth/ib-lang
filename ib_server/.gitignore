@@ -15,3 +15,5 @@ Cargo.lock
 
 # Remove ib-lang-generated control flow graph graphviz file
 controlflow.dot
+
+data/

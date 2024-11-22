@@ -5,7 +5,7 @@ import { indentLess, indentMore, indentWithTab } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TopBar } from "components/TopBar";
 import {
     Box,
@@ -17,14 +17,34 @@ import {
     Tabs,
     Typography,
 } from "@mui/material";
+import { IBFile, getFiles } from "services/server";
+
+export let currentFile: string | null = null;
 
 const Editor = () => {
     const [code, setCode] = useState("");
     const [tabState, setTabState] = useState(0);
+    const [files, setFiles] = useState<IBFile[]>([]);
 
     const changeTab = (_e: React.SyntheticEvent, val: number) => {
+        const file = files[val];
+        currentFile = file.filename;
+
+        setCode(file.contents);
         setTabState(val);
     };
+
+    useEffect(() => {
+        const loadFiles = async () => {
+            const f = await getFiles();
+            setFiles(f);
+
+            const file = f[tabState];
+            setCode(file.contents);
+        };
+
+        loadFiles();
+    }, []);
 
     const ibSupport = ib();
     const keys = keymap.of([
@@ -77,15 +97,20 @@ const Editor = () => {
                                 ...tabStyle,
                             }}
                         >
-                            <Tab
-                                icon={<IbIcon />}
-                                label="test.ib"
-                                iconPosition="start"
-                                sx={{
-                                    ...tabStyle,
-                                    gap: "8px",
-                                }}
-                            />
+                            {files.map((file, index) => {
+                                return (
+                                    <Tab
+                                        value={index}
+                                        icon={<IbIcon />}
+                                        label={file.filename}
+                                        iconPosition="start"
+                                        sx={{
+                                            ...tabStyle,
+                                            gap: "8px",
+                                        }}
+                                    />
+                                );
+                            })}
                         </Tabs>
                     </Box>
                     <CodeMirror
