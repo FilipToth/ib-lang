@@ -7,8 +7,18 @@ import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
 import React, { useEffect, useState } from "react";
 import { TopBar } from "components/TopBar";
-import { Box, Stack, SxProps, Tab, Tabs, Typography } from "@mui/material";
+import {
+    Box,
+    Button,
+    Stack,
+    SxProps,
+    Tab,
+    Tabs,
+    Typography,
+} from "@mui/material";
 import { IBFile, getFiles } from "services/server";
+import { Add } from "@mui/icons-material";
+import NewFileDialog from "./NewFileDialog";
 
 export let currentFile: string | null = null;
 
@@ -16,6 +26,7 @@ const Editor = () => {
     const [code, setCode] = useState("");
     const [tabState, setTabState] = useState(0);
     const [files, setFiles] = useState<IBFile[]>([]);
+    const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
 
     const changeTab = (_e: React.SyntheticEvent, val: number) => {
         const currFile = files[tabState];
@@ -26,6 +37,11 @@ const Editor = () => {
 
         setCode(file.contents);
         setTabState(val);
+    };
+
+    const addFile = () => {
+        console.log("fuck");
+        setNewFileDialogOpen(true);
     };
 
     useEffect(() => {
@@ -79,50 +95,68 @@ const Editor = () => {
                 <Typography variant="h6">Code Editor</Typography>
             </TopBar>
             <div>
-                <OutputBar code={code} />
-                <Stack direction="column">
-                    <Box>
-                        <Tabs
-                            value={tabState}
-                            onChange={changeTab}
-                            variant="scrollable"
-                            scrollButtons="auto"
-                            sx={{
-                                ...tabStyle,
-                            }}
+                <Stack direction="row">
+                    <Stack direction="column">
+                        <Box
+                            display="flex"
+                            flexDirection="row"
+                            justifyContent="space-between"
                         >
-                            {files.map((file, index) => {
-                                return (
-                                    <Tab
-                                        value={index}
-                                        icon={<IbIcon />}
-                                        label={file.filename}
-                                        iconPosition="start"
-                                        sx={{
-                                            ...tabStyle,
-                                            gap: "8px",
-                                        }}
-                                    />
-                                );
-                            })}
-                        </Tabs>
-                    </Box>
-                    <CodeMirror
-                        height="100vh"
-                        width="90vw"
-                        theme={coolGlow}
-                        extensions={[
-                            ibSupport,
-                            keyExtension,
-                            indentUnit.of("    "),
-                        ]}
-                        value={code}
-                        onChange={(value: string, _viewUpdate: ViewUpdate) => {
-                            setCode(value);
-                        }}
-                    />
+                            <Tabs
+                                value={tabState}
+                                onChange={changeTab}
+                                variant="scrollable"
+                                scrollButtons="auto"
+                                sx={{
+                                    ...tabStyle,
+                                }}
+                            >
+                                {files.map((file, index) => {
+                                    return (
+                                        <Tab
+                                            value={index}
+                                            icon={<IbIcon />}
+                                            label={file.filename}
+                                            iconPosition="start"
+                                            sx={{
+                                                ...tabStyle,
+                                                gap: "8px",
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </Tabs>
+                            <Button
+                                onClick={addFile}
+                                startIcon={<Add />}
+                            ></Button>
+                        </Box>
+                        <CodeMirror
+                            height="100vh"
+                            width="90vw"
+                            theme={coolGlow}
+                            extensions={[
+                                ibSupport,
+                                keyExtension,
+                                indentUnit.of("    "),
+                            ]}
+                            value={code}
+                            onChange={(
+                                value: string,
+                                _viewUpdate: ViewUpdate
+                            ) => {
+                                setCode(value);
+                            }}
+                        />
+                    </Stack>
+                    <OutputBar code={code} />
                 </Stack>
             </div>
+            <NewFileDialog
+                isOpen={newFileDialogOpen}
+                close={() => setNewFileDialogOpen(false)}
+                ok={(file) => {}}
+            />
         </>
     );
 };

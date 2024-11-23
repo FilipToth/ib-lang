@@ -1,5 +1,5 @@
-import "assets/output-bar.css";
-import { FunctionComponent, useRef } from "react";
+import { Button, Stack, TextField } from "@mui/material";
+import { FunctionComponent, useRef, useState } from "react";
 import { runCode } from "services/server";
 
 interface OutputProps {
@@ -7,21 +7,35 @@ interface OutputProps {
 }
 
 const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
-    const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+    const [output, setOutput] = useState("");
 
     const onClick = async () => {
-        textAreaRef.current!.value = "";
-        const output = await runCode(code);
-        textAreaRef.current!.value = output;
+        setOutput("");
+        const codeOutput = await runCode(code);
+        setOutput(codeOutput);
     };
 
     return (
-        <div className="output-bar">
-            <button className="run-button" onClick={onClick}>
-                Run
-            </button>
-            <textarea className="text-area" ref={textAreaRef} />
-        </div>
+        <Stack>
+            <Button onClick={onClick}>Run</Button>
+            <TextField
+                multiline
+                fullWidth
+                value={output}
+                slotProps={{
+                    input: {
+                        readOnly: true,
+                    },
+                }}
+                sx={{
+                    flex: 1,
+                    "& .MuiInputBase-root": {
+                        height: "100%",
+                        alignItems: "start", // Aligns the text to the top
+                    },
+                }}
+            />
+        </Stack>
     );
 };
 
