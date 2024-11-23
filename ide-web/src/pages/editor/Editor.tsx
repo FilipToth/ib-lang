@@ -40,8 +40,21 @@ const Editor = () => {
     };
 
     const addFile = () => {
-        console.log("fuck");
         setNewFileDialogOpen(true);
+    };
+
+    const createFile = (filename: string) => {
+        const file: IBFile = {
+            filename: filename,
+            contents: "",
+        };
+
+        setFiles([...files, file]);
+
+        // files length isn't updated yet :D
+        setTabState(files.length);
+
+        setNewFileDialogOpen(false);
     };
 
     useEffect(() => {
@@ -155,7 +168,7 @@ const Editor = () => {
             <NewFileDialog
                 isOpen={newFileDialogOpen}
                 close={() => setNewFileDialogOpen(false)}
-                ok={(file) => {}}
+                dialogOK={createFile}
             />
         </>
     );
