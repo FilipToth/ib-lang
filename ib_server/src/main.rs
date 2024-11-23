@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use axum::{extract::Query, routing::{post, get}, Json, Router};
+use auth::auth_middleware;
+use axum::{extract::Query, routing::{get, post}, Extension, Json, Router};
 use serde::Serialize;
 use sync::get_files;
 use tokio::net::TcpListener;
@@ -10,6 +11,7 @@ use tower_http::cors::{Any, CorsLayer};
 extern crate ibc;
 
 pub mod sync;
+pub mod auth;
 
 #[derive(Serialize)]
 struct Diagnostic {
@@ -41,12 +43,13 @@ impl RunResult {
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
+    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any).allow_headers(Any);
 
     let app = Router::new()
         .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
+        .layer(axum::middleware::from_fn(auth_middleware))
         .layer(ServiceBuilder::new().layer(cors));
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
@@ -79,17 +82,11 @@ async fn execute(body: String) -> Json<RunResult> {
     Json(result)
 }
 
-async fn diagnostics(query: Query<HashMap<String, String>>, body: String) -> Json<Vec<Diagnostic>> {
+async fn diagnostics(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>, body: String) -> Json<Vec<Diagnostic>> {
     let result = ibc::analysis::analyze(body.clone());
 
-    // TODO: JWT verification
     let file = match query.0.get("file") {
         Some(f) => f.clone(),
-        None => return Json(Vec::new())
-    };
-
-    let uid = match query.0.get("uid") {
-        Some(u) => u.clone(),
         None => return Json(Vec::new())
     };
 
@@ -111,14 +108,8 @@ async fn diagnostics(query: Query<HashMap<String, String>>, body: String) -> Jso
     Json(diagnostics)
 }
 
-async fn files(query: Query<HashMap<String, String>>) -> Json<Vec<IbFile>> {
-    let uid = match query.0.get("uid") {
-        Some(u) => u.clone(),
-        None => return Json(Vec::new())
-    };
-
+async fn files(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>) -> Json<Vec<IbFile>> {
     let files = get_files(uid);
-
     println!("{:?}", files);
     Json(files)
 }

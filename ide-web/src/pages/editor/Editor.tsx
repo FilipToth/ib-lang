@@ -63,7 +63,7 @@ const Editor = () => {
             setFiles(f);
 
             const file = f[tabState];
-            setCode(file.contents);
+            // setCode(file.contents);
         };
 
         loadFiles();
@@ -134,6 +134,7 @@ const Editor = () => {
                                             sx={{
                                                 ...tabStyle,
                                                 gap: "8px",
+                                                textTransform: "none",
                                             }}
                                         />
                                     );
