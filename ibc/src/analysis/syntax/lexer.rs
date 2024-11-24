@@ -31,6 +31,7 @@ pub enum LexerTokenKind {
     CloseParenthesisToken,
     CommaToken,
     ColonToken,
+    DotToken,
     IntegerLiteralToken(i64),
     IdentifierToken(String),
 
@@ -196,6 +197,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             ')' => LexerTokenKind::CloseParenthesisToken,
             ',' => LexerTokenKind::CommaToken,
             ':' => LexerTokenKind::ColonToken,
+            '.' => LexerTokenKind::DotToken,
             ' ' => continue,
             '\n' => {
                 line += 1;

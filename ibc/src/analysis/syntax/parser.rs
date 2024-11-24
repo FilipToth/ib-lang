@@ -133,9 +133,7 @@ impl<'a> Parser<'a> {
                     LexerTokenKind::OpenParenthesisToken => {
                         self.parse_parenthesis_expression(errors)
                     }
-                    LexerTokenKind::IdentifierToken(_) => {
-                        self.parse_reference_or_call_or_assignment(errors)
-                    }
+                    LexerTokenKind::IdentifierToken(_) => self.parse_reference_based_token(errors),
                     LexerTokenKind::IntegerLiteralToken(val) => {
                         // consume token
                         self.tokens.next();
@@ -173,10 +171,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_reference_or_call_or_assignment(
-        &mut self,
-        errors: &mut ErrorBag,
-    ) -> Option<SyntaxToken> {
+    fn parse_reference_based_token(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         // theoretically shouldn't be none
         let (identifier, identifier_span) = match self.parse_identifier() {
             Some(i) => i,
@@ -237,6 +232,27 @@ impl<'a> Parser<'a> {
                 };
 
                 let span = Span::from_loc(identifier_span.start, end_loc);
+                let token = SyntaxToken::new(kind, span);
+                Some(token)
+            }
+            LexerTokenKind::DotToken => {
+                // object call expression
+                let dot = self.tokens.next().unwrap();
+                let next_expr = match self.parse_reference_based_token(errors) {
+                    Some(n) => n,
+                    None => {
+                        let error_kind = ErrorKind::ExpectedToken("object member".to_string());
+                        errors.add(error_kind, dot.span);
+                        return None;
+                    }
+                };
+
+                let span = Span::from_loc(reference.span.start, next_expr.span.end);
+                let kind = SyntaxKind::ObjectMemberExpression {
+                    base: Box::new(reference),
+                    next: Box::new(next_expr),
+                };
+
                 let token = SyntaxToken::new(kind, span);
                 Some(token)
             }

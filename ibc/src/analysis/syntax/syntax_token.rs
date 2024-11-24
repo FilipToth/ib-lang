@@ -21,6 +21,10 @@ pub enum SyntaxKind {
         subtokens: Vec<SyntaxToken>,
     },
     ReferenceExpression(String),
+    ObjectMemberExpression {
+        base: Box<SyntaxToken>,
+        next: Box<SyntaxToken>,
+    },
     IntegerLiteralExpression(i64),
     BooleanLiteralExpression(bool),
     BinaryExpression {

@@ -444,6 +444,22 @@ fn bind_reference_expression(
     Some(node)
 }
 
+fn bind_object_member_expression(
+    base: &SyntaxToken,
+    next: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let base_node = bind(base, scope, errors);
+
+    // create a scope with all object member methods
+    // and the run regular binding with that scope
+    let object_scope = BoundScope::new_root();
+
+    None
+}
+
 fn bind_instantiation_expression(
     type_name: String,
     args: &Vec<SyntaxToken>,
@@ -521,6 +537,9 @@ pub fn bind(
         }
         SyntaxKind::ReferenceExpression(identifier) => {
             bind_reference_expression(identifier.clone(), scope, errors, span)
+        }
+        SyntaxKind::ObjectMemberExpression { base, next } => {
+            bind_object_member_expression(&base, &next, scope, errors, span)
         }
         SyntaxKind::InstantiationExpression { type_name, args } => {
             bind_instantiation_expression(type_name.clone(), &args, scope, errors, span)
