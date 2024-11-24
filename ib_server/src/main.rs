@@ -1,10 +1,17 @@
-use axum::{extract::Query, routing::post, Json, Router};
+use std::collections::HashMap;
+
+use auth::auth_middleware;
+use axum::{extract::Query, routing::{get, post}, Extension, Json, Router};
 use serde::Serialize;
+use sync::get_files;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
 extern crate ibc;
+
+pub mod sync;
+pub mod auth;
 
 #[derive(Serialize)]
 struct Diagnostic {
@@ -19,6 +26,12 @@ struct RunResult {
     output: String,
 }
 
+#[derive(Serialize, Debug)]
+pub struct IbFile {
+    pub filename: String,
+    pub contents: String
+}
+
 impl RunResult {
     fn new(diagnostics: Vec<Diagnostic>, output: String) -> RunResult {
         RunResult {
@@ -30,11 +43,13 @@ impl RunResult {
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
+    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any).allow_headers(Any);
 
     let app = Router::new()
         .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
+        .route("/files", get(files))
+        .layer(axum::middleware::from_fn(auth_middleware))
         .layer(ServiceBuilder::new().layer(cors));
 
     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
@@ -67,8 +82,15 @@ async fn execute(body: String) -> Json<RunResult> {
     Json(result)
 }
 
-async fn diagnostics(body: String) -> Json<Vec<Diagnostic>> {
-    let result = ibc::analysis::analyze(body);
+async fn diagnostics(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>, body: String) -> Json<Vec<Diagnostic>> {
+    let result = ibc::analysis::analyze(body.clone());
+
+    let file = match query.0.get("file") {
+        Some(f) => f.clone(),
+        None => return Json(Vec::new())
+    };
+
+    sync::sync_file(uid, file, body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let errors = result.errors.errors;
@@ -84,4 +106,10 @@ async fn diagnostics(body: String) -> Json<Vec<Diagnostic>> {
     }
 
     Json(diagnostics)
+}
+
+async fn files(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>) -> Json<Vec<IbFile>> {
+    let files = get_files(uid);
+    println!("{:?}", files);
+    Json(files)
 }
