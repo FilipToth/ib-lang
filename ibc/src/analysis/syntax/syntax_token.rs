@@ -43,6 +43,10 @@ pub enum SyntaxKind {
     ParenthesizedExpression {
         inner: Box<SyntaxToken>,
     },
+    InstantiationExpression {
+        type_name: String,
+        args: Vec<SyntaxToken>,
+    },
     OutputStatement {
         expr: Box<SyntaxToken>,
     },

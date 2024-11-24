@@ -43,6 +43,7 @@ pub enum LexerTokenKind {
     FunctionKeyword,
     TrueKeyword,
     FalseKeyword,
+    NewKeyword,
 }
 
 impl LexerTokenKind {
@@ -87,11 +88,17 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
         "function" => LexerTokenKind::FunctionKeyword,
         "true" => LexerTokenKind::TrueKeyword,
         "false" => LexerTokenKind::FalseKeyword,
+        "new" => LexerTokenKind::NewKeyword,
         _ => LexerTokenKind::IdentifierToken(value),
     }
 }
 
-fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize, char_offset: &mut usize) -> LexerTokenKind {
+fn lex_rolling(
+    iter: &mut Peekable<Chars>,
+    current: char,
+    column: &mut usize,
+    char_offset: &mut usize,
+) -> LexerTokenKind {
     let mut value = current.to_string();
     let is_numeric = current.is_numeric();
 

@@ -160,6 +160,7 @@ impl<'a> Parser<'a> {
                         let token = SyntaxToken::new(kind, span);
                         Some(token)
                     }
+                    LexerTokenKind::NewKeyword => self.parse_instantiation_expression(errors),
                     _ => return None,
                 }
             }
@@ -241,6 +242,42 @@ impl<'a> Parser<'a> {
             }
             _ => Some(reference),
         }
+    }
+
+    fn parse_instantiation_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let new_keyword = self.tokens.next().unwrap();
+
+        let (identifier, identifier_span) = match self.parse_identifier() {
+            Some((i, s)) => (i, s),
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("Identifier".to_string());
+                errors.add(error_kind, new_keyword.span);
+                return None;
+            }
+        };
+
+        let arg_list = match self.parse_argument_list(errors) {
+            Some(a) => a,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("Argument List".to_string());
+                errors.add(error_kind, identifier_span);
+                return None;
+            }
+        };
+
+        let end_loc = match arg_list.last() {
+            Some(l) => l.span.end,
+            None => identifier_span.end,
+        };
+
+        let kind = SyntaxKind::InstantiationExpression {
+            type_name: identifier,
+            args: arg_list,
+        };
+
+        let span = Span::from_loc(new_keyword.span.start, end_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
     }
 
     fn parse_argument_list(&mut self, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {

@@ -4,6 +4,7 @@ use crate::analysis::{
     binding::{
         bound_node::{BoundNode, BoundNodeKind},
         symbols::{FunctionSymbol, VariableSymbol},
+        types::{get_object_state, ObjectState},
     },
     operator::Operator,
 };
@@ -58,6 +59,8 @@ pub enum EvalValue {
     Int(i64),
     Bool(bool),
     String(String),
+    // used for non-primitive types
+    Object(ObjectState),
     // used to return in
     // the eval rec function
     Return(Box<EvalValue>),
@@ -86,6 +89,7 @@ impl EvalValue {
             EvalValue::Int(val) => val.to_string(),
             EvalValue::Bool(val) => val.to_string(),
             EvalValue::String(val) => val.clone(),
+            EvalValue::Object(_) => unreachable!(),
             EvalValue::Return(_) => unreachable!(),
         }
     }
@@ -161,6 +165,7 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                     let rhs = rhs.force_get_string();
                     EvalValue::Bool(rhs == lhs)
                 }
+                EvalValue::Object(_) => unreachable!(),
                 EvalValue::Return(_) => unreachable!(),
             }
         }
@@ -275,6 +280,12 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
                 EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
                 _ => unreachable!(),
             }
+        }
+        BoundNodeKind::ObjectExpression => {
+            let node_type = node.node_type.clone();
+            let object = get_object_state(node_type);
+
+            EvalValue::Object(object)
         }
     };
 

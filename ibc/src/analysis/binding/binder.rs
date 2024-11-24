@@ -444,6 +444,36 @@ fn bind_reference_expression(
     Some(node)
 }
 
+fn bind_instantiation_expression(
+    type_name: String,
+    args: &Vec<SyntaxToken>,
+    _scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let instantiation_type = match get_type(type_name.clone(), &span, errors) {
+        Some(t) => t,
+        None => return None,
+    };
+
+    if args.len() != 0 {
+        // we don't support constructors yet
+        let ctor = format!("{}.constructor()", type_name);
+        let kind = ErrorKind::MismatchedNumberOfArgs {
+            id: ctor,
+            expected: 0,
+            found: args.len(),
+        };
+
+        errors.add(kind, span);
+        return None;
+    }
+
+    let kind = BoundNodeKind::ObjectExpression;
+    let node = BoundNode::new(kind, instantiation_type, span);
+    Some(node)
+}
+
 pub fn bind(
     token: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
@@ -491,6 +521,9 @@ pub fn bind(
         }
         SyntaxKind::ReferenceExpression(identifier) => {
             bind_reference_expression(identifier.clone(), scope, errors, span)
+        }
+        SyntaxKind::InstantiationExpression { type_name, args } => {
+            bind_instantiation_expression(type_name.clone(), &args, scope, errors, span)
         }
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
         _ => {

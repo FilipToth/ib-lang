@@ -60,6 +60,7 @@ impl BoundNode {
             BoundNodeKind::BoundCallExpression { symbol, args: _ } => {
                 format!("{}(...)", symbol.identifier)
             }
+            BoundNodeKind::ObjectExpression => "Object".to_string(),
             BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
@@ -107,6 +108,7 @@ pub enum BoundNodeKind {
         symbol: FunctionSymbol,
         args: Box<Vec<BoundNode>>,
     },
+    ObjectExpression,
     ReferenceExpression(VariableSymbol),
     NumberLiteral(i64),
     BooleanLiteral(bool),
