@@ -14,17 +14,18 @@ const charOffset = (doc: Text, line: number, col: number) => {
 };
 
 const ibLinter = linter(async (view) => {
+    console.log(currentFile);
     if (currentFile == null) return [];
 
     const doc = view.state.doc;
     const ibDiagnostics = await runDiagnostics(doc.toString(), currentFile);
+    console.log(ibDiagnostics);
 
     const diagnostics = ibDiagnostics.map((d) => {
-        console.log(`l: ${d.line}, c: ${d.col}`);
-        const from = charOffset(doc, d.line, d.col);
+        // const from = charOffset(doc, d.line, d.col);
         const diagnostic: Diagnostic = {
-            from: from,
-            to: from + 1,
+            from: d.offset_start,
+            to: d.offset_end,
             severity: "error",
             source: "ibc",
             message: d.message,

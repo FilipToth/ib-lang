@@ -3,8 +3,8 @@ use std::{cell::RefCell, rc::Rc};
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
+    span::Span,
     syntax::syntax_token::{SyntaxKind, SyntaxToken},
-    CodeLocation,
 };
 
 use super::{
@@ -17,7 +17,7 @@ fn bind_module(
     block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let block = match bind(block, scope, errors) {
         Some(b) => b,
@@ -29,7 +29,7 @@ fn bind_module(
         block: Box::new(block),
     };
 
-    let node = BoundNode::new(kind, node_type, loc);
+    let node = BoundNode::new(kind, node_type, span);
     Some(node)
 }
 
@@ -38,7 +38,7 @@ fn bind_block(
     scope: Rc<RefCell<BoundScope>>,
     create_child_scope: bool,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let scope_ref = if create_child_scope {
         let child_scope = BoundScope::new(scope);
@@ -61,7 +61,7 @@ fn bind_block(
         children: Box::new(bound),
     };
 
-    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    let node = BoundNode::new(kind, TypeKind::Void, span);
     Some(node)
 }
 
@@ -69,7 +69,7 @@ fn bind_output_statement(
     expr: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let expr = match bind(expr, scope, errors) {
         Some(expr) => expr,
@@ -80,7 +80,7 @@ fn bind_output_statement(
         expr: Box::new(expr),
     };
 
-    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    let node = BoundNode::new(kind, TypeKind::Void, span);
     Some(node)
 }
 
@@ -88,7 +88,7 @@ fn bind_return_statement(
     ret_expr: &Option<Box<SyntaxToken>>,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let (ret_type, expr) = match ret_expr {
         Some(ret_expr) => {
@@ -105,7 +105,7 @@ fn bind_return_statement(
     };
 
     let kind = BoundNodeKind::ReturnStatement { expr: expr };
-    let node = BoundNode::new(kind, ret_type, loc);
+    let node = BoundNode::new(kind, ret_type, span);
     Some(node)
 }
 
@@ -115,7 +115,7 @@ fn bind_if_statement(
     else_next: Option<&SyntaxToken>,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let condition = match bind(condition, scope.clone(), errors) {
         Some(cond) => cond,
@@ -125,8 +125,7 @@ fn bind_if_statement(
     if condition.node_type != TypeKind::Boolean {
         errors.add(
             ErrorKind::ConditionMustBeBoolean(condition.node_type),
-            loc.line,
-            loc.col,
+            condition.span,
         );
         return None;
     }
@@ -150,7 +149,7 @@ fn bind_if_statement(
         else_block: else_block,
     };
 
-    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    let node = BoundNode::new(kind, TypeKind::Void, span);
     Some(node)
 }
 
@@ -161,7 +160,7 @@ fn bind_function_declaration(
     block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let func_scope = BoundScope::new(scope.clone());
     let func_scope_ref = Rc::new(RefCell::new(func_scope));
@@ -178,17 +177,17 @@ fn bind_function_declaration(
     }
     .to_string();
 
-    let ret_type = match get_type(ret_type, &loc, errors) {
+    let ret_type = match get_type(ret_type, &span, errors) {
         Some(t) => t,
         None => return None,
     };
 
-    let block_loc = block.loc.clone();
+    let block_span = block.span.clone();
     let SyntaxKind::Scope { subtokens } = &block.kind else {
         return None;
     };
 
-    let block = match bind_block(&subtokens, func_scope_ref, false, errors, block_loc) {
+    let block = match bind_block(&subtokens, func_scope_ref, false, errors, block_span) {
         Some(b) => b,
         None => return None,
     };
@@ -205,12 +204,12 @@ fn bind_function_declaration(
         },
         None => {
             let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span);
             return None;
         }
     };
 
-    let node = BoundNode::new(kind, TypeKind::Void, loc);
+    let node = BoundNode::new(kind, TypeKind::Void, span);
     Some(node)
 }
 
@@ -221,7 +220,7 @@ fn bind_params(
 ) -> Option<Vec<BoundParameter>> {
     let mut parameters: Vec<BoundParameter> = Vec::new();
     for param in params {
-        let loc = param.loc.clone();
+        let span = param.span.clone();
         let SyntaxKind::Parameter {
             identifier,
             type_annotation,
@@ -230,7 +229,7 @@ fn bind_params(
             return None;
         };
 
-        let param_type = match get_type(type_annotation.clone(), &loc, errors) {
+        let param_type = match get_type(type_annotation.clone(), &span, errors) {
             Some(t) => t,
             None => return None,
         };
@@ -242,7 +241,7 @@ fn bind_params(
 
         if symbol.is_none() {
             let kind = ErrorKind::ParamMismatchedTypes(identifier.clone());
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span);
             return None;
         }
 
@@ -263,7 +262,7 @@ fn bind_binary_expression(
     rhs: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let lhs = match bind(lhs, scope.clone(), errors) {
         Some(n) => n,
@@ -286,7 +285,7 @@ fn bind_binary_expression(
         rhs: Box::new(rhs),
     };
 
-    let node = BoundNode::new(kind, op_type, loc);
+    let node = BoundNode::new(kind, op_type, span);
     Some(node)
 }
 
@@ -295,7 +294,7 @@ fn bind_unary_expression(
     rhs: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let rhs = match bind(rhs, scope, errors) {
         Some(n) => n,
@@ -312,27 +311,19 @@ fn bind_unary_expression(
         rhs: Box::new(rhs),
     };
 
-    let node = BoundNode::new(kind, op_type, loc);
+    let node = BoundNode::new(kind, op_type, span);
     Some(node)
 }
 
-fn bind_integer_literal(
-    value: i64,
-    _errors: &mut ErrorBag,
-    loc: CodeLocation,
-) -> Option<BoundNode> {
+fn bind_integer_literal(value: i64, _errors: &mut ErrorBag, span: Span) -> Option<BoundNode> {
     let kind = BoundNodeKind::NumberLiteral(value);
-    let node = BoundNode::new(kind, TypeKind::Int, loc);
+    let node = BoundNode::new(kind, TypeKind::Int, span);
     Some(node)
 }
 
-fn bind_boolean_literal(
-    value: bool,
-    _errors: &mut ErrorBag,
-    loc: CodeLocation,
-) -> Option<BoundNode> {
+fn bind_boolean_literal(value: bool, _errors: &mut ErrorBag, span: Span) -> Option<BoundNode> {
     let kind = BoundNodeKind::BooleanLiteral(value);
-    let node = BoundNode::new(kind, TypeKind::Boolean, loc);
+    let node = BoundNode::new(kind, TypeKind::Boolean, span);
     Some(node)
 }
 
@@ -341,7 +332,7 @@ fn bind_assignment_expression(
     value: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let value = match bind(value, scope.clone(), errors) {
         Some(v) => v,
@@ -359,12 +350,12 @@ fn bind_assignment_expression(
             value: Box::new(value),
         },
         None => {
-            errors.add(ErrorKind::AssignMismatchedTypes, loc.line, loc.col);
+            errors.add(ErrorKind::AssignMismatchedTypes, span);
             return None;
         }
     };
 
-    let node = BoundNode::new(kind, node_type, loc);
+    let node = BoundNode::new(kind, node_type, span);
     Some(node)
 }
 
@@ -373,13 +364,13 @@ fn bind_call_expression(
     args: &Vec<SyntaxToken>,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let symbol = match scope.borrow().get_function(identifier.clone()) {
         Some(sym) => sym,
         None => {
             let kind = ErrorKind::CannotFindFunction(identifier);
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span);
             return None;
         }
     };
@@ -395,7 +386,7 @@ fn bind_call_expression(
             found: args.len(),
         };
 
-        errors.add(kind, loc.line, loc.col);
+        errors.add(kind, span);
         return None;
     }
 
@@ -416,7 +407,7 @@ fn bind_call_expression(
                 found: bound_arg.node_type,
             };
 
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span);
             return None;
         }
 
@@ -429,7 +420,7 @@ fn bind_call_expression(
         args: Box::new(bound_args),
     };
 
-    let node = BoundNode::new(kind, ret_type, loc);
+    let node = BoundNode::new(kind, ret_type, span);
     Some(node)
 }
 
@@ -437,19 +428,19 @@ fn bind_reference_expression(
     identifier: String,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    loc: CodeLocation,
+    span: Span,
 ) -> Option<BoundNode> {
     let symbol = match scope.borrow().get_variable(identifier.clone()) {
         Some(def) => def,
         None => {
-            errors.add(ErrorKind::CannotFindValue(identifier), loc.line, loc.col);
+            errors.add(ErrorKind::CannotFindValue(identifier), span);
             return None;
         }
     };
 
     let var_type = symbol.var_type.clone();
     let kind = BoundNodeKind::ReferenceExpression(symbol);
-    let node = BoundNode::new(kind, var_type, loc);
+    let node = BoundNode::new(kind, var_type, span);
     Some(node)
 }
 
@@ -458,13 +449,13 @@ pub fn bind(
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
 ) -> Option<BoundNode> {
-    let loc = token.loc.clone();
+    let span = token.span.clone();
     match &token.kind {
-        SyntaxKind::Scope { subtokens } => bind_block(&subtokens, scope, true, errors, loc),
-        SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, loc),
-        SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, loc),
+        SyntaxKind::Scope { subtokens } => bind_block(&subtokens, scope, true, errors, span),
+        SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, span),
+        SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, span),
         SyntaxKind::IfStatement { condition, body } => {
-            bind_if_statement(&condition, &body, None, scope, errors, loc)
+            bind_if_statement(&condition, &body, None, scope, errors, span)
         }
         SyntaxKind::FunctionDeclaration {
             identifier,
@@ -478,28 +469,28 @@ pub fn bind(
             &body,
             scope,
             errors,
-            loc,
+            span,
         ),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
-            bind_binary_expression(&lhs, &op, &rhs, scope, errors, loc)
+            bind_binary_expression(&lhs, &op, &rhs, scope, errors, span)
         }
         SyntaxKind::UnaryExpression { op, rhs } => {
-            bind_unary_expression(&op, &rhs, scope, errors, loc)
+            bind_unary_expression(&op, &rhs, scope, errors, span)
         }
         SyntaxKind::IntegerLiteralExpression(value) => {
-            bind_integer_literal(value.clone(), errors, loc)
+            bind_integer_literal(value.clone(), errors, span)
         }
         SyntaxKind::BooleanLiteralExpression(value) => {
-            bind_boolean_literal(value.clone(), errors, loc)
+            bind_boolean_literal(value.clone(), errors, span)
         }
         SyntaxKind::AssignmentExpression { identifier, value } => {
-            bind_assignment_expression(identifier.clone(), value, scope, errors, loc)
+            bind_assignment_expression(identifier.clone(), value, scope, errors, span)
         }
         SyntaxKind::CallExpression { identifier, args } => {
-            bind_call_expression(identifier.clone(), &args, scope, errors, loc)
+            bind_call_expression(identifier.clone(), &args, scope, errors, span)
         }
         SyntaxKind::ReferenceExpression(identifier) => {
-            bind_reference_expression(identifier.clone(), scope, errors, loc)
+            bind_reference_expression(identifier.clone(), scope, errors, span)
         }
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
         _ => {

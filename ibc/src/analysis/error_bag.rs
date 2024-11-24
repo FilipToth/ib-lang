@@ -1,4 +1,4 @@
-use super::{binding::types::TypeKind, operator::Operator};
+use super::{binding::types::TypeKind, operator::Operator, span::Span};
 
 pub enum ErrorKind {
     // Parsing Errors
@@ -104,8 +104,7 @@ impl ErrorKind {
 
 pub struct Error {
     pub kind: ErrorKind,
-    pub line: usize,
-    pub column: usize,
+    pub span: Span,
 }
 
 impl Error {
@@ -113,7 +112,7 @@ impl Error {
         let err_msg = self.kind.format();
         format!(
             "{} on line: {}, column: {}",
-            err_msg, self.line, self.column
+            err_msg, self.span.start.line, self.span.start.col
         )
     }
 }
@@ -129,11 +128,10 @@ impl ErrorBag {
         }
     }
 
-    pub fn add(&mut self, kind: ErrorKind, line: usize, col: usize) {
+    pub fn add(&mut self, kind: ErrorKind, span: Span) {
         let err = Error {
             kind: kind,
-            line: line,
-            column: col,
+            span: span,
         };
 
         self.errors.push(err);

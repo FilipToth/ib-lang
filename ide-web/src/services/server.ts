@@ -3,8 +3,8 @@ import { auth } from "./firebase";
 
 export interface IBDiagnostic {
     message: string;
-    line: number;
-    col: number;
+    offset_start: number;
+    offset_end: number;
 }
 
 export interface IBFile {
@@ -48,7 +48,6 @@ export const getFiles = async (): Promise<IBFile[]> => {
     });
 
     const data = req.data;
-    console.log(data);
     return data;
 };
 

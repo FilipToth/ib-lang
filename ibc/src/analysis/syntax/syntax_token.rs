@@ -1,16 +1,16 @@
-use crate::analysis::{operator::Operator, CodeLocation};
+use crate::analysis::{operator::Operator, span::Span};
 
 #[derive(Debug)]
 pub struct SyntaxToken {
     pub kind: SyntaxKind,
-    pub loc: CodeLocation,
+    pub span: Span,
 }
 
 impl SyntaxToken {
-    pub fn new(kind: SyntaxKind, loc: CodeLocation) -> SyntaxToken {
+    pub fn new(kind: SyntaxKind, span: Span) -> SyntaxToken {
         SyntaxToken {
             kind: kind,
-            loc: loc,
+            span: span,
         }
     }
 }

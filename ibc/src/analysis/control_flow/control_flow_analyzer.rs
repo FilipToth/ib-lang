@@ -3,14 +3,14 @@ use std::{cell::RefCell, rc::Rc};
 use crate::analysis::{
     binding::types::TypeKind,
     error_bag::{ErrorBag, ErrorKind},
-    CodeLocation,
+    span::Span,
 };
 
 use super::control_flow_graph::ControlFlowNode;
 
 fn analyze_func_rec(
     node: Rc<RefCell<ControlFlowNode>>,
-    loc: &CodeLocation,
+    span: &Span,
     func_ret_type: &TypeKind,
     errors: &mut ErrorBag,
 ) {
@@ -25,7 +25,7 @@ fn analyze_func_rec(
         // we don't have to check for next return
         // since the next token is always a block
         let next_ref = on_condition.clone();
-        analyze_func_rec(next_ref, loc, func_ret_type, errors);
+        analyze_func_rec(next_ref, span, func_ret_type, errors);
     }
 
     if let Some(next) = &node.next {
@@ -48,11 +48,11 @@ fn analyze_func_rec(
                 expected: func_ret_type.clone(),
             };
 
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span.clone());
             return;
         }
 
-        analyze_func_rec(next_ref, loc, func_ret_type, errors);
+        analyze_func_rec(next_ref, span, func_ret_type, errors);
     } else {
         let void = TypeKind::Void;
         if func_ret_type == &void {
@@ -62,13 +62,13 @@ fn analyze_func_rec(
 
         // report error
         let kind = ErrorKind::NotAllCodePathsReturn;
-        errors.add(kind, loc.line, loc.col);
+        errors.add(kind, span.clone());
     }
 }
 
 pub fn analyze_func(
     root: Rc<RefCell<ControlFlowNode>>,
-    loc: &CodeLocation,
+    loc: &Span,
     func_ret_type: &TypeKind,
     errors: &mut ErrorBag,
 ) {

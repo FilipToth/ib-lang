@@ -2,25 +2,11 @@ pub mod binding;
 pub mod control_flow;
 pub mod error_bag;
 pub mod operator;
+pub mod span;
 pub mod syntax;
 
 use self::binding::bound_node::BoundNode;
 use self::error_bag::{ErrorBag, ErrorKind};
-
-#[derive(Debug, Clone)]
-pub struct CodeLocation {
-    line: usize,
-    col: usize,
-}
-
-impl CodeLocation {
-    pub fn new(line: usize, col: usize) -> CodeLocation {
-        CodeLocation {
-            line: line,
-            col: col,
-        }
-    }
-}
 
 pub struct AnalysisResult {
     pub errors: ErrorBag,
@@ -49,7 +35,7 @@ pub fn analyze(contents: String) -> AnalysisResult {
     let root = match syntax::parse(contents, &mut bag) {
         Some(root) => root,
         None => {
-            bag.add(ErrorKind::FailedParsing, 0, 0);
+            bag.add(ErrorKind::FailedParsing, span::Span::new(0, 0, 0, 0, 0, 0));
             return AnalysisResult::new_err(bag);
         }
     };

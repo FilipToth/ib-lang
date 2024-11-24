@@ -1,6 +1,6 @@
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
-    CodeLocation,
+    span::Span,
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -24,7 +24,7 @@ impl TypeKind {
     }
 }
 
-pub fn get_type(identifier: String, loc: &CodeLocation, errors: &mut ErrorBag) -> Option<TypeKind> {
+pub fn get_type(identifier: String, span: &Span, errors: &mut ErrorBag) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
@@ -32,7 +32,7 @@ pub fn get_type(identifier: String, loc: &CodeLocation, errors: &mut ErrorBag) -
         "Boolean" => TypeKind::Boolean,
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
-            errors.add(kind, loc.line, loc.col);
+            errors.add(kind, span.clone());
             return None;
         }
     };

@@ -16,8 +16,8 @@ pub mod auth;
 #[derive(Serialize)]
 struct Diagnostic {
     message: String,
-    line: usize,
-    col: usize
+    offset_start: usize,
+    offset_end: usize
 }
 
 #[derive(Serialize)]
@@ -65,8 +65,8 @@ async fn execute(body: String) -> Json<RunResult> {
     for error in errors {
         let diagnostic = Diagnostic {
             message: error.kind.format(),
-            line: error.line,
-            col: error.column
+            offset_start: error.span.start.char_offset,
+            offset_end: error.span.end.char_offset,
         };
 
         diagnostics.push(diagnostic)
@@ -98,8 +98,8 @@ async fn diagnostics(Extension(uid): Extension<String>, query: Query<HashMap<Str
     for error in errors {
         let diagnostic = Diagnostic {
             message: error.kind.format(),
-            line: error.line + 1,
-            col: error.column + 1
+            offset_start: error.span.start.char_offset,
+            offset_end: error.span.end.char_offset,
         };
 
         diagnostics.push(diagnostic)

@@ -1,18 +1,18 @@
 use std::{fmt, iter::Peekable, str::Chars, usize, vec};
 
-use crate::analysis::CodeLocation;
+use crate::analysis::span::{Location, Span};
 
 #[derive(Debug)]
 pub struct LexerToken {
     pub kind: LexerTokenKind,
-    pub loc: CodeLocation,
+    pub span: Span,
 }
 
 impl LexerToken {
-    fn new(kind: LexerTokenKind, loc: CodeLocation) -> LexerToken {
+    fn new(kind: LexerTokenKind, span: Span) -> LexerToken {
         LexerToken {
             kind: kind,
-            loc: loc,
+            span: span,
         }
     }
 }
@@ -91,7 +91,7 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
     }
 }
 
-fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize) -> LexerTokenKind {
+fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize, char_offset: &mut usize) -> LexerTokenKind {
     let mut value = current.to_string();
     let is_numeric = current.is_numeric();
 
@@ -112,6 +112,8 @@ fn lex_rolling(iter: &mut Peekable<Chars>, current: char, column: &mut usize) ->
                 }
 
                 *column += 1;
+                *char_offset += 1;
+
                 value.push(*next);
                 iter.next();
             }
@@ -140,6 +142,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
 
     let mut line: usize = 0;
     let mut column: usize = 0;
+    let mut char_offset: usize = 0;
 
     loop {
         let current = match chars.next() {
@@ -147,8 +150,9 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             None => break,
         };
 
-        let loc = CodeLocation::new(line, column);
+        let start_loc = Location::new(line, column, char_offset);
         column += 1;
+        char_offset += 1;
 
         let kind = match current {
             '+' => LexerTokenKind::PlusToken,
@@ -192,10 +196,13 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                 continue;
             }
             '\r' => continue,
-            _ => lex_rolling(&mut chars, current, &mut column),
+            _ => lex_rolling(&mut chars, current, &mut column, &mut char_offset),
         };
 
-        let token = LexerToken::new(kind, loc);
+        let end_loc = Location::new(line, column, char_offset);
+        let span = Span::from_loc(start_loc, end_loc);
+
+        let token = LexerToken::new(kind, span);
         tokens.push(token);
     }
 

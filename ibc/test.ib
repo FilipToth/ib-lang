@@ -1,10 +1,10 @@
 FUNCTION my_func(num: Int) -> Int
-    IF num == 2 THEN
+    IF nums == 2 THEN
         return 3 + 1
-    END IF
+    END
 
     return 0
-END FUNCTION
+END
 
 output my_func(1)
 output 10

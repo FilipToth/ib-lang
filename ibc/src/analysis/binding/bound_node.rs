@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::analysis::{operator::Operator, CodeLocation};
+use crate::analysis::{operator::Operator, span::Span};
 
 use super::{
     symbols::{FunctionSymbol, VariableSymbol},
@@ -11,15 +11,15 @@ use super::{
 pub struct BoundNode {
     pub kind: BoundNodeKind,
     pub node_type: TypeKind,
-    pub loc: CodeLocation,
+    pub span: Span,
 }
 
 impl BoundNode {
-    pub fn new(kind: BoundNodeKind, node_type: TypeKind, loc: CodeLocation) -> BoundNode {
+    pub fn new(kind: BoundNodeKind, node_type: TypeKind, span: Span) -> BoundNode {
         BoundNode {
             kind: kind,
             node_type: node_type,
-            loc: loc,
+            span: span,
         }
     }
 

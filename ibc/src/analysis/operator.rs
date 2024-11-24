@@ -15,7 +15,7 @@ pub enum Operator {
 
 impl Operator {
     pub fn return_type_unary(&self, rhs: &BoundNode, errors: &mut ErrorBag) -> Option<TypeKind> {
-        let loc = rhs.loc.clone();
+        let span = rhs.span.clone();
         let rhs_type = rhs.node_type.clone();
         match self {
             Operator::Not => {
@@ -25,7 +25,7 @@ impl Operator {
                         used_type: rhs_type,
                     };
 
-                    errors.add(err, loc.line, loc.col);
+                    errors.add(err, span);
                     return None;
                 }
 
@@ -44,7 +44,7 @@ impl Operator {
         let rhs_type = rhs.node_type.clone();
         let lhs_type = lhs.node_type.clone();
 
-        let loc = rhs.loc.clone();
+        let span = rhs.span.clone();
         match self {
             Operator::Subtraction | Operator::Multiplication | Operator::Division => {
                 if rhs_type != TypeKind::Int || lhs_type != TypeKind::Int {
@@ -54,7 +54,7 @@ impl Operator {
                         rhs: rhs_type,
                     };
 
-                    errors.add(err, loc.line, loc.col);
+                    errors.add(err, span);
                     return None;
                 }
 
@@ -73,7 +73,7 @@ impl Operator {
                     rhs: rhs_type,
                 };
 
-                errors.add(err, loc.line, loc.col);
+                errors.add(err, span);
                 None
             }
             Operator::Equality => {
@@ -83,7 +83,7 @@ impl Operator {
                         rhs: rhs_type,
                     };
 
-                    errors.add(err, loc.line, loc.col);
+                    errors.add(err, span);
                     return None;
                 }
 
