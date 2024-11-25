@@ -49,6 +49,7 @@ pub enum ErrorKind {
         lhs: TypeKind,
         rhs: TypeKind,
     },
+    ExpectsGenericTypeParam(String)
 }
 
 impl ErrorKind {
@@ -97,6 +98,9 @@ impl ErrorKind {
                     "Equality operator must have matching types, found '{:?}' and '{:?}'",
                     lhs, rhs
                 )
+            },
+            Self::ExpectsGenericTypeParam(t) => {
+                format!("Type {} expects a generic type parameter", t)
             }
         }
     }

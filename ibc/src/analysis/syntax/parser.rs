@@ -272,6 +272,35 @@ impl<'a> Parser<'a> {
             }
         };
 
+        let peek = match self.tokens.peek() {
+            Some(i) => i,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("Argument List".to_string());
+                errors.add(error_kind, identifier_span);
+                return None;
+            }
+        };
+
+        let type_param = match peek.kind {
+            LexerTokenKind::LesserThanToken => {
+                let le_token = self.tokens.next().unwrap();
+                let (identifier, _) = match self.parse_identifier() {
+                    Some(i) => i,
+                    None => {
+                        let error_kind = ErrorKind::ExpectedToken("Type Identifier".to_string());
+                        errors.add(error_kind, le_token.span);
+                        return None;
+                    }
+                };
+
+                // consume ge token
+                self.expect_next_token(LexerTokenKind::GreaterThanToken);
+
+                Some(identifier)
+            },
+            _ => None
+        };
+
         let arg_list = match self.parse_argument_list(errors) {
             Some(a) => a,
             None => {
@@ -288,6 +317,7 @@ impl<'a> Parser<'a> {
 
         let kind = SyntaxKind::InstantiationExpression {
             type_name: identifier,
+            type_param: type_param,
             args: arg_list,
         };
 

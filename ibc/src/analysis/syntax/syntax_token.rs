@@ -49,6 +49,7 @@ pub enum SyntaxKind {
     },
     InstantiationExpression {
         type_name: String,
+        type_param: Option<String>,
         args: Vec<SyntaxToken>,
     },
     OutputStatement {

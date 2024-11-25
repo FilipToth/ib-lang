@@ -14,7 +14,7 @@ pub enum TypeKind {
     Int,
     String,
     Boolean,
-    Array,
+    Array(Box<TypeKind>),
 }
 
 pub struct TypeMethodRepresentation {
@@ -30,22 +30,24 @@ pub struct TypeMethodParamRepresentation {
 
 impl TypeKind {
     pub fn to_string(&self) -> String {
-        let kind = match &self {
-            TypeKind::Void => "Void",
-            TypeKind::Int => "Int",
-            TypeKind::String => "String",
-            TypeKind::Boolean => "Boolean",
-            TypeKind::Array => "Array",
-        };
-
-        kind.to_string()
+        match &self {
+            TypeKind::Void => "Void".to_string(),
+            TypeKind::Int => "Int".to_string(),
+            TypeKind::String => "String".to_string(),
+            TypeKind::Boolean => "Boolean".to_string(),
+            TypeKind::Array(generic) => {
+                let generic = generic.to_string();
+                format!("Array<{}>", generic)
+            },
+        }
     }
 
     pub fn reflection_methods(&self) -> Vec<TypeMethodRepresentation> {
         let mut methods: Vec<TypeMethodRepresentation> = Vec::new();
 
         match &self {
-            TypeKind::Array => {
+            TypeKind::Array(generic) => {
+                let generic = *generic.clone();
                 let add = TypeMethodRepresentation {
                     identifier: "push".to_string(),
                     ret_type: TypeKind::Void,
@@ -53,7 +55,7 @@ impl TypeKind {
                         let mut params = Vec::<TypeMethodParamRepresentation>::new();
                         let item = TypeMethodParamRepresentation {
                             identifier: "item".to_string(),
-                            param_type: TypeKind::Int,
+                            param_type: generic.clone(),
                         };
 
                         params.push(item);
@@ -63,7 +65,7 @@ impl TypeKind {
 
                 let get = TypeMethodRepresentation {
                     identifier: "get".to_string(),
-                    ret_type: TypeKind::Int,
+                    ret_type: generic,
                     params: {
                         let mut params = Vec::<TypeMethodParamRepresentation>::new();
                         let item = TypeMethodParamRepresentation {
@@ -93,13 +95,29 @@ impl TypeKind {
     }
 }
 
-pub fn get_type(identifier: String, span: &Span, errors: &mut ErrorBag) -> Option<TypeKind> {
+pub fn get_type(identifier: String, generic: Option<String>, span: &Span, errors: &mut ErrorBag) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
         "String" => TypeKind::String,
         "Boolean" => TypeKind::Boolean,
-        "Array" => TypeKind::Array,
+        "Array" => {
+            let generic = match generic {
+                Some(id) => {
+                    match get_type(id, None, span, errors) {
+                        Some(t) => t,
+                        None => return None,
+                    }
+                },
+                None => {
+                    let kind = ErrorKind::ExpectsGenericTypeParam("Array".to_string());
+                    errors.add(kind, span.clone());
+                    return None;
+                }
+            };
+
+            TypeKind::Array(Box::new(generic))
+        },
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());
@@ -145,7 +163,7 @@ impl ArrayState {
 
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
-        TypeKind::Array => ObjectState::Array(ArrayState::new()),
+        TypeKind::Array(generic) => ObjectState::Array(ArrayState::new()),
         _ => unreachable!(),
     }
 }

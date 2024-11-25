@@ -181,7 +181,7 @@ fn bind_function_declaration(
     }
     .to_string();
 
-    let ret_type = match get_type(ret_type, &span, errors) {
+    let ret_type = match get_type(ret_type, None, &span, errors) {
         Some(t) => t,
         None => return None,
     };
@@ -233,7 +233,7 @@ fn bind_params(
             return None;
         };
 
-        let param_type = match get_type(type_annotation.clone(), &span, errors) {
+        let param_type = match get_type(type_annotation.clone(), None, &span, errors) {
             Some(t) => t,
             None => return None,
         };
@@ -504,12 +504,13 @@ fn bind_object_member_expression(
 
 fn bind_instantiation_expression(
     type_name: String,
+    type_param: Option<String>,
     args: &Vec<SyntaxToken>,
     _scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let instantiation_type = match get_type(type_name.clone(), &span, errors) {
+    let instantiation_type = match get_type(type_name.clone(), type_param, &span, errors) {
         Some(t) => t,
         None => return None,
     };
@@ -583,8 +584,8 @@ pub fn bind(
         SyntaxKind::ObjectMemberExpression { base, next } => {
             bind_object_member_expression(&base, &next, scope, errors, span)
         }
-        SyntaxKind::InstantiationExpression { type_name, args } => {
-            bind_instantiation_expression(type_name.clone(), &args, scope, errors, span)
+        SyntaxKind::InstantiationExpression { type_name, type_param, args } => {
+            bind_instantiation_expression(type_name.clone(), type_param.clone(), &args, scope, errors, span)
         }
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
         _ => {

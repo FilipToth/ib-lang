@@ -26,6 +26,8 @@ pub enum LexerTokenKind {
     BangToken,
     EqualsToken,
     ArrowToken,
+    GreaterThanToken,
+    LesserThanToken,
     EqualsEqualsToken,
     OpenParenthesisToken,
     CloseParenthesisToken,
@@ -192,7 +194,9 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                     },
                     None => LexerTokenKind::EqualsToken,
                 }
-            }
+            },
+            '>' => LexerTokenKind::GreaterThanToken,
+            '<' => LexerTokenKind::LesserThanToken,
             '(' => LexerTokenKind::OpenParenthesisToken,
             ')' => LexerTokenKind::CloseParenthesisToken,
             ',' => LexerTokenKind::CommaToken,

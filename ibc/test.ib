@@ -1,3 +1,9 @@
-array = new Array()
-array.push(10)
+array = new Array<Int>()
+
+array.push(44)
+array.push(54)
+array.push(54)
+array.push(64)
+
 output array.len()
+output array.get(2)
