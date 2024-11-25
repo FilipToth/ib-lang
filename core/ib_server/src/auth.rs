@@ -9,7 +9,7 @@ use serde::Serialize;
 async fn ping_auth_backend(jwt: &str) -> Option<String> {
     let client = reqwest::Client::new();
     let authorization = format!("Bearer {}", jwt);
-    let url = "http://localhost:8081/auth";
+    let url = "http://auth-server:8081/auth";
 
     let mut headers = HeaderMap::new();
     headers.insert(AUTHORIZATION, HeaderValue::from_str(&authorization).unwrap());

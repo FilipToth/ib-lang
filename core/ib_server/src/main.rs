@@ -52,7 +52,8 @@ async fn main() {
         .layer(axum::middleware::from_fn(auth_middleware))
         .layer(ServiceBuilder::new().layer(cors));
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    println!("Listening on port 8080...");
+    let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
