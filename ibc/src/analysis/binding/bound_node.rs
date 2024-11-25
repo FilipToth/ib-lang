@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{ops::Bound, rc::Rc};
 
 use crate::analysis::{operator::Operator, span::Span};
 
@@ -61,6 +61,9 @@ impl BoundNode {
                 format!("{}(...)", symbol.identifier)
             }
             BoundNodeKind::ObjectExpression => "Object".to_string(),
+            BoundNodeKind::ObjectMemberExpression { base, next } => {
+                format!("{}.{}", base.to_string(), next.to_string())
+            }
             BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
@@ -109,6 +112,10 @@ pub enum BoundNodeKind {
         args: Box<Vec<BoundNode>>,
     },
     ObjectExpression,
+    ObjectMemberExpression {
+        base: Box<BoundNode>,
+        next: Box<BoundNode>,
+    },
     ReferenceExpression(VariableSymbol),
     NumberLiteral(i64),
     BooleanLiteral(bool),

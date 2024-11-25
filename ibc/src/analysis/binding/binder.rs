@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -10,6 +13,7 @@ use crate::analysis::{
 use super::{
     bound_node::{BoundNode, BoundNodeKind, BoundParameter},
     bound_scope::BoundScope,
+    symbols::VariableSymbol,
     types::{get_type, TypeKind},
 };
 
@@ -451,13 +455,51 @@ fn bind_object_member_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let base_node = bind(base, scope, errors);
+    let base_node = match bind(base, scope.clone(), errors) {
+        Some(n) => n,
+        None => return None,
+    };
 
     // create a scope with all object member methods
     // and the run regular binding with that scope
-    let object_scope = BoundScope::new_root();
+    let mut object_scope = BoundScope::new_root();
+    let type_methods = base_node.node_type.reflection_methods();
 
-    None
+    for method in type_methods {
+        let mut params = Vec::<BoundParameter>::new();
+        let mut scope_mut = scope.borrow_mut();
+
+        for param in method.params {
+            let param = match scope_mut.assign_variable(param.identifier, param.param_type) {
+                Some(p) => p,
+                None => return None,
+            };
+
+            let param_type = param.var_type.clone();
+            let bound_parameter = BoundParameter {
+                symbol: param,
+                param_type: param_type,
+            };
+
+            params.push(bound_parameter);
+        }
+
+        object_scope.declare_function(method.identifier, params, method.ret_type);
+    }
+
+    let next = match bind(next, Rc::new(RefCell::new(object_scope)), errors) {
+        Some(n) => n,
+        None => return None,
+    };
+
+    let node_type = next.node_type.clone();
+    let kind = BoundNodeKind::ObjectMemberExpression {
+        base: Box::new(base_node),
+        next: Box::new(next),
+    };
+
+    let node = BoundNode::new(kind, node_type, span);
+    Some(node)
 }
 
 fn bind_instantiation_expression(

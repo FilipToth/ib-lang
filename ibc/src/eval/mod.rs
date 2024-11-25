@@ -1,6 +1,7 @@
 use crate::analysis::binding::bound_node::BoundNode;
 
 pub mod evaluator;
+pub mod object_methods;
 
 pub fn eval(root: &BoundNode) -> String {
     let mut output = String::from("");

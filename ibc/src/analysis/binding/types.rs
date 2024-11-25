@@ -6,6 +6,8 @@ use crate::{
     eval::evaluator::EvalValue,
 };
 
+use super::bound_node::BoundParameter;
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TypeKind {
     Void,
@@ -13,6 +15,17 @@ pub enum TypeKind {
     String,
     Boolean,
     Array,
+}
+
+pub struct TypeMethodRepresentation {
+    pub identifier: String,
+    pub ret_type: TypeKind,
+    pub params: Vec<TypeMethodParamRepresentation>,
+}
+
+pub struct TypeMethodParamRepresentation {
+    pub identifier: String,
+    pub param_type: TypeKind,
 }
 
 impl TypeKind {
@@ -26,6 +39,57 @@ impl TypeKind {
         };
 
         kind.to_string()
+    }
+
+    pub fn reflection_methods(&self) -> Vec<TypeMethodRepresentation> {
+        let mut methods: Vec<TypeMethodRepresentation> = Vec::new();
+
+        match &self {
+            TypeKind::Array => {
+                let add = TypeMethodRepresentation {
+                    identifier: "push".to_string(),
+                    ret_type: TypeKind::Void,
+                    params: {
+                        let mut params = Vec::<TypeMethodParamRepresentation>::new();
+                        let item = TypeMethodParamRepresentation {
+                            identifier: "item".to_string(),
+                            param_type: TypeKind::Int,
+                        };
+
+                        params.push(item);
+                        params
+                    },
+                };
+
+                let get = TypeMethodRepresentation {
+                    identifier: "get".to_string(),
+                    ret_type: TypeKind::Int,
+                    params: {
+                        let mut params = Vec::<TypeMethodParamRepresentation>::new();
+                        let item = TypeMethodParamRepresentation {
+                            identifier: "index".to_string(),
+                            param_type: TypeKind::Int,
+                        };
+
+                        params.push(item);
+                        params
+                    },
+                };
+
+                let len = TypeMethodRepresentation {
+                    identifier: "len".to_string(),
+                    ret_type: TypeKind::Int,
+                    params: Vec::new(),
+                };
+
+                methods.push(add);
+                methods.push(get);
+                methods.push(len);
+            }
+            _ => {}
+        }
+
+        methods
     }
 }
 
@@ -58,7 +122,7 @@ pub trait TypeObject {
 
 #[derive(Debug, Clone)]
 pub struct ArrayState {
-    internal: Vec<EvalValue>,
+    pub internal: Vec<EvalValue>,
 }
 
 impl TypeObject for ArrayState {

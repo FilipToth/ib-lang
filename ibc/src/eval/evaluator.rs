@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use crate::analysis::{
     binding::{
@@ -9,9 +9,11 @@ use crate::analysis::{
     operator::Operator,
 };
 
+use super::object_methods::execute_type_method;
+
 pub struct EvalInfo<'a> {
-    heap: &'a mut EvalHeap,
-    output: &'a mut String,
+    pub heap: &'a mut EvalHeap,
+    pub output: &'a mut String,
 }
 
 pub struct EvalHeap {
@@ -30,23 +32,23 @@ impl EvalHeap {
         }
     }
 
-    fn assign_var(&mut self, symbol: &VariableSymbol, val: EvalValue) {
+    pub fn assign_var(&mut self, symbol: &VariableSymbol, val: EvalValue) {
         let id = symbol.symbol_id;
         self.variables.insert(id, val);
     }
 
-    fn get_var(&self, symbol: &VariableSymbol) -> EvalValue {
+    pub fn get_var(&self, symbol: &VariableSymbol) -> EvalValue {
         let id = &symbol.symbol_id;
         let value = &self.variables[id];
         value.clone()
     }
 
-    fn declare_func(&mut self, symbol: &FunctionSymbol, body: Rc<BoundNode>) {
+    pub fn declare_func(&mut self, symbol: &FunctionSymbol, body: Rc<BoundNode>) {
         let id = symbol.symbol_id;
         self.functions.insert(id, body);
     }
 
-    fn get_func(&self, symbol: &FunctionSymbol) -> Rc<BoundNode> {
+    pub fn get_func(&self, symbol: &FunctionSymbol) -> Rc<BoundNode> {
         let id = &symbol.symbol_id;
         let body = &self.functions[id];
         body.clone()
@@ -60,7 +62,7 @@ pub enum EvalValue {
     Bool(bool),
     String(String),
     // used for non-primitive types
-    Object(ObjectState),
+    Object(Rc<RefCell<ObjectState>>),
     // used to return in
     // the eval rec function
     Return(Box<EvalValue>),
@@ -188,6 +190,18 @@ fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
     }
 }
 
+fn eval_call_args(symbol: &FunctionSymbol, args: &Box<Vec<BoundNode>>, info: &mut EvalInfo) {
+    let num_params = symbol.parameters.len();
+    for index in 0..num_params {
+        let param = &symbol.parameters[index];
+        let arg = &args[index];
+
+        let symbol = &param.symbol;
+        let value = eval_rec(arg, info);
+        info.heap.assign_var(symbol, value);
+    }
+}
+
 fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
     let val = match &node.kind {
         BoundNodeKind::Module { block } => eval_rec(&block, info),
@@ -261,15 +275,7 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             EvalValue::void()
         }
         BoundNodeKind::BoundCallExpression { symbol, args } => {
-            let num_params = symbol.parameters.len();
-            for index in 0..num_params {
-                let param = &symbol.parameters[index];
-                let arg = &args[index];
-
-                let symbol = &param.symbol;
-                let value = eval_rec(arg, info);
-                info.heap.assign_var(symbol, value);
-            }
+            eval_call_args(symbol, args, info);
 
             // no need to clear arguments after executing the block
             let body = info.heap.get_func(symbol);
@@ -285,7 +291,20 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             let node_type = node.node_type.clone();
             let object = get_object_state(node_type);
 
-            EvalValue::Object(object)
+            EvalValue::Object(Rc::new(RefCell::new(object)))
+        }
+        BoundNodeKind::ObjectMemberExpression { base, next } => {
+            let base_value = eval_rec(&base, info);
+
+            // next should either be a reference or a call ;D
+            // values are also objects, but they don't hold state?
+            match &next.kind {
+                BoundNodeKind::BoundCallExpression { symbol, args } => {
+                    eval_call_args(&symbol, &args, info);
+                    execute_type_method(base_value, symbol, info)
+                }
+                _ => unreachable!(),
+            }
         }
     };
 
