@@ -9,7 +9,7 @@ use crate::analysis::{
     operator::Operator,
 };
 
-use super::object_methods::execute_type_method;
+use super::object_methods::eval_type_method;
 
 pub struct EvalInfo<'a> {
     pub heap: &'a mut EvalHeap,
@@ -202,6 +202,22 @@ fn eval_call_args(symbol: &FunctionSymbol, args: &Box<Vec<BoundNode>>, info: &mu
     }
 }
 
+fn eval_for_loop(
+    iterator: &VariableSymbol,
+    lower_bound: usize,
+    upper_bound: usize,
+    body: Rc<BoundNode>,
+    info: &mut EvalInfo,
+) -> EvalValue {
+    for index in lower_bound..upper_bound {
+        let index_val = EvalValue::Int(index as i64);
+        info.heap.assign_var(iterator, index_val);
+        eval_rec(&body, info);
+    }
+
+    EvalValue::void()
+}
+
 fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
     let val = match &node.kind {
         BoundNodeKind::Module { block } => eval_rec(&block, info),
@@ -301,11 +317,17 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             match &next.kind {
                 BoundNodeKind::BoundCallExpression { symbol, args } => {
                     eval_call_args(&symbol, &args, info);
-                    execute_type_method(base_value, symbol, info)
+                    eval_type_method(base_value, symbol, info)
                 }
                 _ => unreachable!(),
             }
         }
+        BoundNodeKind::ForLoop {
+            iterator,
+            lower_bound,
+            upper_bound,
+            block,
+        } => eval_for_loop(iterator, lower_bound.clone(), upper_bound.clone(), block.clone(), info),
     };
 
     val

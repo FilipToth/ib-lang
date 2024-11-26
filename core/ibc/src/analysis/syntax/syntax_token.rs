@@ -72,4 +72,10 @@ pub enum SyntaxKind {
     ReturnStatement {
         expr: Option<Box<SyntaxToken>>,
     },
+    ForLoop {
+        identifier: String,
+        lower_bound: usize,
+        upper_bound: usize,
+        body: Box<SyntaxToken>,
+    },
 }

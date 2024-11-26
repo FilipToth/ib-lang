@@ -1,7 +1,4 @@
-use std::{
-    cell::{Ref, RefCell},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -211,6 +208,38 @@ fn bind_function_declaration(
             errors.add(kind, span);
             return None;
         }
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, span);
+    Some(node)
+}
+
+fn bind_for_statement(
+    identifier: String,
+    lower_bound: usize,
+    upper_bound: usize,
+    body: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let mut loop_scope = BoundScope::new(scope);
+    let iterator = match loop_scope.assign_variable(identifier, TypeKind::Int) {
+        Some(s) => s,
+        None => return None,
+    };
+
+    let loop_scope = Rc::new(RefCell::new(loop_scope));
+    let body = match bind(body, loop_scope, errors) {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::ForLoop {
+        iterator: iterator,
+        lower_bound: lower_bound,
+        upper_bound: upper_bound,
+        block: Rc::new(body),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, span);
@@ -560,6 +589,20 @@ pub fn bind(
             errors,
             span,
         ),
+        SyntaxKind::ForLoop {
+            identifier,
+            lower_bound,
+            upper_bound,
+            body,
+        } => bind_for_statement(
+            identifier.clone(),
+            lower_bound.clone(),
+            upper_bound.clone(),
+            &body,
+            scope,
+            errors,
+            span,
+        ),
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, span)
         }
@@ -584,9 +627,18 @@ pub fn bind(
         SyntaxKind::ObjectMemberExpression { base, next } => {
             bind_object_member_expression(&base, &next, scope, errors, span)
         }
-        SyntaxKind::InstantiationExpression { type_name, type_param, args } => {
-            bind_instantiation_expression(type_name.clone(), type_param.clone(), &args, scope, errors, span)
-        }
+        SyntaxKind::InstantiationExpression {
+            type_name,
+            type_param,
+            args,
+        } => bind_instantiation_expression(
+            type_name.clone(),
+            type_param.clone(),
+            &args,
+            scope,
+            errors,
+            span,
+        ),
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
         _ => {
             println!("unknown: {:?}", token.kind);

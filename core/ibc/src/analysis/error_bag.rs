@@ -10,6 +10,9 @@ pub enum ErrorKind {
     UnclosedParenthesisExpression,
     ExpectedArgument,
     ExpectedParameter,
+    ExpectedLoop,
+    ExpectedLoopLowerBound,
+    ExpectedLoopUpperBound,
 
     // Binding Errors
     FailedParsing,
@@ -49,7 +52,7 @@ pub enum ErrorKind {
         lhs: TypeKind,
         rhs: TypeKind,
     },
-    ExpectsGenericTypeParam(String)
+    ExpectsGenericTypeParam(String),
 }
 
 impl ErrorKind {
@@ -63,6 +66,9 @@ impl ErrorKind {
             Self::UnclosedParenthesisExpression => "Unclosed parenthesis expression".to_string(),
             Self::ExpectedArgument => "Expected an argument".to_string(),
             Self::ExpectedParameter => "Expected a parameter".to_string(),
+            Self::ExpectedLoop => "Expected loop".to_string(),
+            Self::ExpectedLoopLowerBound => "Expected loop lower bound".to_string(),
+            Self::ExpectedLoopUpperBound => "Expected loop upper bound".to_string(),
 
             Self::FailedParsing => "Failed parsing".to_string(),
             Self::NumberParsing => "Cannot parse number".to_string(),

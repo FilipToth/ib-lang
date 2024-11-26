@@ -47,6 +47,9 @@ pub enum LexerTokenKind {
     TrueKeyword,
     FalseKeyword,
     NewKeyword,
+    LoopKeyword,
+    FromKeyword,
+    ToKeyword,
 }
 
 impl LexerTokenKind {
@@ -92,6 +95,9 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
         "true" => LexerTokenKind::TrueKeyword,
         "false" => LexerTokenKind::FalseKeyword,
         "new" => LexerTokenKind::NewKeyword,
+        "loop" => LexerTokenKind::LoopKeyword,
+        "from" => LexerTokenKind::FromKeyword,
+        "to" => LexerTokenKind::ToKeyword,
         _ => LexerTokenKind::IdentifierToken(value),
     }
 }
@@ -194,7 +200,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                     },
                     None => LexerTokenKind::EqualsToken,
                 }
-            },
+            }
             '>' => LexerTokenKind::GreaterThanToken,
             '<' => LexerTokenKind::LesserThanToken,
             '(' => LexerTokenKind::OpenParenthesisToken,

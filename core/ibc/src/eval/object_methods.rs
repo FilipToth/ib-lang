@@ -51,7 +51,7 @@ fn execute_object_method(
     }
 }
 
-pub fn execute_type_method(
+pub fn eval_type_method(
     mut value: EvalValue,
     symbol: &FunctionSymbol,
     info: &mut EvalInfo,

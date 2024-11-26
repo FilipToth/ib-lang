@@ -38,7 +38,7 @@ impl TypeKind {
             TypeKind::Array(generic) => {
                 let generic = generic.to_string();
                 format!("Array<{}>", generic)
-            },
+            }
         }
     }
 
@@ -95,7 +95,12 @@ impl TypeKind {
     }
 }
 
-pub fn get_type(identifier: String, generic: Option<String>, span: &Span, errors: &mut ErrorBag) -> Option<TypeKind> {
+pub fn get_type(
+    identifier: String,
+    generic: Option<String>,
+    span: &Span,
+    errors: &mut ErrorBag,
+) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
@@ -103,11 +108,9 @@ pub fn get_type(identifier: String, generic: Option<String>, span: &Span, errors
         "Boolean" => TypeKind::Boolean,
         "Array" => {
             let generic = match generic {
-                Some(id) => {
-                    match get_type(id, None, span, errors) {
-                        Some(t) => t,
-                        None => return None,
-                    }
+                Some(id) => match get_type(id, None, span, errors) {
+                    Some(t) => t,
+                    None => return None,
                 },
                 None => {
                     let kind = ErrorKind::ExpectsGenericTypeParam("Array".to_string());
@@ -117,7 +120,7 @@ pub fn get_type(identifier: String, generic: Option<String>, span: &Span, errors
             };
 
             TypeKind::Array(Box::new(generic))
-        },
+        }
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());

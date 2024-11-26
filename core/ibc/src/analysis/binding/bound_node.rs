@@ -1,4 +1,4 @@
-use std::{ops::Bound, rc::Rc};
+use std::rc::Rc;
 
 use crate::analysis::{operator::Operator, span::Span};
 
@@ -41,6 +41,20 @@ impl BoundNode {
                 block: _,
                 else_block: _,
             } => format!("if {}", &condition.to_string()),
+            BoundNodeKind::ForLoop {
+                iterator,
+                lower_bound,
+                upper_bound,
+                block,
+            } => {
+                format!(
+                    "loop {} from {} to {} {} end",
+                    iterator.identifier,
+                    lower_bound,
+                    upper_bound,
+                    block.to_string()
+                )
+            }
             BoundNodeKind::FunctionDeclaration { symbol, block: _ } => {
                 format!(
                     "function {}(...) -> {}",
@@ -92,6 +106,12 @@ pub enum BoundNodeKind {
     },
     FunctionDeclaration {
         symbol: FunctionSymbol,
+        block: Rc<BoundNode>,
+    },
+    ForLoop {
+        iterator: VariableSymbol,
+        lower_bound: usize,
+        upper_bound: usize,
         block: Rc<BoundNode>,
     },
     BinaryExpression {

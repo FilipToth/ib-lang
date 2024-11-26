@@ -297,8 +297,8 @@ impl<'a> Parser<'a> {
                 self.expect_next_token(LexerTokenKind::GreaterThanToken);
 
                 Some(identifier)
-            },
-            _ => None
+            }
+            _ => None,
         };
 
         let arg_list = match self.parse_argument_list(errors) {
@@ -679,6 +679,99 @@ impl<'a> Parser<'a> {
         Some(params)
     }
 
+    fn parse_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let loop_token = self.tokens.next().unwrap();
+        match self.tokens.peek() {
+            Some(p) => match p.kind {
+                LexerTokenKind::IdentifierToken(_) => self.parse_for_loop(errors),
+                _ => {
+                    let kind = ErrorKind::ExpectedLoop;
+                    errors.add(kind, loop_token.span);
+                    return None;
+                }
+            },
+            None => {
+                let kind = ErrorKind::ExpectedLoop;
+                errors.add(kind, loop_token.span);
+                return None;
+            }
+        }
+    }
+
+    fn parse_for_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let (identifier, identifier_span) = self.parse_identifier().unwrap();
+
+        if !self.expect_next_token(LexerTokenKind::FromKeyword) {
+            return None;
+        }
+
+        let lower_bound = match self.tokens.next() {
+            Some(t) => match t.kind {
+                LexerTokenKind::IntegerLiteralToken(val) => val,
+                _ => {
+                    let kind = ErrorKind::ExpectedLoopLowerBound;
+                    errors.add(kind, identifier_span);
+                    return None;
+                }
+            },
+            None => {
+                let kind = ErrorKind::ExpectedLoopLowerBound;
+                errors.add(kind, identifier_span);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token(LexerTokenKind::ToKeyword) {
+            return None;
+        }
+
+        let (upper_bound, upper_bound_span) = match self.tokens.next() {
+            Some(t) => {
+                let span = t.span.clone();
+                match t.kind {
+                    LexerTokenKind::IntegerLiteralToken(val) => (val, span),
+                    _ => {
+                        let kind = ErrorKind::ExpectedLoopUpperBound;
+                        errors.add(kind, identifier_span);
+                        return None;
+                    }
+                }
+            }
+            None => {
+                let kind = ErrorKind::ExpectedLoopUpperBound;
+                errors.add(kind, identifier_span);
+                return None;
+            }
+        };
+
+        let body = match self.parse_scope(errors) {
+            Some(b) => b,
+            None => {
+                let error_kind = ErrorKind::ExpectedScope;
+                errors.add(error_kind, upper_bound_span);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
+            errors.add(error_kind, body.span);
+            return None;
+        }
+
+        let end_loc = body.span.end.clone();
+        let kind = SyntaxKind::ForLoop {
+            identifier: identifier,
+            lower_bound: lower_bound as usize,
+            upper_bound: upper_bound as usize,
+            body: Box::new(body),
+        };
+
+        let span = Span::from_loc(identifier_span.start, end_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
+    }
+
     fn parse_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let peek = self.tokens.peek();
 
@@ -688,6 +781,7 @@ impl<'a> Parser<'a> {
             LexerTokenKind::IfKeyword => self.parse_if_statement(errors),
             LexerTokenKind::ReturnKeyword => self.parse_return_statement(errors),
             LexerTokenKind::FunctionKeyword => self.parse_function_declaration(errors),
+            LexerTokenKind::LoopKeyword => self.parse_loop(errors),
             _ => self.parse_expression(errors),
         }
     }
