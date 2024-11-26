@@ -13,7 +13,7 @@ pub enum TypeKind {
     String,
     Boolean,
     Array(Box<TypeKind>),
-    Collection(Box<TypeKind>)
+    Collection(Box<TypeKind>),
 }
 
 pub struct TypeMethodRepresentation {
@@ -37,7 +37,7 @@ impl TypeKind {
             TypeKind::Array(generic) => {
                 let generic = generic.to_string();
                 format!("Array<{}>", generic)
-            },
+            }
             TypeKind::Collection(generic) => {
                 let generic = generic.to_string();
                 format!("Collection<{}>", generic)
@@ -91,6 +91,53 @@ impl TypeKind {
                 methods.push(get);
                 methods.push(len);
             }
+            TypeKind::Collection(generic) => {
+                let generic = *generic.clone();
+                let has_next = TypeMethodRepresentation {
+                    identifier: "hasNext".to_string(),
+                    ret_type: TypeKind::Boolean,
+                    params: Vec::new()
+                };
+
+                let get_item = TypeMethodRepresentation {
+                    identifier: "getItem".to_string(),
+                    ret_type: generic.clone(),
+                    params: Vec::new()
+                };
+
+                let reset_next = TypeMethodRepresentation {
+                    identifier: "resetNext".to_string(),
+                    ret_type: TypeKind::Void,
+                    params: Vec::new(),
+                };
+
+                let add_item = TypeMethodRepresentation {
+                    identifier: "addItem".to_string(),
+                    ret_type: TypeKind::Void,
+                    params: {
+                        let mut params = Vec::<TypeMethodParamRepresentation>::new();
+                        let item = TypeMethodParamRepresentation {
+                            identifier: "item".to_string(),
+                            param_type: generic,
+                        };
+
+                        params.push(item);
+                        params
+                    },
+                };
+
+                let is_empty = TypeMethodRepresentation {
+                    identifier: "isEmpty".to_string(),
+                    ret_type: TypeKind::Boolean,
+                    params: Vec::new(),
+                };
+
+                methods.push(has_next);
+                methods.push(get_item);
+                methods.push(reset_next);
+                methods.push(add_item);
+                methods.push(is_empty);
+            }
             _ => {}
         }
 
@@ -123,7 +170,7 @@ pub fn get_type(
             };
 
             TypeKind::Array(Box::new(generic))
-        },
+        }
         "Collection" => {
             let generic = match generic {
                 Some(id) => match get_type(id, None, span, errors) {
@@ -138,7 +185,7 @@ pub fn get_type(
             };
 
             TypeKind::Collection(Box::new(generic))
-        },
+        }
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());
@@ -152,7 +199,7 @@ pub fn get_type(
 #[derive(Debug, Clone)]
 pub enum ObjectState {
     Array(ArrayState),
-    Collection(CollectionState)
+    Collection(CollectionState),
 }
 
 #[derive(Debug, Clone)]
@@ -171,7 +218,7 @@ impl ArrayState {
 #[derive(Debug, Clone)]
 pub struct CollectionState {
     pub head: usize,
-    pub internal: Vec<EvalValue>
+    pub internal: Vec<EvalValue>,
 }
 
 impl CollectionState {

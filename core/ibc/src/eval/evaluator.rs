@@ -327,7 +327,13 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             lower_bound,
             upper_bound,
             block,
-        } => eval_for_loop(iterator, lower_bound.clone(), upper_bound.clone(), block.clone(), info),
+        } => eval_for_loop(
+            iterator,
+            lower_bound.clone(),
+            upper_bound.clone(),
+            block.clone(),
+            info,
+        ),
     };
 
     val

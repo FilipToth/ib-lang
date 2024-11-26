@@ -29,8 +29,12 @@ fn execute_array_method(
                 _ => unreachable!(),
             };
 
-            let value = &state.internal[index_value];
-            value.clone()
+            match state.internal.get(index_value) {
+                Some(v) => v.clone(),
+                None => {
+                    panic!("Runtime error");
+                }
+            }
         }
         "len" => {
             let length = state.internal.len() as i64;
@@ -46,11 +50,39 @@ fn execute_collection_method(
     info: &mut EvalInfo,
 ) -> EvalValue {
     match symbol.identifier.as_str() {
-        "hasNext" => {},
-        "getItem" => {},
-        "resetNext" => {},
-        "addItem" => {},
-        "isEmpty" => {},
+        "hasNext" => {
+            let index = state.head.clone() + 1;
+            let res = state.internal.get(index).is_some();
+            EvalValue::Bool(res)
+        }
+        "getItem" => {
+            let index = state.head.clone();
+            match state.internal.get(index) {
+                Some(v) => {
+                    state.head += 1;
+                    v.clone()
+                },
+                None => {
+                    panic!("Runtime error");
+                }
+            }
+        }
+        "resetNext" => {
+            state.head = 0;
+            EvalValue::Void
+        }
+        "addItem" => {
+            let item = &symbol.parameters[0].symbol;
+            let item_value = info.heap.get_var(item);
+
+            state.internal.push(item_value);
+            EvalValue::Void
+        }
+        "isEmpty" => {
+            let res = state.internal.len() == 0;
+            EvalValue::Bool(res)
+        }
+        _ => unimplemented!(),
     }
 }
 

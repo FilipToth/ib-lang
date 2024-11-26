@@ -1,3 +1,21 @@
-loop index from 0 to 10
-    output index + 10
-end
+col = new Collection<Int>()
+
+output col.isEmpty()
+
+col.addItem(1)
+col.addItem(2)
+col.addItem(3)
+col.addItem(4)
+
+output col.isEmpty()
+output col.hasNext()
+
+output col.getItem()
+output col.getItem()
+output col.getItem()
+output col.getItem()
+
+output col.hasNext()
+col.resetNext()
+
+output col.getItem()
