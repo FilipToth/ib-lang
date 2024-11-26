@@ -6,8 +6,6 @@ use crate::{
     eval::evaluator::EvalValue,
 };
 
-use super::bound_node::BoundParameter;
-
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TypeKind {
     Void,
@@ -15,6 +13,7 @@ pub enum TypeKind {
     String,
     Boolean,
     Array(Box<TypeKind>),
+    Collection(Box<TypeKind>)
 }
 
 pub struct TypeMethodRepresentation {
@@ -38,6 +37,10 @@ impl TypeKind {
             TypeKind::Array(generic) => {
                 let generic = generic.to_string();
                 format!("Array<{}>", generic)
+            },
+            TypeKind::Collection(generic) => {
+                let generic = generic.to_string();
+                format!("Collection<{}>", generic)
             }
         }
     }
@@ -120,7 +123,22 @@ pub fn get_type(
             };
 
             TypeKind::Array(Box::new(generic))
-        }
+        },
+        "Collection" => {
+            let generic = match generic {
+                Some(id) => match get_type(id, None, span, errors) {
+                    Some(t) => t,
+                    None => return None,
+                },
+                None => {
+                    let kind = ErrorKind::ExpectsGenericTypeParam("Collection".to_string());
+                    errors.add(kind, span.clone());
+                    return None;
+                }
+            };
+
+            TypeKind::Collection(Box::new(generic))
+        },
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());
@@ -134,26 +152,12 @@ pub fn get_type(
 #[derive(Debug, Clone)]
 pub enum ObjectState {
     Array(ArrayState),
-}
-
-pub trait TypeObject {
-    fn execute_method();
-    fn get_value();
+    Collection(CollectionState)
 }
 
 #[derive(Debug, Clone)]
 pub struct ArrayState {
     pub internal: Vec<EvalValue>,
-}
-
-impl TypeObject for ArrayState {
-    fn execute_method() {
-        todo!()
-    }
-
-    fn get_value() {
-        todo!()
-    }
 }
 
 impl ArrayState {
@@ -164,9 +168,25 @@ impl ArrayState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CollectionState {
+    pub head: usize,
+    pub internal: Vec<EvalValue>
+}
+
+impl CollectionState {
+    fn new() -> Self {
+        CollectionState {
+            head: 0,
+            internal: Vec::new(),
+        }
+    }
+}
+
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
-        TypeKind::Array(generic) => ObjectState::Array(ArrayState::new()),
+        TypeKind::Array(_) => ObjectState::Array(ArrayState::new()),
+        TypeKind::Collection(_) => ObjectState::Collection(CollectionState::new()),
         _ => unreachable!(),
     }
 }

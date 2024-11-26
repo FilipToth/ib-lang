@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::binding::{
     symbols::FunctionSymbol,
-    types::{ArrayState, ObjectState},
+    types::{ArrayState, CollectionState, ObjectState},
 };
 
 use super::evaluator::{EvalInfo, EvalValue};
@@ -40,6 +40,20 @@ fn execute_array_method(
     }
 }
 
+fn execute_collection_method(
+    state: &mut CollectionState,
+    symbol: &FunctionSymbol,
+    info: &mut EvalInfo,
+) -> EvalValue {
+    match symbol.identifier.as_str() {
+        "hasNext" => {},
+        "getItem" => {},
+        "resetNext" => {},
+        "addItem" => {},
+        "isEmpty" => {},
+    }
+}
+
 fn execute_object_method(
     state: Rc<RefCell<ObjectState>>,
     symbol: &FunctionSymbol,
@@ -48,6 +62,7 @@ fn execute_object_method(
     let mut state = state.borrow_mut();
     match &mut *state {
         ObjectState::Array(state) => execute_array_method(state, symbol, info),
+        ObjectState::Collection(state) => execute_collection_method(state, symbol, info),
     }
 }
 
