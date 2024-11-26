@@ -51,7 +51,7 @@ fn execute_collection_method(
 ) -> EvalValue {
     match symbol.identifier.as_str() {
         "hasNext" => {
-            let index = state.head.clone() + 1;
+            let index = state.head.clone();
             let res = state.internal.get(index).is_some();
             EvalValue::Bool(res)
         }
@@ -61,7 +61,7 @@ fn execute_collection_method(
                 Some(v) => {
                     state.head += 1;
                     v.clone()
-                },
+                }
                 None => {
                     panic!("Runtime error");
                 }

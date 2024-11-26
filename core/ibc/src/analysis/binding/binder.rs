@@ -246,6 +246,39 @@ fn bind_for_statement(
     Some(node)
 }
 
+fn bind_while_statement(
+    expr: &SyntaxToken,
+    body: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let expr = match bind(expr, scope.clone(), errors) {
+        Some(e) => e,
+        None => return None,
+    };
+
+    let expr_type = expr.node_type.clone();
+    if expr_type != TypeKind::Boolean {
+        let kind = ErrorKind::ConditionMustBeBoolean(expr_type);
+        errors.add(kind, expr.span);
+        return None;
+    }
+
+    let body = match bind(body, scope, errors) {
+        Some(b) => b,
+        None => return None,
+    };
+
+    let kind = BoundNodeKind::WhileLoop {
+        expr: Box::new(expr),
+        block: Rc::new(body),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, span);
+    Some(node)
+}
+
 fn bind_params(
     params: &Vec<SyntaxToken>,
     scope: Rc<RefCell<BoundScope>>,
@@ -603,6 +636,9 @@ pub fn bind(
             errors,
             span,
         ),
+        SyntaxKind::WhileLoop { expr, body } => {
+            bind_while_statement(&expr, &body, scope, errors, span)
+        }
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, span)
         }

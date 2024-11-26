@@ -218,6 +218,23 @@ fn eval_for_loop(
     EvalValue::void()
 }
 
+fn eval_while_loop(expr: &BoundNode, body: Rc<BoundNode>, info: &mut EvalInfo) -> EvalValue {
+    loop {
+        let expr_eval = eval_rec(expr, info);
+        let EvalValue::Bool(expr_eval) = expr_eval else {
+            unreachable!()
+        };
+
+        if !expr_eval {
+            break;
+        }
+
+        eval_rec(&body, info);
+    }
+
+    EvalValue::void()
+}
+
 fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
     let val = match &node.kind {
         BoundNodeKind::Module { block } => eval_rec(&block, info),
@@ -334,6 +351,7 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             block.clone(),
             info,
         ),
+        BoundNodeKind::WhileLoop { expr, block } => eval_while_loop(expr.clone(), block.clone(), info)
     };
 
     val

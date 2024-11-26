@@ -684,6 +684,7 @@ impl<'a> Parser<'a> {
         match self.tokens.peek() {
             Some(p) => match p.kind {
                 LexerTokenKind::IdentifierToken(_) => self.parse_for_loop(errors),
+                LexerTokenKind::WhileKeyword => self.parse_while_loop(errors),
                 _ => {
                     let kind = ErrorKind::ExpectedLoop;
                     errors.add(kind, loop_token.span);
@@ -768,6 +769,40 @@ impl<'a> Parser<'a> {
         };
 
         let span = Span::from_loc(identifier_span.start, end_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
+    }
+
+    fn parse_while_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let while_keyword = self.tokens.next().unwrap();
+
+        let expr = match self.parse_expression(errors) {
+            Some(e) => e,
+            None => return None,
+        };
+
+        let body = match self.parse_scope(errors) {
+            Some(b) => b,
+            None => {
+                let error_kind = ErrorKind::ExpectedScope;
+                errors.add(error_kind, expr.span);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
+            errors.add(error_kind, body.span);
+            return None;
+        }
+
+        let end_loc = body.span.end.clone();
+        let kind = SyntaxKind::WhileLoop {
+            expr: Box::new(expr),
+            body: Box::new(body),
+        };
+
+        let span = Span::from_loc(while_keyword.span.start, end_loc);
         let token = SyntaxToken::new(kind, span);
         Some(token)
     }

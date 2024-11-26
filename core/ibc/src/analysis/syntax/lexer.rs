@@ -50,6 +50,7 @@ pub enum LexerTokenKind {
     LoopKeyword,
     FromKeyword,
     ToKeyword,
+    WhileKeyword,
 }
 
 impl LexerTokenKind {
@@ -98,6 +99,7 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
         "loop" => LexerTokenKind::LoopKeyword,
         "from" => LexerTokenKind::FromKeyword,
         "to" => LexerTokenKind::ToKeyword,
+        "while" => LexerTokenKind::WhileKeyword,
         _ => LexerTokenKind::IdentifierToken(value),
     }
 }

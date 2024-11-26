@@ -55,6 +55,9 @@ impl BoundNode {
                     block.to_string()
                 )
             }
+            BoundNodeKind::WhileLoop { expr, block } => {
+                format!("loop while {} {} end", expr.to_string(), block.to_string())
+            }
             BoundNodeKind::FunctionDeclaration { symbol, block: _ } => {
                 format!(
                     "function {}(...) -> {}",
@@ -112,6 +115,10 @@ pub enum BoundNodeKind {
         iterator: VariableSymbol,
         lower_bound: usize,
         upper_bound: usize,
+        block: Rc<BoundNode>,
+    },
+    WhileLoop {
+        expr: Box<BoundNode>,
         block: Rc<BoundNode>,
     },
     BinaryExpression {

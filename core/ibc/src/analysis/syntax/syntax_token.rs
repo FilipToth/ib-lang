@@ -78,4 +78,8 @@ pub enum SyntaxKind {
         upper_bound: usize,
         body: Box<SyntaxToken>,
     },
+    WhileLoop {
+        expr: Box<SyntaxToken>,
+        body: Box<SyntaxToken>,
+    },
 }

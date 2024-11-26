@@ -96,13 +96,13 @@ impl TypeKind {
                 let has_next = TypeMethodRepresentation {
                     identifier: "hasNext".to_string(),
                     ret_type: TypeKind::Boolean,
-                    params: Vec::new()
+                    params: Vec::new(),
                 };
 
                 let get_item = TypeMethodRepresentation {
                     identifier: "getItem".to_string(),
                     ret_type: generic.clone(),
-                    params: Vec::new()
+                    params: Vec::new(),
                 };
 
                 let reset_next = TypeMethodRepresentation {
