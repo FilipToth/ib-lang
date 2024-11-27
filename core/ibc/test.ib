@@ -1,9 +1,9 @@
-stack = new Stack<Int>()
+queue = new Queue<Int>()
 
-stack.push(1)
-stack.push(2)
-stack.push(3)
+queue.enqueue(1)
+queue.enqueue(2)
+queue.enqueue(3)
 
-output stack.pop()
-output stack.pop()
-output stack.pop()
+output queue.dequeue()
+output queue.dequeue()
+output queue.dequeue()

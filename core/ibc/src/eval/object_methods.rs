@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::binding::{
     symbols::FunctionSymbol,
-    types::{ArrayState, CollectionState, ObjectState, StackState},
+    types::{ArrayState, CollectionState, ObjectState, QueueState, StackState},
 };
 
 use super::evaluator::{EvalInfo, EvalValue};
@@ -109,6 +109,29 @@ fn execute_stack_method(state: &mut StackState, symbol: &FunctionSymbol, info: &
     }
 }
 
+fn execute_queue_method(state: &mut QueueState, symbol: &FunctionSymbol, info: &mut EvalInfo) -> EvalValue {
+    match symbol.identifier.as_str() {
+        "enqueue" => {
+            let item = &symbol.parameters[0].symbol;
+            let item_value = info.heap.get_var(item);
+
+            state.internal.insert(0, item_value);
+            EvalValue::Void
+        },
+        "dequeue" => {
+            match state.internal.pop() {
+                Some(v) => v,
+                None => panic!("Runtime error")
+            }
+        },
+        "isEmpty" => {
+            let res = state.internal.len() == 0;
+            EvalValue::Bool(res)
+        },
+        _ => unimplemented!()
+    }
+}
+
 fn execute_object_method(
     state: Rc<RefCell<ObjectState>>,
     symbol: &FunctionSymbol,
@@ -119,6 +142,7 @@ fn execute_object_method(
         ObjectState::Array(state) => execute_array_method(state, symbol, info),
         ObjectState::Collection(state) => execute_collection_method(state, symbol, info),
         ObjectState::Stack(state) => execute_stack_method(state, symbol, info),
+        ObjectState::Queue(state) => execute_queue_method(state, symbol, info),
     }
 }
 

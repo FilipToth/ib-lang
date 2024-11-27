@@ -14,7 +14,8 @@ pub enum TypeKind {
     Boolean,
     Array(Box<TypeKind>),
     Collection(Box<TypeKind>),
-    Stack(Box<TypeKind>)
+    Stack(Box<TypeKind>),
+    Queue(Box<TypeKind>),
 }
 
 pub struct TypeMethodRepresentation {
@@ -46,6 +47,10 @@ impl TypeKind {
             TypeKind::Stack(generic) => {
                 let generic = generic.to_string();
                 format!("Stack<{}>", generic)
+            }
+            TypeKind::Queue(generic) => {
+                let generic = generic.to_string();
+                format!("Queue<{}>", generic)
             }
         }
     }
@@ -176,6 +181,39 @@ impl TypeKind {
                 methods.push(pop);
                 methods.push(is_empty);
             }
+            TypeKind::Queue(generic) => {
+                let generic = *generic.clone();
+                let enqueue = TypeMethodRepresentation {
+                    identifier: "enqueue".to_string(),
+                    ret_type: TypeKind::Void,
+                    params: {
+                        let mut params = Vec::<TypeMethodParamRepresentation>::new();
+                        let item = TypeMethodParamRepresentation {
+                            identifier: "item".to_string(),
+                            param_type: generic.clone(),
+                        };
+
+                        params.push(item);
+                        params
+                    }
+                };
+
+                let dequeue = TypeMethodRepresentation {
+                    identifier: "dequeue".to_string(),
+                    ret_type: generic,
+                    params: Vec::new()
+                };
+
+                let is_empty = TypeMethodRepresentation {
+                    identifier: "isEmpty".to_string(),
+                    ret_type: TypeKind::Boolean,
+                    params: Vec::new(),
+                };
+
+                methods.push(enqueue);
+                methods.push(dequeue);
+                methods.push(is_empty);
+            }
             _ => {}
         }
 
@@ -231,7 +269,7 @@ pub fn get_type(
                     None => return None,
                 },
                 None => {
-                    let kind = ErrorKind::ExpectsGenericTypeParam("Collection".to_string());
+                    let kind = ErrorKind::ExpectsGenericTypeParam("Stack".to_string());
                     errors.add(kind, span.clone());
                     return None;
                 }
@@ -239,6 +277,21 @@ pub fn get_type(
 
             TypeKind::Stack(Box::new(generic))
         },
+        "Queue" => {
+            let generic = match generic {
+                Some(id) => match get_type(id, None, span, errors) {
+                    Some(t) => t,
+                    None => return None,
+                },
+                None => {
+                    let kind = ErrorKind::ExpectsGenericTypeParam("Queue".to_string());
+                    errors.add(kind, span.clone());
+                    return None;
+                }
+            };
+
+            TypeKind::Queue(Box::new(generic))
+        }
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());
@@ -253,7 +306,8 @@ pub fn get_type(
 pub enum ObjectState {
     Array(ArrayState),
     Collection(CollectionState),
-    Stack(StackState)
+    Stack(StackState),
+    Queue(QueueState)
 }
 
 #[derive(Debug, Clone)]
@@ -295,11 +349,23 @@ impl StackState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct QueueState {
+    pub internal: Vec<EvalValue>
+}
+
+impl QueueState {
+    fn new() -> Self {
+        QueueState { internal: Vec::new() }
+    }
+}
+
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
         TypeKind::Array(_) => ObjectState::Array(ArrayState::new()),
         TypeKind::Collection(_) => ObjectState::Collection(CollectionState::new()),
         TypeKind::Stack(_) => ObjectState::Stack(StackState::new()),
+        TypeKind::Queue(_) => ObjectState::Queue(QueueState::new()),
         _ => unreachable!(),
     }
 }
