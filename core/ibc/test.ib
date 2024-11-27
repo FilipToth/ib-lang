@@ -1,9 +1,9 @@
-col = new Collection<Int>()
+stack = new Stack<Int>()
 
-col.addItem(1)
-col.addItem(2)
-col.addItem(3)
+stack.push(1)
+stack.push(2)
+stack.push(3)
 
-loop while col.hasNext()
-    output col.getItem()
-end
+output stack.pop()
+output stack.pop()
+output stack.pop()

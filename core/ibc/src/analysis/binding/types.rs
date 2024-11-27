@@ -14,6 +14,7 @@ pub enum TypeKind {
     Boolean,
     Array(Box<TypeKind>),
     Collection(Box<TypeKind>),
+    Stack(Box<TypeKind>)
 }
 
 pub struct TypeMethodRepresentation {
@@ -41,6 +42,10 @@ impl TypeKind {
             TypeKind::Collection(generic) => {
                 let generic = generic.to_string();
                 format!("Collection<{}>", generic)
+            }
+            TypeKind::Stack(generic) => {
+                let generic = generic.to_string();
+                format!("Stack<{}>", generic)
             }
         }
     }
@@ -137,6 +142,39 @@ impl TypeKind {
                 methods.push(reset_next);
                 methods.push(add_item);
                 methods.push(is_empty);
+            },
+            TypeKind::Stack(generic) => {
+                let generic = *generic.clone();
+                let push = TypeMethodRepresentation {
+                    identifier: "push".to_string(),
+                    ret_type: TypeKind::Void,
+                    params: {
+                        let mut params = Vec::<TypeMethodParamRepresentation>::new();
+                        let item = TypeMethodParamRepresentation {
+                            identifier: "item".to_string(),
+                            param_type: generic.clone(),
+                        };
+
+                        params.push(item);
+                        params
+                    },
+                };
+
+                let pop = TypeMethodRepresentation {
+                    identifier: "pop".to_string(),
+                    ret_type: generic,
+                    params: Vec::new()
+                };
+
+                let is_empty = TypeMethodRepresentation {
+                    identifier: "isEmpty".to_string(),
+                    ret_type: TypeKind::Boolean,
+                    params: Vec::new(),
+                };
+
+                methods.push(push);
+                methods.push(pop);
+                methods.push(is_empty);
             }
             _ => {}
         }
@@ -185,7 +223,22 @@ pub fn get_type(
             };
 
             TypeKind::Collection(Box::new(generic))
-        }
+        },
+        "Stack" => {
+            let generic = match generic {
+                Some(id) => match get_type(id, None, span, errors) {
+                    Some(t) => t,
+                    None => return None,
+                },
+                None => {
+                    let kind = ErrorKind::ExpectsGenericTypeParam("Collection".to_string());
+                    errors.add(kind, span.clone());
+                    return None;
+                }
+            };
+
+            TypeKind::Stack(Box::new(generic))
+        },
         _ => {
             let kind = ErrorKind::UndefinedType(identifier);
             errors.add(kind, span.clone());
@@ -200,6 +253,7 @@ pub fn get_type(
 pub enum ObjectState {
     Array(ArrayState),
     Collection(CollectionState),
+    Stack(StackState)
 }
 
 #[derive(Debug, Clone)]
@@ -230,10 +284,22 @@ impl CollectionState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct StackState {
+    pub internal: Vec<EvalValue>
+}
+
+impl StackState {
+    fn new() -> Self {
+        StackState { internal: Vec::new() }
+    }
+}
+
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
         TypeKind::Array(_) => ObjectState::Array(ArrayState::new()),
         TypeKind::Collection(_) => ObjectState::Collection(CollectionState::new()),
+        TypeKind::Stack(_) => ObjectState::Stack(StackState::new()),
         _ => unreachable!(),
     }
 }
