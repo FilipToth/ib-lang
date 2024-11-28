@@ -16,6 +16,8 @@ services:
       context: ./core
       dockerfile: Dockerfile
     container_name: ib-core
+    volumes:
+      - ib-data:/data
     expose:
       - 8080
     ports:
