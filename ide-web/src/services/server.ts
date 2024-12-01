@@ -12,9 +12,11 @@ export interface IBFile {
     contents: string;
 }
 
+const API_BASE = "https://ibcomp.on.accelley.com/";
+
 export const runCode = async (code: string): Promise<string> => {
     const headers = await getHeaders();
-    const req = await axios.post("http://127.0.0.1:8080/execute", code, {
+    const req = await axios.post(`${API_BASE}execute`, code, {
         headers: headers,
     });
 
@@ -32,7 +34,7 @@ export const runDiagnostics = async (
         file: file,
     };
 
-    const req = await axios.post("http://127.0.0.1:8080/diagnostics", code, {
+    const req = await axios.post(`${API_BASE}diagnostics`, code, {
         params: params,
         headers: headers,
     });
@@ -43,7 +45,7 @@ export const runDiagnostics = async (
 
 export const getFiles = async (): Promise<IBFile[]> => {
     const headers = await getHeaders();
-    const req = await axios.get("http://127.0.0.1:8080/files", {
+    const req = await axios.get(`${API_BASE}files`, {
         headers: headers,
     });
 

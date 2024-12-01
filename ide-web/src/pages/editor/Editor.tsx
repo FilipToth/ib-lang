@@ -50,9 +50,11 @@ const Editor = () => {
         };
 
         setFiles([...files, file]);
+        currentFile = filename;
 
         // files length isn't updated yet :D
         setTabState(files.length);
+        setCode("");
 
         setNewFileDialogOpen(false);
     };
