@@ -29,6 +29,7 @@ const Editor = () => {
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
 
     const changeTab = (_e: React.SyntheticEvent, val: number) => {
+        console.log(files);
         const currFile = files[tabState];
         currFile.contents = code;
 
@@ -65,7 +66,9 @@ const Editor = () => {
             setFiles(f);
 
             const file = f[tabState];
-            // setCode(file.contents);
+            setCode(file.contents);
+
+            currentFile = file.filename;
         };
 
         loadFiles();
