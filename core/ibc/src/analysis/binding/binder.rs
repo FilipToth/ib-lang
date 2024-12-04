@@ -578,7 +578,7 @@ fn bind_instantiation_expression(
     };
 
     if args.len() != 0 {
-        // we don't support constructors yet
+        // we don't support constructors with arguments yet
         let ctor = format!("{}.constructor()", type_name);
         let kind = ErrorKind::MismatchedNumberOfArgs {
             id: ctor,

@@ -19,6 +19,7 @@ import {
 import { IBFile, getFiles } from "services/server";
 import { Add } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
+import EmptyWorkspace from "./EmptyWorkspace";
 
 export let currentFile: string | null = null;
 
@@ -64,6 +65,9 @@ const Editor = () => {
         const loadFiles = async () => {
             const f = await getFiles();
             setFiles(f);
+
+            if (f.length == 0)
+                return;
 
             const file = f[tabState];
             setCode(file.contents);
@@ -150,23 +154,27 @@ const Editor = () => {
                                 startIcon={<Add />}
                             ></Button>
                         </Box>
-                        <CodeMirror
-                            height="100vh"
-                            width="90vw"
-                            theme={coolGlow}
-                            extensions={[
-                                ibSupport,
-                                keyExtension,
-                                indentUnit.of("    "),
-                            ]}
-                            value={code}
-                            onChange={(
-                                value: string,
-                                _viewUpdate: ViewUpdate
-                            ) => {
-                                setCode(value);
-                            }}
-                        />
+                        {
+                            files.length == 0
+                            ?    <EmptyWorkspace newFileClick={addFile} />
+                            :   <CodeMirror
+                                    height="100vh"
+                                    width="90vw"
+                                    theme={coolGlow}
+                                    extensions={[
+                                        ibSupport,
+                                        keyExtension,
+                                        indentUnit.of("    "),
+                                    ]}
+                                    value={code}
+                                    onChange={(
+                                        value: string,
+                                        _viewUpdate: ViewUpdate
+                                    ) => {
+                                        setCode(value);
+                                    }}
+                                />
+                        }
                     </Stack>
                     <OutputBar code={code} />
                 </Stack>
