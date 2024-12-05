@@ -20,6 +20,7 @@ import { IBFile, getFiles } from "services/server";
 import { Add } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
+import LeftBar from "./LeftBar";
 
 export let currentFile: string | null = null;
 
@@ -29,16 +30,15 @@ const Editor = () => {
     const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
 
-    const changeTab = (_e: React.SyntheticEvent, val: number) => {
-        console.log(files);
+    const changeTab = (index: number) => {
         const currFile = files[tabState];
         currFile.contents = code;
 
-        const file = files[val];
+        const file = files[index];
         currentFile = file.filename;
 
         setCode(file.contents);
-        setTabState(val);
+        setTabState(index);
     };
 
     const addFile = () => {
@@ -118,6 +118,7 @@ const Editor = () => {
             </TopBar>
             <div>
                 <Stack direction="row">
+                    <LeftBar files={files} click={(index) => changeTab(index)} />
                     <Stack direction="column">
                         <Box
                             display="flex"
@@ -126,7 +127,7 @@ const Editor = () => {
                         >
                             <Tabs
                                 value={tabState}
-                                onChange={changeTab}
+                                onChange={(_, index) => changeTab(index)}
                                 variant="scrollable"
                                 scrollButtons="auto"
                                 sx={{
@@ -156,10 +157,10 @@ const Editor = () => {
                         </Box>
                         {
                             files.length == 0
-                            ?    <EmptyWorkspace newFileClick={addFile} />
+                            ?   <EmptyWorkspace newFileClick={addFile} />
                             :   <CodeMirror
                                     height="100vh"
-                                    width="90vw"
+                                    width="70vw"
                                     theme={coolGlow}
                                     extensions={[
                                         ibSupport,
