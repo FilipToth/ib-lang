@@ -1,7 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::Path};
 
 use auth::auth_middleware;
-use axum::{extract::Query, routing::{get, post}, Extension, Json, Router};
+use axum::{
+    extract::Query,
+    routing::{get, post},
+    Extension, Json, Router,
+};
+use rusqlite::Connection;
 use serde::Serialize;
 use sync::get_files;
 use tokio::net::TcpListener;
@@ -10,14 +15,14 @@ use tower_http::cors::{Any, CorsLayer};
 
 extern crate ibc;
 
-pub mod sync;
 pub mod auth;
+pub mod sync;
 
 #[derive(Serialize)]
 struct Diagnostic {
     message: String,
     offset_start: usize,
-    offset_end: usize
+    offset_end: usize,
 }
 
 #[derive(Serialize)]
@@ -29,7 +34,7 @@ struct RunResult {
 #[derive(Serialize, Debug)]
 pub struct IbFile {
     pub filename: String,
-    pub contents: String
+    pub contents: String,
 }
 
 impl RunResult {
@@ -43,7 +48,12 @@ impl RunResult {
 
 #[tokio::main]
 async fn main() {
-    let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any).allow_headers(Any);
+    setup_db();
+
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(Any)
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/execute", post(execute))
@@ -83,15 +93,19 @@ async fn execute(body: String) -> Json<RunResult> {
     Json(result)
 }
 
-async fn diagnostics(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>, body: String) -> Json<Vec<Diagnostic>> {
+async fn diagnostics(
+    Extension(uid): Extension<String>,
+    query: Query<HashMap<String, String>>,
+    body: String,
+) -> Json<Vec<Diagnostic>> {
     let result = ibc::analysis::analyze(body.clone());
 
-    let file = match query.0.get("file") {
-        Some(f) => f.clone(),
-        None => return Json(Vec::new())
+    let id = match query.0.get("id") {
+        Some(i) => i.clone(),
+        None => return Json(Vec::new()),
     };
 
-    sync::sync_file(uid, file, body);
+    sync::sync_file(uid, id, body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let errors = result.errors.errors;
@@ -109,8 +123,29 @@ async fn diagnostics(Extension(uid): Extension<String>, query: Query<HashMap<Str
     Json(diagnostics)
 }
 
-async fn files(Extension(uid): Extension<String>, query: Query<HashMap<String, String>>) -> Json<Vec<IbFile>> {
+async fn files(
+    Extension(uid): Extension<String>,
+    _query: Query<HashMap<String, String>>,
+) -> Json<Vec<IbFile>> {
     let files = get_files(uid);
     println!("{:?}", files);
     Json(files)
+}
+
+fn setup_db() {
+    let dir_path = Path::new("./data/");
+    if !dir_path.exists() {
+        fs::create_dir(dir_path).unwrap();
+    }
+
+    let path = dir_path.join("files.db");
+    let conn = Connection::open(path).unwrap();
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, filename TEXT)",
+        [],
+    )
+    .unwrap();
+
+    conn.close().unwrap();
 }

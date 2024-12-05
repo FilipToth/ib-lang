@@ -8,11 +8,12 @@ export interface IBDiagnostic {
 }
 
 export interface IBFile {
+    id: string;
     filename: string;
     contents: string;
 }
 
-const API_BASE = "https://ibcomp.on.accelley.com/";
+const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
 export const runCode = async (code: string): Promise<string> => {
     const headers = await getHeaders();
@@ -25,16 +26,13 @@ export const runCode = async (code: string): Promise<string> => {
     return output;
 };
 
-export const runDiagnostics = async (
-    code: string,
-    file: string
-): Promise<IBDiagnostic[]> => {
+export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
     const headers = await getHeaders();
     const params = {
-        file: file,
+        id: file.id,
     };
 
-    const req = await axios.post(`${API_BASE}diagnostics`, code, {
+    const req = await axios.post(`${API_BASE}diagnostics`, file.contents, {
         params: params,
         headers: headers,
     });

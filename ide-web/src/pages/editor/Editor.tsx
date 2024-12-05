@@ -10,6 +10,7 @@ import { TopBar } from "components/TopBar";
 import {
     Box,
     Button,
+    IconButton,
     Stack,
     SxProps,
     Tab,
@@ -17,31 +18,52 @@ import {
     Typography,
 } from "@mui/material";
 import { IBFile, getFiles } from "services/server";
-import { Add } from "@mui/icons-material";
+import { Add, Clear } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
 import IbIcon from "./IbIcon";
 import DeleteFileDialog from "pages/DeleteDialog";
+import { v4 as uuidv4 } from "uuid";
 
 export let currentFile: string | null = null;
+
+const tabHeight = 30;
+const tabStyle: SxProps = {
+    height: tabHeight,
+    minHeight: tabHeight,
+};
 
 const Editor = () => {
     const [code, setCode] = useState("");
     const [tabState, setTabState] = useState(0);
+    const [tabs, setTabs] = useState<IBFile[]>([]);
     const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
-    const [deleteFileDialogIndex, setDelteFileDialogIndex] = useState<number | null>(null);
+    const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
 
     const changeTab = (index: number) => {
-        const currFile = files[tabState];
+        const currFile = tabs[tabState];
         currFile.contents = code;
 
-        const file = files[index];
+        const file = tabs[index];
         currentFile = file.filename;
 
         setCode(file.contents);
         setTabState(index);
+    };
+
+    const openFileOrChangeTab = (fileIndex: number) => {
+        const file = files[fileIndex];
+        const tabIndex = files.findIndex((item) => item.id == file.id);
+
+        if (tabIndex != -1) {
+            // change tabs
+            setTabState(tabIndex);
+        }
+
+        setTabs([...tabs, file]);
+        setTabState(tabs.length);
     };
 
     const addFile = () => {
@@ -49,30 +71,33 @@ const Editor = () => {
     };
 
     const createFile = (filename: string) => {
+        const uuid = uuidv4();
         const file: IBFile = {
             filename: filename,
             contents: "",
+            id: uuid,
         };
 
         setFiles([...files, file]);
+        setTabs([...tabs, file]);
         currentFile = filename;
 
-        // files length isn't updated yet :D
-        setTabState(files.length);
+        // tabs length isn't updated yet :D
+        setTabState(tabs.length);
         setCode("");
 
         setNewFileDialogOpen(false);
     };
 
     const deleteFileClick = (index: number) => {
-        setDelteFileDialogIndex(index);
+        setDelDialogIndex(index);
     };
 
     const deleteFileDialogOK = () => {
-        const index = deleteFileDialogIndex;
+        const index = delFileIndex;
         // TODO: Delete file in backend
 
-        setDelteFileDialogIndex(null);
+        setDelDialogIndex(null);
     };
 
     useEffect(() => {
@@ -80,8 +105,7 @@ const Editor = () => {
             const f = await getFiles();
             setFiles(f);
 
-            if (f.length == 0)
-                return;
+            if (f.length == 0) return;
 
             const file = f[tabState];
             setCode(file.contents);
@@ -106,12 +130,6 @@ const Editor = () => {
 
     const keyExtension = Prec.highest(keys);
 
-    const tabHeight = 30;
-    const tabStyle: SxProps = {
-        height: tabHeight,
-        minHeight: tabHeight,
-    };
-
     return (
         <>
             <TopBar>
@@ -121,7 +139,7 @@ const Editor = () => {
                 <Stack direction="row">
                     <LeftBar
                         files={files}
-                        click={changeTab}
+                        click={openFileOrChangeTab}
                         del={deleteFileClick}
                     />
                     <Stack direction="column">
@@ -139,17 +157,62 @@ const Editor = () => {
                                     ...tabStyle,
                                 }}
                             >
-                                {files.map((file, index) => {
+                                {tabs.map((file, index) => {
                                     return (
                                         <Tab
                                             value={index}
-                                            icon={<IbIcon />}
-                                            label={file.filename}
+                                            label={
+                                                <span>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            flexDirection:
+                                                                "row",
+                                                            justifyContent:
+                                                                "space-between",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                        }}
+                                                        onClick={() =>
+                                                            changeTab(index)
+                                                        }
+                                                    >
+                                                        <Box
+                                                            sx={{
+                                                                display: "flex",
+                                                                flexDirection:
+                                                                    "row",
+                                                                alignItems:
+                                                                    "center",
+                                                                gap: 1,
+                                                            }}
+                                                        >
+                                                            <IbIcon />
+                                                            <Typography>
+                                                                {file.filename}
+                                                            </Typography>
+                                                        </Box>
+                                                        <IconButton
+                                                            onClick={(
+                                                                event
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                            }}
+                                                            sx={{
+                                                                p: 0,
+                                                            }}
+                                                        >
+                                                            <Clear />
+                                                        </IconButton>
+                                                    </Box>
+                                                </span>
+                                            }
                                             iconPosition="start"
                                             sx={{
                                                 ...tabStyle,
-                                                gap: "8px",
                                                 textTransform: "none",
+                                                p: 1.5,
                                             }}
                                         />
                                     );
@@ -160,27 +223,28 @@ const Editor = () => {
                                 startIcon={<Add />}
                             ></Button>
                         </Box>
-                        {
-                            files.length == 0
-                            ?   <EmptyWorkspace newFileClick={addFile} />
-                            :   <CodeMirror
-                                    height="100vh"
-                                    width="70vw"
-                                    theme={coolGlow}
-                                    extensions={[
-                                        ibSupport,
-                                        keyExtension,
-                                        indentUnit.of("    "),
-                                    ]}
-                                    value={code}
-                                    onChange={(
-                                        value: string,
-                                        _viewUpdate: ViewUpdate
-                                    ) => {
-                                        setCode(value);
-                                    }}
-                                />
-                        }
+                        {tabs.length == 0 ? (
+                            <EmptyWorkspace newFileClick={addFile} />
+                        ) : (
+                            <CodeMirror
+                                height="100vh"
+                                width="70vw"
+                                maxHeight="100vh"
+                                theme={coolGlow}
+                                extensions={[
+                                    ibSupport,
+                                    keyExtension,
+                                    indentUnit.of("    "),
+                                ]}
+                                value={code}
+                                onChange={(
+                                    value: string,
+                                    _viewUpdate: ViewUpdate
+                                ) => {
+                                    setCode(value);
+                                }}
+                            />
+                        )}
                     </Stack>
                     <OutputBar code={code} />
                 </Stack>
@@ -191,8 +255,8 @@ const Editor = () => {
                 dialogOK={createFile}
             />
             <DeleteFileDialog
-                isOpen={deleteFileDialogIndex != null}
-                close={() => setDelteFileDialogIndex(null)}
+                isOpen={delFileIndex != null}
+                close={() => setDelDialogIndex(null)}
                 dialogOK={deleteFileDialogOK}
             />
         </>
