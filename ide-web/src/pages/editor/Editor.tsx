@@ -21,6 +21,8 @@ import { Add } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
+import IbIcon from "./IbIcon";
+import DeleteFileDialog from "pages/DeleteDialog";
 
 export let currentFile: string | null = null;
 
@@ -29,6 +31,7 @@ const Editor = () => {
     const [tabState, setTabState] = useState(0);
     const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+    const [deleteFileDialogIndex, setDelteFileDialogIndex] = useState<number | null>(null);
 
     const changeTab = (index: number) => {
         const currFile = files[tabState];
@@ -59,6 +62,17 @@ const Editor = () => {
         setCode("");
 
         setNewFileDialogOpen(false);
+    };
+
+    const deleteFileClick = (index: number) => {
+        setDelteFileDialogIndex(index);
+    };
+
+    const deleteFileDialogOK = () => {
+        const index = deleteFileDialogIndex;
+        // TODO: Delete file in backend
+
+        setDelteFileDialogIndex(null);
     };
 
     useEffect(() => {
@@ -98,19 +112,6 @@ const Editor = () => {
         minHeight: tabHeight,
     };
 
-    const IbIcon = () => {
-        return (
-            <img
-                src="assets/ib.png"
-                style={{
-                    width: "24px",
-                    height: "24px",
-                    backgroundColor: "transparent",
-                }}
-            />
-        );
-    };
-
     return (
         <>
             <TopBar>
@@ -118,7 +119,11 @@ const Editor = () => {
             </TopBar>
             <div>
                 <Stack direction="row">
-                    <LeftBar files={files} click={(index) => changeTab(index)} />
+                    <LeftBar
+                        files={files}
+                        click={changeTab}
+                        del={deleteFileClick}
+                    />
                     <Stack direction="column">
                         <Box
                             display="flex"
@@ -184,6 +189,11 @@ const Editor = () => {
                 isOpen={newFileDialogOpen}
                 close={() => setNewFileDialogOpen(false)}
                 dialogOK={createFile}
+            />
+            <DeleteFileDialog
+                isOpen={deleteFileDialogIndex != null}
+                close={() => setDelteFileDialogIndex(null)}
+                dialogOK={deleteFileDialogOK}
             />
         </>
     );
