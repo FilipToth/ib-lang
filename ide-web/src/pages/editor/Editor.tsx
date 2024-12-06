@@ -17,7 +17,7 @@ import {
     Tabs,
     Typography,
 } from "@mui/material";
-import { IBFile, getFiles } from "services/server";
+import { IBFile, createFile, getFiles } from "services/server";
 import { Add, Clear } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
@@ -26,7 +26,7 @@ import IbIcon from "./IbIcon";
 import DeleteFileDialog from "pages/DeleteDialog";
 import { v4 as uuidv4 } from "uuid";
 
-export let currentFile: string | null = null;
+export let currentFile: IBFile | null = null;
 
 const tabHeight = 30;
 const tabStyle: SxProps = {
@@ -47,7 +47,7 @@ const Editor = () => {
         currFile.contents = code;
 
         const file = tabs[index];
-        currentFile = file.filename;
+        currentFile = file;
 
         setCode(file.contents);
         setTabState(index);
@@ -55,11 +55,13 @@ const Editor = () => {
 
     const openFileOrChangeTab = (fileIndex: number) => {
         const file = files[fileIndex];
-        const tabIndex = files.findIndex((item) => item.id == file.id);
+        const tabIndex = tabs.findIndex((item) => item.id == file.id);
 
         if (tabIndex != -1) {
             // change tabs
+            setCode(file.contents);
             setTabState(tabIndex);
+            return;
         }
 
         setTabs([...tabs, file]);
@@ -70,7 +72,7 @@ const Editor = () => {
         setNewFileDialogOpen(true);
     };
 
-    const createFile = (filename: string) => {
+    const handleCreateFile = (filename: string) => {
         const uuid = uuidv4();
         const file: IBFile = {
             filename: filename,
@@ -80,13 +82,15 @@ const Editor = () => {
 
         setFiles([...files, file]);
         setTabs([...tabs, file]);
-        currentFile = filename;
+        currentFile = file;
 
         // tabs length isn't updated yet :D
         setTabState(tabs.length);
         setCode("");
 
         setNewFileDialogOpen(false);
+
+        createFile(uuid, filename);
     };
 
     const deleteFileClick = (index: number) => {
@@ -110,7 +114,7 @@ const Editor = () => {
             const file = f[tabState];
             setCode(file.contents);
 
-            currentFile = file.filename;
+            currentFile = file;
         };
 
         loadFiles();
@@ -252,7 +256,7 @@ const Editor = () => {
             <NewFileDialog
                 isOpen={newFileDialogOpen}
                 close={() => setNewFileDialogOpen(false)}
-                dialogOK={createFile}
+                dialogOK={handleCreateFile}
             />
             <DeleteFileDialog
                 isOpen={delFileIndex != null}

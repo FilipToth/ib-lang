@@ -8,7 +8,7 @@ use axum::{
 };
 use rusqlite::Connection;
 use serde::Serialize;
-use sync::get_files;
+use sync::{create_file, get_files};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -33,6 +33,7 @@ struct RunResult {
 
 #[derive(Serialize, Debug)]
 pub struct IbFile {
+    pub id: String,
     pub filename: String,
     pub contents: String,
 }
@@ -59,6 +60,7 @@ async fn main() {
         .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
+        .route("/create", post(create_file_route))
         .layer(axum::middleware::from_fn(auth_middleware))
         .layer(ServiceBuilder::new().layer(cors));
 
@@ -128,8 +130,31 @@ async fn files(
     _query: Query<HashMap<String, String>>,
 ) -> Json<Vec<IbFile>> {
     let files = get_files(uid);
-    println!("{:?}", files);
     Json(files)
+}
+
+async fn create_file_route(
+    Extension(uid): Extension<String>,
+    query: Query<HashMap<String, String>>,
+) -> Json<HashMap<String, bool>> {
+    let mut failed_resp = HashMap::new();
+    failed_resp.insert("success".to_string(), false);
+
+    let id = match query.0.get("id") {
+        Some(id) => id,
+        None => return Json(failed_resp),
+    };
+
+    let filename = match query.0.get("filename") {
+        Some(f) => f,
+        None => return Json(failed_resp),
+    };
+
+    let success = create_file(uid.clone(), id.clone(), filename.clone());
+
+    let mut resp = HashMap::new();
+    resp.insert("success".to_string(), success);
+    Json(resp)
 }
 
 fn setup_db() {
@@ -142,7 +167,7 @@ fn setup_db() {
     let conn = Connection::open(path).unwrap();
 
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, filename TEXT)",
+        "CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, uid TEXT, filename TEXT)",
         [],
     )
     .unwrap();

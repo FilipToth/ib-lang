@@ -26,13 +26,16 @@ export const runCode = async (code: string): Promise<string> => {
     return output;
 };
 
-export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
+export const runDiagnostics = async (
+    file: IBFile,
+    contents: string
+): Promise<IBDiagnostic[]> => {
     const headers = await getHeaders();
     const params = {
         id: file.id,
     };
 
-    const req = await axios.post(`${API_BASE}diagnostics`, file.contents, {
+    const req = await axios.post(`${API_BASE}diagnostics`, contents, {
         params: params,
         headers: headers,
     });
@@ -49,6 +52,19 @@ export const getFiles = async (): Promise<IBFile[]> => {
 
     const data = req.data;
     return data;
+};
+
+export const createFile = async (id: string, filename: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+        filename: filename,
+    };
+
+    await axios.post(`${API_BASE}create`, undefined, {
+        params: params,
+        headers: headers,
+    });
 };
 
 const getHeaders = async () => {

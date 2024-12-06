@@ -40,7 +40,7 @@ pub fn analyze(contents: String) -> AnalysisResult {
         }
     };
 
-    print!("{:#?}", &root);
+    // print!("{:#?}", &root);
 
     // binding
     let bound = match binding::bind_root(&root, &mut bag) {
@@ -48,7 +48,7 @@ pub fn analyze(contents: String) -> AnalysisResult {
         None => return AnalysisResult::new_err(bag),
     };
 
-    println!("{:#?}", bound);
+    // println!("{:#?}", bound);
 
     // control flow analysis
     let graphs = control_flow::analyze(&bound, &mut bag);
