@@ -145,6 +145,9 @@ const Editor = () => {
         }
 
         setTabs([...tabs, file]);
+
+        currentFile = file;
+        setCode(file.contents);
         setTabState(tabs.length);
     };
 
