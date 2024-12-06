@@ -9,7 +9,7 @@ const ibLinter = linter(async (view) => {
 
     // try with and without doc see if updates correctly
     const doc = view.state.doc;
-    const ibDiagnostics = await runDiagnostics(currentFile, doc.toString());
+    const ibDiagnostics = await runDiagnostics(currentFile);
     console.log(ibDiagnostics);
 
     const diagnostics = ibDiagnostics.map((d) => {

@@ -34,6 +34,85 @@ const tabStyle: SxProps = {
     minHeight: tabHeight,
 };
 
+const EditorTabs = ({
+    tabState,
+    tabs,
+    changeTab,
+    closeTab,
+}: {
+    tabState: number;
+    tabs: IBFile[];
+    changeTab: (index: number) => void;
+    closeTab: (index: number) => void;
+}) => {
+    return (
+        <Tabs
+            value={tabState}
+            onChange={(_, index) => changeTab(index)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+                ...tabStyle,
+            }}
+        >
+            {tabs.map((file, index) => {
+                return (
+                    <Tab
+                        key={file.id}
+                        value={index}
+                        label={
+                            <span>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                    onClick={(e) => changeTab(index)}
+                                >
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <IbIcon />
+                                        <Typography>{file.filename}</Typography>
+                                    </Box>
+                                    {tabState == index && (
+                                        <IconButton
+                                            onClick={(e) => {
+                                                // prevent mui tab switches
+                                                e.stopPropagation();
+                                                closeTab(index);
+                                            }}
+                                            sx={{
+                                                p: 0,
+                                            }}
+                                        >
+                                            <Clear />
+                                        </IconButton>
+                                    )}
+                                </Box>
+                            </span>
+                        }
+                        iconPosition="start"
+                        sx={{
+                            ...tabStyle,
+                            textTransform: "none",
+                            p: 1.5,
+                        }}
+                    />
+                );
+            })}
+        </Tabs>
+    );
+};
+
 const Editor = () => {
     const [code, setCode] = useState("");
     const [tabState, setTabState] = useState(0);
@@ -59,6 +138,7 @@ const Editor = () => {
 
         if (tabIndex != -1) {
             // change tabs
+            currentFile = file;
             setCode(file.contents);
             setTabState(tabIndex);
             return;
@@ -66,6 +146,19 @@ const Editor = () => {
 
         setTabs([...tabs, file]);
         setTabState(tabs.length);
+    };
+
+    const closeTab = (index: number) => {
+        const newIndex = index > 0 ? index - 1 : 0;
+        currentFile = tabs[newIndex];
+        setCode(currentFile.contents);
+        setTabState(newIndex);
+
+        setTabs((t) => {
+            const x = t.filter((_, i) => i != index);
+            console.log(x);
+            return x;
+        });
     };
 
     const addFile = () => {
@@ -152,76 +245,12 @@ const Editor = () => {
                             flexDirection="row"
                             justifyContent="space-between"
                         >
-                            <Tabs
-                                value={tabState}
-                                onChange={(_, index) => changeTab(index)}
-                                variant="scrollable"
-                                scrollButtons="auto"
-                                sx={{
-                                    ...tabStyle,
-                                }}
-                            >
-                                {tabs.map((file, index) => {
-                                    return (
-                                        <Tab
-                                            value={index}
-                                            label={
-                                                <span>
-                                                    <Box
-                                                        sx={{
-                                                            display: "flex",
-                                                            flexDirection:
-                                                                "row",
-                                                            justifyContent:
-                                                                "space-between",
-                                                            alignItems:
-                                                                "center",
-                                                            gap: 1,
-                                                        }}
-                                                        onClick={() =>
-                                                            changeTab(index)
-                                                        }
-                                                    >
-                                                        <Box
-                                                            sx={{
-                                                                display: "flex",
-                                                                flexDirection:
-                                                                    "row",
-                                                                alignItems:
-                                                                    "center",
-                                                                gap: 1,
-                                                            }}
-                                                        >
-                                                            <IbIcon />
-                                                            <Typography>
-                                                                {file.filename}
-                                                            </Typography>
-                                                        </Box>
-                                                        <IconButton
-                                                            onClick={(
-                                                                event
-                                                            ) => {
-                                                                event.stopPropagation();
-                                                            }}
-                                                            sx={{
-                                                                p: 0,
-                                                            }}
-                                                        >
-                                                            <Clear />
-                                                        </IconButton>
-                                                    </Box>
-                                                </span>
-                                            }
-                                            iconPosition="start"
-                                            sx={{
-                                                ...tabStyle,
-                                                textTransform: "none",
-                                                p: 1.5,
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </Tabs>
+                            <EditorTabs
+                                tabState={tabState}
+                                tabs={tabs}
+                                changeTab={changeTab}
+                                closeTab={closeTab}
+                            />
                             <Button
                                 onClick={addFile}
                                 startIcon={<Add />}
@@ -246,6 +275,8 @@ const Editor = () => {
                                     _viewUpdate: ViewUpdate
                                 ) => {
                                     setCode(value);
+                                    if (currentFile != null)
+                                        currentFile.contents = value;
                                 }}
                             />
                         )}

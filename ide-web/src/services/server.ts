@@ -26,16 +26,13 @@ export const runCode = async (code: string): Promise<string> => {
     return output;
 };
 
-export const runDiagnostics = async (
-    file: IBFile,
-    contents: string
-): Promise<IBDiagnostic[]> => {
+export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
     const headers = await getHeaders();
     const params = {
         id: file.id,
     };
 
-    const req = await axios.post(`${API_BASE}diagnostics`, contents, {
+    const req = await axios.post(`${API_BASE}diagnostics`, file.contents, {
         params: params,
         headers: headers,
     });
