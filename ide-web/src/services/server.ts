@@ -64,6 +64,18 @@ export const createFile = async (id: string, filename: string) => {
     });
 };
 
+export const deleteFile = async (id: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+    };
+
+    await axios.post(`${API_BASE}delete`, undefined, {
+        params: params,
+        headers: headers,
+    });
+};
+
 const getHeaders = async () => {
     const jwt = await auth.currentUser?.getIdToken();
     const headers = {

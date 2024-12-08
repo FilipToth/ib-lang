@@ -17,7 +17,7 @@ import {
     Tabs,
     Typography,
 } from "@mui/material";
-import { IBFile, createFile, getFiles } from "services/server";
+import { IBFile, createFile, deleteFile, getFiles } from "services/server";
 import { Add, Clear } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
@@ -152,16 +152,17 @@ const Editor = () => {
     };
 
     const closeTab = (index: number) => {
-        const newIndex = index > 0 ? index - 1 : 0;
-        currentFile = tabs[newIndex];
-        setCode(currentFile.contents);
-        setTabState(newIndex);
+        const oldFile = tabs[index];
 
-        setTabs((t) => {
-            const x = t.filter((_, i) => i != index);
-            console.log(x);
-            return x;
-        });
+        let newIndex = tabState > 0 ? tabState - 1 : 0;
+        if (currentFile != null && currentFile.id == oldFile.id) {
+            newIndex = index > 0 ? index - 1 : 0;
+            currentFile = tabs[newIndex];
+            setCode(currentFile.contents);
+        }
+
+        setTabState(newIndex);
+        setTabs((t) => t.filter((_, i) => i != index));
     };
 
     const addFile = () => {
@@ -194,10 +195,20 @@ const Editor = () => {
     };
 
     const deleteFileDialogOK = () => {
-        const index = delFileIndex;
-        // TODO: Delete file in backend
+        if (delFileIndex == null) return;
+        const file = files[delFileIndex];
 
+        deleteFile(file.id);
         setDelDialogIndex(null);
+
+        setFiles((fs) => fs.filter((f) => f.id != file.id));
+
+        // close tab
+        const tabIndex = tabs.findIndex((t) => t.id == file.id);
+        if (tabIndex != -1) {
+            console.log(tabIndex);
+            closeTab(tabIndex);
+        }
     };
 
     useEffect(() => {
