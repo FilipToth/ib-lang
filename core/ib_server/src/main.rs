@@ -8,7 +8,7 @@ use axum::{
 };
 use rusqlite::Connection;
 use serde::Serialize;
-use sync::{create_file, get_files};
+use sync::{create_file, delete_file, get_files};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -16,6 +16,7 @@ use tower_http::cors::{Any, CorsLayer};
 extern crate ibc;
 
 pub mod auth;
+pub mod db;
 pub mod sync;
 
 #[derive(Serialize)]
@@ -29,6 +30,11 @@ struct Diagnostic {
 struct RunResult {
     diagnostics: Vec<Diagnostic>,
     output: String,
+}
+
+#[derive(Serialize)]
+struct RouteSuccess {
+    success: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -61,6 +67,7 @@ async fn main() {
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
+        .route("/delete", post(delete_file_route))
         .layer(axum::middleware::from_fn(auth_middleware))
         .layer(ServiceBuilder::new().layer(cors));
 
@@ -136,9 +143,8 @@ async fn files(
 async fn create_file_route(
     Extension(uid): Extension<String>,
     query: Query<HashMap<String, String>>,
-) -> Json<HashMap<String, bool>> {
-    let mut failed_resp = HashMap::new();
-    failed_resp.insert("success".to_string(), false);
+) -> Json<RouteSuccess> {
+    let failed_resp = RouteSuccess { success: false };
 
     let id = match query.0.get("id") {
         Some(id) => id,
@@ -152,8 +158,22 @@ async fn create_file_route(
 
     let success = create_file(uid.clone(), id.clone(), filename.clone());
 
-    let mut resp = HashMap::new();
-    resp.insert("success".to_string(), success);
+    let resp = RouteSuccess { success: success };
+    Json(resp)
+}
+
+async fn delete_file_route(
+    Extension(uid): Extension<String>,
+    query: Query<HashMap<String, String>>,
+) -> Json<RouteSuccess> {
+    let failed = RouteSuccess { success: false };
+    let id = match query.0.get("id") {
+        Some(id) => id,
+        None => return Json(failed),
+    };
+
+    delete_file(uid, id.clone());
+    let resp = RouteSuccess { success: true };
     Json(resp)
 }
 
