@@ -157,7 +157,6 @@ const Editor = () => {
 
         let newIndex = tabState > 0 ? tabState - 1 : 0;
         if (currentFile != null && currentFile.id == oldFile.id) {
-            console.log(`FUCK YOU ${newIndex}`)
             newIndex = index > 0 ? index - 1 : 0;
             currentFile = newTabs[newIndex];
         }

@@ -1,9 +1,1 @@
-queue = new Queue<Int>()
-
-queue.enqueue(1)
-queue.enqueue(2)
-queue.enqueue(3)
-
-output queue.dequeue()
-output queue.dequeue()
-output queue.dequeue()
+output 1 > 0 == false

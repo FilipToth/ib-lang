@@ -171,6 +171,20 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                 EvalValue::Return(_) => unreachable!(),
             }
         }
+        Operator::LesserThan => {
+            // rhs and lhs are ints
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            println!("Lesser than");
+            EvalValue::bool(lhs < rhs)
+        }
+        Operator::GreaterThan => {
+            // rhs and lhs are ints
+            let lhs = lhs.force_get_int();
+            let rhs = rhs.force_get_int();
+            println!("Greater than");
+            EvalValue::bool(lhs > rhs)
+        }
         _ => {
             unreachable!("Not a binary operator")
         }
@@ -183,6 +197,11 @@ fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
             // only defined on bools
             let rhs = rhs_val.force_get_bool();
             EvalValue::Bool(!rhs)
+        }
+        Operator::Subtraction => {
+            // only defined on ints
+            let rhs = rhs_val.force_get_int();
+            EvalValue::Int(-rhs)
         }
         _ => {
             unreachable!("Not a unary operator")
@@ -351,7 +370,9 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             block.clone(),
             info,
         ),
-        BoundNodeKind::WhileLoop { expr, block } => eval_while_loop(expr.clone(), block.clone(), info)
+        BoundNodeKind::WhileLoop { expr, block } => {
+            eval_while_loop(expr.clone(), block.clone(), info)
+        }
     };
 
     val
