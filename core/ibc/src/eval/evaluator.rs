@@ -175,14 +175,12 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
             // rhs and lhs are ints
             let lhs = lhs.force_get_int();
             let rhs = rhs.force_get_int();
-            println!("Lesser than");
             EvalValue::bool(lhs < rhs)
         }
         Operator::GreaterThan => {
             // rhs and lhs are ints
             let lhs = lhs.force_get_int();
             let rhs = rhs.force_get_int();
-            println!("Greater than");
             EvalValue::bool(lhs > rhs)
         }
         _ => {
