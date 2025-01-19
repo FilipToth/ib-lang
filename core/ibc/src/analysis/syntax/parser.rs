@@ -700,15 +700,25 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_for_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-        let (identifier, identifier_span) = self.parse_identifier().unwrap();
+        let for_keyword = self.tokens.next().unwrap();
+        let (identifier, identifier_span) = match self.parse_identifier() {
+            Some(i) => i,
+            None => {
+                let kind = ErrorKind::ExpectedToken("identifier".to_string());
+                errors.add(kind, for_keyword.span);
+                return None;
+            }
+        };
 
         if !self.expect_next_token(LexerTokenKind::FromKeyword) {
+            let kind = ErrorKind::ExpectedToken("from keyword".to_string());
+            errors.add(kind, identifier_span);
             return None;
         }
 
-        let lower_bound = match self.tokens.next() {
+        let (lower_bound, lower_bound_span) = match self.tokens.next() {
             Some(t) => match t.kind {
-                LexerTokenKind::IntegerLiteralToken(val) => val,
+                LexerTokenKind::IntegerLiteralToken(val) => (val, t.span),
                 _ => {
                     let kind = ErrorKind::ExpectedLoopLowerBound;
                     errors.add(kind, identifier_span);
@@ -723,6 +733,8 @@ impl<'a> Parser<'a> {
         };
 
         if !self.expect_next_token(LexerTokenKind::ToKeyword) {
+            let kind = ErrorKind::ExpectedToken("to keyword".to_string());
+            errors.add(kind, lower_bound_span);
             return None;
         }
 
@@ -768,7 +780,7 @@ impl<'a> Parser<'a> {
             body: Box::new(body),
         };
 
-        let span = Span::from_loc(identifier_span.start, end_loc);
+        let span = Span::from_loc(for_keyword.span.start, end_loc);
         let token = SyntaxToken::new(kind, span);
         Some(token)
     }
