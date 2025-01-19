@@ -2,46 +2,38 @@
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+# Introduction
 
-Let's discover **Docusaurus in less than 5 minutes**.
+Welcome to the **IB Pseudocode Web IDE**—your ultimate tool for running and managing IB pseudocode projects.
 
 ## Getting Started
 
-Get started by **creating a new site**.
+Getting started is simple! Click the **Launch App** button on the landing page or go directly to [https://ib-web-ide.firebaseapp.com/](https://ib-web-ide.firebaseapp.com/).
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+Log in using your Google or GitHub account, or create a new account with your email and password—it’s quick and secure.
 
-### What you'll need
+## Creating a New File
 
--   [Node.js](https://nodejs.org/en/download/) version 18.0 or above:
-    -   When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+When you first open the app, you’ll see a popup:
 
-## Generate a new site
+![File Creation Prompt](img/get-started.png)
 
-Generate a new Docusaurus site using the **classic template**.
+Click the **Create New File** button to open the following prompt, where you can name your file:
 
-The classic template will automatically be added to your project after you run the command:
+![New File Dialog](img/new-file.png)
 
-```bash
-npm init docusaurus@latest my-website classic
+Simply enter your desired filename (no need to add the `.ib` extension). Note that dots in filenames are not allowed for security reasons. Once you’re done, click **Done**, and your file will be created, automatically synced, and ready to use. The app ensures your progress is saved even if you close the editor.
+
+Your new file will appear in the editor and in the left sidebar. You’re now ready to start coding!
+
+## Writing Code
+
+The editor works just like any other code editor. To get started, try writing this simple program:
+
+```
+output "Hello, World!"
 ```
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+Run your code by clicking the **Run** button on the right-hand side. The output will appear in the text field below the editor.
 
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+Congratulations, you’ve just executed your first IB pseudocode program! Now that you’re familiar with the basics, head to the next section to learn more about IB pseudocode syntax and advanced features.

@@ -1,0 +1,59 @@
+---
+sidebar_position: 3
+---
+
+# Variables
+
+Here, you will learn about variables, which are objects that store a value inside of them and can be referenced or assigned to in your code.
+
+## Creating Variables
+
+You can create a variable by simply giving it a name and a value.
+
+```python
+my_variable = 100
+```
+
+This assign the value `100` to `my_variable` in the current scope (which you will learn about later).
+
+## Referencing Variables
+
+You can reference the value of the variable by simply typing its name, which will be treated as the value.
+
+```
+output my_variable + 100
+```
+
+This will print `200` to the standard output.
+
+## Re-assigning Variables
+
+:::tip Comments
+`#` represents a comment, the rest of the line following a `#` will be ignored.
+:::
+
+You can re-assign a variable by simply re-initializing its value.
+
+```python
+my_variable = 100
+output my_variable # will print `100`
+
+my_variable = 200
+output my_variable # will print `200`
+
+my_variable = my_variable + 1000
+output my_variable # will print `1200`
+```
+
+:::danger Types
+Once a variable has been implicitly initialized with a type, it cannot be re-assigned with a value that is of a different type.
+The following example will result in an error:
+
+```
+my_variable = 100
+my_variable = false
+```
+
+This will result in an error since `my_variable` has already been initialized with a value of type `Int`, thus cannot be assigned with a `Bool`.
+
+:::
