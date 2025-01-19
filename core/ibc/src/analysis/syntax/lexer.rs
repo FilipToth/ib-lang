@@ -65,11 +65,14 @@ impl LexerTokenKind {
 
     pub fn binary_operator_precedence(&self) -> usize {
         match self {
-            LexerTokenKind::StarToken => 3,
-            LexerTokenKind::SlashToken => 3,
+            LexerTokenKind::StarToken => 4,
+            LexerTokenKind::SlashToken => 4,
 
-            LexerTokenKind::PlusToken => 2,
-            LexerTokenKind::MinusToken => 2,
+            LexerTokenKind::PlusToken => 3,
+            LexerTokenKind::MinusToken => 3,
+
+            LexerTokenKind::GreaterThanToken => 2,
+            LexerTokenKind::LesserThanToken => 2,
 
             LexerTokenKind::EqualsEqualsToken => 1,
 

@@ -153,16 +153,19 @@ const Editor = () => {
 
     const closeTab = (index: number) => {
         const oldFile = tabs[index];
+        const newTabs = tabs.filter((_, i) => i != index)
 
         let newIndex = tabState > 0 ? tabState - 1 : 0;
         if (currentFile != null && currentFile.id == oldFile.id) {
             newIndex = index > 0 ? index - 1 : 0;
-            currentFile = tabs[newIndex];
-            setCode(currentFile.contents);
+            currentFile = newTabs[newIndex];
         }
 
+        if (currentFile != null)
+            setCode(currentFile.contents);
+
+        setTabs(newTabs);
         setTabState(newIndex);
-        setTabs((t) => t.filter((_, i) => i != index));
     };
 
     const addFile = () => {
@@ -206,7 +209,6 @@ const Editor = () => {
         // close tab
         const tabIndex = tabs.findIndex((t) => t.id == file.id);
         if (tabIndex != -1) {
-            console.log(tabIndex);
             closeTab(tabIndex);
         }
     };

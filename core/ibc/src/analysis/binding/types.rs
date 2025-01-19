@@ -147,7 +147,7 @@ impl TypeKind {
                 methods.push(reset_next);
                 methods.push(add_item);
                 methods.push(is_empty);
-            },
+            }
             TypeKind::Stack(generic) => {
                 let generic = *generic.clone();
                 let push = TypeMethodRepresentation {
@@ -168,7 +168,7 @@ impl TypeKind {
                 let pop = TypeMethodRepresentation {
                     identifier: "pop".to_string(),
                     ret_type: generic,
-                    params: Vec::new()
+                    params: Vec::new(),
                 };
 
                 let is_empty = TypeMethodRepresentation {
@@ -195,13 +195,13 @@ impl TypeKind {
 
                         params.push(item);
                         params
-                    }
+                    },
                 };
 
                 let dequeue = TypeMethodRepresentation {
                     identifier: "dequeue".to_string(),
                     ret_type: generic,
-                    params: Vec::new()
+                    params: Vec::new(),
                 };
 
                 let is_empty = TypeMethodRepresentation {
@@ -261,7 +261,7 @@ pub fn get_type(
             };
 
             TypeKind::Collection(Box::new(generic))
-        },
+        }
         "Stack" => {
             let generic = match generic {
                 Some(id) => match get_type(id, None, span, errors) {
@@ -276,7 +276,7 @@ pub fn get_type(
             };
 
             TypeKind::Stack(Box::new(generic))
-        },
+        }
         "Queue" => {
             let generic = match generic {
                 Some(id) => match get_type(id, None, span, errors) {
@@ -307,7 +307,7 @@ pub enum ObjectState {
     Array(ArrayState),
     Collection(CollectionState),
     Stack(StackState),
-    Queue(QueueState)
+    Queue(QueueState),
 }
 
 #[derive(Debug, Clone)]
@@ -340,23 +340,27 @@ impl CollectionState {
 
 #[derive(Debug, Clone)]
 pub struct StackState {
-    pub internal: Vec<EvalValue>
+    pub internal: Vec<EvalValue>,
 }
 
 impl StackState {
     fn new() -> Self {
-        StackState { internal: Vec::new() }
+        StackState {
+            internal: Vec::new(),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct QueueState {
-    pub internal: Vec<EvalValue>
+    pub internal: Vec<EvalValue>,
 }
 
 impl QueueState {
     fn new() -> Self {
-        QueueState { internal: Vec::new() }
+        QueueState {
+            internal: Vec::new(),
+        }
     }
 }
 

@@ -11,6 +11,8 @@ pub enum Operator {
     Multiplication,
     Not,
     Equality,
+    LesserThan,
+    GreaterThan,
 }
 
 impl Operator {
@@ -31,7 +33,20 @@ impl Operator {
 
                 return Some(TypeKind::Boolean);
             }
-            _ => unreachable!(),
+            Operator::Subtraction => {
+                if rhs_type != TypeKind::Int {
+                    let err = ErrorKind::UnaryOperatorNotDefinedOnType {
+                        op: self.clone(),
+                        used_type: rhs_type,
+                    };
+
+                    errors.add(err, span);
+                    return None;
+                }
+
+                return Some(TypeKind::Int);
+            }
+            _ => unreachable!("Operator {:?}", self),
         }
     }
 
@@ -89,6 +104,20 @@ impl Operator {
 
                 Some(TypeKind::Boolean)
             }
+            Operator::LesserThan | Operator::GreaterThan => {
+                if rhs_type != TypeKind::Int || lhs_type != TypeKind::Int {
+                    let err = ErrorKind::BinaryOPeratorNotDefinedOnType {
+                        op: self.clone(),
+                        lhs: lhs_type,
+                        rhs: rhs_type,
+                    };
+
+                    errors.add(err, span);
+                    return None;
+                }
+
+                return Some(TypeKind::Boolean);
+            }
             _ => unreachable!(),
         }
     }
@@ -101,6 +130,8 @@ impl Operator {
             Operator::Multiplication => "*",
             Operator::Not => "!",
             Operator::Equality => "==",
+            Operator::LesserThan => "<",
+            Operator::GreaterThan => ">",
         };
 
         op.to_string()

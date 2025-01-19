@@ -86,7 +86,11 @@ fn execute_collection_method(
     }
 }
 
-fn execute_stack_method(state: &mut StackState, symbol: &FunctionSymbol, info: &mut EvalInfo) -> EvalValue {
+fn execute_stack_method(
+    state: &mut StackState,
+    symbol: &FunctionSymbol,
+    info: &mut EvalInfo,
+) -> EvalValue {
     match symbol.identifier.as_str() {
         "push" => {
             let item = &symbol.parameters[0].symbol;
@@ -94,22 +98,24 @@ fn execute_stack_method(state: &mut StackState, symbol: &FunctionSymbol, info: &
 
             state.internal.push(item_value);
             EvalValue::Void
-        },
-        "pop" => {
-            match state.internal.pop() {
-                Some(v) => v,
-                None => panic!("Runtime error")
-            }
+        }
+        "pop" => match state.internal.pop() {
+            Some(v) => v,
+            None => panic!("Runtime error"),
         },
         "isEmpty" => {
             let res = state.internal.len() == 0;
             EvalValue::Bool(res)
         }
-        _ => unimplemented!()
+        _ => unimplemented!(),
     }
 }
 
-fn execute_queue_method(state: &mut QueueState, symbol: &FunctionSymbol, info: &mut EvalInfo) -> EvalValue {
+fn execute_queue_method(
+    state: &mut QueueState,
+    symbol: &FunctionSymbol,
+    info: &mut EvalInfo,
+) -> EvalValue {
     match symbol.identifier.as_str() {
         "enqueue" => {
             let item = &symbol.parameters[0].symbol;
@@ -117,18 +123,16 @@ fn execute_queue_method(state: &mut QueueState, symbol: &FunctionSymbol, info: &
 
             state.internal.insert(0, item_value);
             EvalValue::Void
-        },
-        "dequeue" => {
-            match state.internal.pop() {
-                Some(v) => v,
-                None => panic!("Runtime error")
-            }
+        }
+        "dequeue" => match state.internal.pop() {
+            Some(v) => v,
+            None => panic!("Runtime error"),
         },
         "isEmpty" => {
             let res = state.internal.len() == 0;
             EvalValue::Bool(res)
-        },
-        _ => unimplemented!()
+        }
+        _ => unimplemented!(),
     }
 }
 

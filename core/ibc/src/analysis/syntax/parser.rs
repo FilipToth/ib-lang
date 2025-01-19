@@ -421,6 +421,8 @@ impl<'a> Parser<'a> {
             LexerTokenKind::SlashToken => Some(Operator::Division),
             LexerTokenKind::EqualsEqualsToken => Some(Operator::Equality),
             LexerTokenKind::BangToken => Some(Operator::Not),
+            LexerTokenKind::LesserThanToken => Some(Operator::LesserThan),
+            LexerTokenKind::GreaterThanToken => Some(Operator::GreaterThan),
             _ => None,
         }
     }
