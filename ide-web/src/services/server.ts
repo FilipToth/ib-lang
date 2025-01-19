@@ -3,18 +3,21 @@ import { auth } from "./firebase";
 
 export interface IBDiagnostic {
     message: string;
-    line: number;
-    col: number;
+    offset_start: number;
+    offset_end: number;
 }
 
 export interface IBFile {
+    id: string;
     filename: string;
     contents: string;
 }
 
+const API_BASE = process.env.REACT_APP_BACKEND_URL;
+
 export const runCode = async (code: string): Promise<string> => {
     const headers = await getHeaders();
-    const req = await axios.post("http://127.0.0.1:8080/execute", code, {
+    const req = await axios.post(`${API_BASE}execute`, code, {
         headers: headers,
     });
 
@@ -23,16 +26,13 @@ export const runCode = async (code: string): Promise<string> => {
     return output;
 };
 
-export const runDiagnostics = async (
-    code: string,
-    file: string
-): Promise<IBDiagnostic[]> => {
+export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
     const headers = await getHeaders();
     const params = {
-        file: file,
+        id: file.id,
     };
 
-    const req = await axios.post("http://127.0.0.1:8080/diagnostics", code, {
+    const req = await axios.post(`${API_BASE}diagnostics`, file.contents, {
         params: params,
         headers: headers,
     });
@@ -43,13 +43,37 @@ export const runDiagnostics = async (
 
 export const getFiles = async (): Promise<IBFile[]> => {
     const headers = await getHeaders();
-    const req = await axios.get("http://127.0.0.1:8080/files", {
+    const req = await axios.get(`${API_BASE}files`, {
         headers: headers,
     });
 
     const data = req.data;
-    console.log(data);
     return data;
+};
+
+export const createFile = async (id: string, filename: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+        filename: filename,
+    };
+
+    await axios.post(`${API_BASE}create`, undefined, {
+        params: params,
+        headers: headers,
+    });
+};
+
+export const deleteFile = async (id: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+    };
+
+    await axios.post(`${API_BASE}delete`, undefined, {
+        params: params,
+        headers: headers,
+    });
 };
 
 const getHeaders = async () => {
