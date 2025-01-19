@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  auth-server:
+    build:
+      context: ./auth-server
+      dockerfile: Dockerfile
+    container_name: auth-server
+    expose:
+      - 8081
+    ports:
+      - "8081:8081"
+    restart: always
+  ib-core:
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: ib-core
+    volumes:
+      - ib-data:/usr/src/ibcore/data
+    expose:
+      - 8080
+    ports:
+      - "8080:8080"
+    restart: always
+
+volumes:
+  ib-data:
