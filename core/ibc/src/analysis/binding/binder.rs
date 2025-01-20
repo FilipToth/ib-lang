@@ -393,6 +393,12 @@ fn bind_boolean_literal(value: bool, _errors: &mut ErrorBag, span: Span) -> Opti
     Some(node)
 }
 
+fn bind_string_literal(value: String, _errors: &mut ErrorBag, span: Span) -> Option<BoundNode> {
+    let kind = BoundNodeKind::StringLiteral(value);
+    let node = BoundNode::new(kind, TypeKind::String, span);
+    Some(node)
+}
+
 fn bind_assignment_expression(
     identifier: String,
     value: &SyntaxToken,
@@ -650,6 +656,9 @@ pub fn bind(
         }
         SyntaxKind::BooleanLiteralExpression(value) => {
             bind_boolean_literal(value.clone(), errors, span)
+        }
+        SyntaxKind::StringLiteralExpression(value) => {
+            bind_string_literal(value.clone(), errors, span)
         }
         SyntaxKind::AssignmentExpression { identifier, value } => {
             bind_assignment_expression(identifier.clone(), value, scope, errors, span)

@@ -84,6 +84,9 @@ impl BoundNode {
             BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
+            BoundNodeKind::StringLiteral(val) => {
+                format!("\"{}\"", val)
+            }
         }
     }
 }
@@ -146,6 +149,7 @@ pub enum BoundNodeKind {
     ReferenceExpression(VariableSymbol),
     NumberLiteral(i64),
     BooleanLiteral(bool),
+    StringLiteral(String),
 }
 
 #[derive(Debug, Clone)]

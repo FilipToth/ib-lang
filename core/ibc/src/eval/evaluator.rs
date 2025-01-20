@@ -283,6 +283,7 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
         }
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
+        BoundNodeKind::StringLiteral(val) => EvalValue::string(val.clone()),
         BoundNodeKind::OutputStatement { expr } => {
             let value = eval_rec(&expr, info);
 
