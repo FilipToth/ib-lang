@@ -31,6 +31,7 @@ Binary operations act on two operands to produce a resultant value. The supporte
 - **Division (`/`)**: Performs integer division of one operand by another. Example: `10 / 3`. Note that IBL exclusively supports integer arithmetic; thus, `10 / 3` results in `3` rather than a fractional value.
 - **Comparison (`<`, `>`)**: Evaluates the relative magnitude of two operands. For instance, `a < b` checks whether `a` is less than `b`, while `a > b` checks whether `a` is greater than `b`. These operations return a `Boolean` value.
 - **Equality (`==`)**: Compares two entities for equivalence. Example: `10 == (5 + 5)` evaluates to `true`, while `5 == (10 + 10)` evaluates to `false`.
+- **String Concatenation**: Join two objects of type `String` (or a string and an `Any` object) together using the `+` operator. Example: `"Result: " + (54 * 6)` evaluates to `Result: 324`.
 
 :::tip Precision Note
 IBL does not currently support floating-point arithmetic. All numerical computations are constrained to integers. For example, `10 / 3` evaluates to `3`.

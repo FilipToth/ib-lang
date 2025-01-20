@@ -124,10 +124,21 @@ impl EvalValue {
 fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue {
     match op {
         Operator::Addition => {
-            // addition is only defined on integers
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::int(lhs + rhs)
+            if let EvalValue::String(lhs_val) = &lhs {
+                let rhs_val = rhs.to_string();
+                let val = format!("{}{}", lhs_val, rhs_val);
+                EvalValue::String(val)
+            } else if let EvalValue::String(rhs_val) = &rhs {
+                let lhs_val = lhs.to_string();
+                let val = format!("{}{}", lhs_val, rhs_val);
+                EvalValue::String(val)
+            } else {
+                // addition on integers,
+                // binder should enforce this
+                let lhs = lhs.force_get_int();
+                let rhs = rhs.force_get_int();
+                EvalValue::int(lhs + rhs)   
+            }
         }
         Operator::Subtraction => {
             // subtraction is only defined on integers

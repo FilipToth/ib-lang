@@ -171,6 +171,7 @@ fn lex_string(
         match peek {
             Some(next) => {
                 if *next == '\"' {
+                    iter.next();
                     break;
                 }
 
