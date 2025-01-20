@@ -2,13 +2,13 @@
 sidebar_position: 2
 ---
 
-# Input / Output
+# Input and Output
 
-Here, you will learn how to write to the standard output and get input from the user.
+This section provides a detailed overview of how to use the `output` statement to display information and how the `input` function (once implemented) will enable user interaction in IB Pseudocode.
 
-## Output
+## Output: Displaying Information
 
-Printing to the standard output is simple, just use the `output` statement and pass any object as an argument (it accepts all types).
+To print information to the standard output, you use the `output` statement. This statement accepts objects of any type and evaluates them before displaying the results in the output console. Below are some examples:
 
 ```python
 output "Hello, World!"
@@ -17,21 +17,30 @@ output false && true
 output my_variable
 ```
 
-You can now look at the output box on the right to see the standard output (we set the `my_variable` variable to `2`).
+Explanation:
+
+ - **String Output**: Prints the string value directly (e.g., `"Hello, World!"`).
+ - **Arithmetic Expressions**: Evaluates and prints the result (e.g., `1234 + 4567` outputs `5701`).
+ - **Logical Operations**: Evaluates boolean expressions (e.g., `false && true` outputs `false`).
+ - **Variable Values**: Displays the value of the variable (e.g., if `my_variable` equals `2`, it outputs `2`).
+
+The output appears in the designated output box, as illustrated below:
 
 ![Output](img/output.png)
 
-## Input
+## Input: Capturing User Data
 
-:::danger Take care
-
-Not implemented yet
-
+:::danger Feature Not Implemented
+The `input` function for user input is not currently supported.
 :::
 
-You can get input from the user by calling the `input` function, which returns the user input (of type `String`).
+When available, the `input` function will allow your program to read user-provided data. The data captured will always be returned as a `String`, which can then be processed as needed. Below is an example of how this feature is expected to function:
 
-```python
+```
 user_input = input()
 output user_input
 ```
+
+Future Use Case:
+
+This functionality will enable dynamic interaction with users, making it possible to accept input during runtime and respond accordingly within your program. Keep an eye on updates for when this feature becomes available.

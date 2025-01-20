@@ -3,3 +3,55 @@ sidebar_position: 8
 ---
 
 # Stacks & Queues
+
+Here, we will learn about Stacks and Queues, which are collection objects that store data in a
+structured manner.
+
+## Stacks
+
+A stack holds elements like any normal collection. A stack can be created in the following way:
+
+```python
+stack = new Stack<String>()
+```
+
+You can add elements to the stack with the `push` method which expects an argument of the generic type.
+Usage: `stack.push("Hello")`. You can also get items from the stack by calling the `pop` method, which
+returns an object of the generic type. The `pop` method returns the last item added to the stack, and
+adheres to the LIFO (Last In, First Out) ordering, it also removes the element from the stack.
+```python
+stack.push("Hello 1")
+stack.push("Hello 2")
+
+output stack.pop() # prints "Hello 2"
+output stack.pop() # prints "Hello 1"
+```
+You can also get the number of elements in a stack using the `len` method, which returns an
+object of type `Int`.
+
+## Queues
+
+A queue holds elements like any normal collection. A queue can be created in the following way:
+
+```python
+queue = new Queue<String>()
+```
+
+You can add elements to the queue with the `enqueue` method which expects an argument of the generic type.
+Usage: `queue.enqueue("Hello")`. You can also get items from the queue by calling the `dequeue` method, which
+returns an object of the generic type. The `dequeue` method returns the first item added to the stack, and
+adheres to the FIFO (First In, First Out) ordering, it also removes the element from the queue.
+```python
+queue.enqueue("Hello 1")
+queue.enqueue("Hello 2")
+
+output queue.dequeue() # prints "Hello 1"
+output queue.dequeue() # prints "Hello 2"
+```
+You can also check whether a queue is empty using the `isEmpty` method which returns a `Bool`
+indicating whether the queue is empty.
+
+:::danger Empty Stacks & Queues
+Calling `pop` or `dequeue` on an empty stack or queue, will result in a **runtime error** and the module
+will fail execution. It's recommended to check the `len` or `isEmpty` methods before executing `pop` or `dequeue`.
+:::

@@ -4,11 +4,11 @@ sidebar_position: 5
 
 # Loops
 
-Here, you will learn about loops, which are statements that alter the control flow of your code and run a code block multiple times.
+This document elucidates the use of loops in IB Pseudocode, a fundamental construct for controlling program execution flow by iterating over code blocks multiple times.
 
 ## For Loops
 
-A for loop can be defined in the following way:
+The `for` loop in IB Pseudocode enables deterministic iteration over a specified range of values. The syntax is as follows:
 
 ```
 loop for index from 0 to 10
@@ -17,11 +17,11 @@ loop for index from 0 to 10
 end
 ```
 
-This runs the code inside the block (the statements before the `end`) 10 times. For each iteration, it assigns the value of the iteration to a variable (in our case, it's called `index`). Note that the for loop is not right-inclusive, thus will not run for `index = 10`, and will only run for `0, 1, 2, ... 9`.
+This construct executes the code block enclosed between `loop` and `end` exactly 10 times. On each iteration, the variable `index` assumes the current value within the specified range. It is noteworthy that the range is non-inclusive of the upper bound; hence, the loop iterates for index values `0, 1, 2, ..., 9` but excludes `10`.
 
 ## While Loops
 
-A while loop can be defined in the following way:
+The `while` loop facilitates iteration contingent upon a specified condition. Its syntax is illustrated below:
 
 ```
 x = 0
@@ -31,4 +31,44 @@ loop while x < 10
 end
 ```
 
-This runs the code inside the block until the condition evaluates to `false`. The while loop evaluates the condition before each run, and evaluates the block if and only if the conditon is `true`.
+In this example, the loop evaluates the condition `x < 10` prior to executing the code block. If the condition evaluates to `true`, the block is executed; otherwise, the loop terminates. This mechanism ensures that the loop executes only as long as the condition remains satisfied.
+
+## Break
+
+The `break` statement offers a mechanism for premature termination of a loop. Upon execution, it immediately redirects the program’s instruction pointer to the first statement following the loop construct.
+
+```
+loop while true
+    rand = random(0, 10)
+    if rand == 5 then
+        break
+    end
+end
+
+output "Hello!"
+```
+
+In this instance, the loop generates random numbers between 0 and 9 until the value `5` is produced. At this juncture, the `break` statement halts the loop, and the program proceeds to output `"Hello!"`.
+
+## Continue
+
+The `continue` statement allows the loop to skip the current iteration and advance directly to the next cycle. This is particularly useful for bypassing specific cases within an iterative process:
+
+```
+loop for i from 0 to 10
+    if i / 2 == 0 then
+        continue
+    end
+
+    output i
+end
+```
+
+This code omits iterations where `i / 2 == 0`, thereby outputting only odd numbers.
+
+:::tip Modulus Reminder
+To determine odd or even numbers more effectively, the modulus operator is conventionally employed. However, the current implementation of IB Pseudocode does not support the modulus operator. In this example, integer division rounding behavior is leveraged as a workaround.
+
+Your contributions are welcome! If you’d like to implement the modulus operator, consider submitting a pull request to our GitHub repository.
+:::
+
