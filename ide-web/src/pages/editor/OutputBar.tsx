@@ -1,4 +1,4 @@
-import { Button, Stack, TextField } from "@mui/material";
+import { Button, Stack, TextField, Typography } from "@mui/material";
 import { FunctionComponent, useRef, useState } from "react";
 import { runCode } from "services/server";
 
@@ -35,6 +35,13 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                     },
                 }}
             />
+            <Typography>Awaiting User Input</Typography>
+            <Stack direction={"row"}>
+                <TextField
+                    multiline
+                />
+                <Button>Send</Button>
+            </Stack>
         </Stack>
     );
 };

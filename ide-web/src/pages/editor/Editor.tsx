@@ -10,6 +10,7 @@ import { TopBar } from "components/TopBar";
 import {
     Box,
     Button,
+    GlobalStyles,
     IconButton,
     Stack,
     SxProps,
@@ -153,7 +154,7 @@ const Editor = () => {
 
     const closeTab = (index: number) => {
         const oldFile = tabs[index];
-        const newTabs = tabs.filter((_, i) => i != index);
+        const newTabs = tabs.filter((_, i) => i != index)
 
         let newIndex = tabState > 0 ? tabState - 1 : 0;
         if (currentFile != null && currentFile.id == oldFile.id) {
@@ -161,7 +162,8 @@ const Editor = () => {
             currentFile = newTabs[newIndex];
         }
 
-        if (currentFile != null) setCode(currentFile.contents);
+        if (currentFile != null)
+            setCode(currentFile.contents);
 
         setTabs(newTabs);
         setTabState(newIndex);
@@ -244,71 +246,80 @@ const Editor = () => {
 
     return (
         <>
-            <TopBar>
-                <Typography variant="h6">Code Editor</Typography>
-            </TopBar>
-            <div>
-                <Stack direction="row">
-                    <LeftBar
-                        files={files}
-                        click={openFileOrChangeTab}
-                        del={deleteFileClick}
-                    />
-                    <Stack direction="column">
-                        <Box
-                            display="flex"
-                            flexDirection="row"
-                            justifyContent="space-between"
-                        >
-                            <EditorTabs
-                                tabState={tabState}
-                                tabs={tabs}
-                                changeTab={changeTab}
-                                closeTab={closeTab}
-                            />
-                            <Button
-                                onClick={addFile}
-                                startIcon={<Add />}
-                            ></Button>
-                        </Box>
-                        {tabs.length == 0 ? (
-                            <EmptyWorkspace newFileClick={addFile} />
-                        ) : (
-                            <CodeMirror
-                                height="100vh"
-                                width="70vw"
-                                maxHeight="100vh"
-                                theme={coolGlow}
-                                extensions={[
-                                    ibSupport,
-                                    keyExtension,
-                                    indentUnit.of("    "),
-                                ]}
-                                value={code}
-                                onChange={(
-                                    value: string,
-                                    _viewUpdate: ViewUpdate
-                                ) => {
-                                    setCode(value);
-                                    if (currentFile != null)
-                                        currentFile.contents = value;
-                                }}
-                            />
-                        )}
+            <GlobalStyles styles={{ body: { overflow: "hidden" } }} />
+            <Stack height={"100vh"} maxHeight={"100vh"} overflow={"hidden"}>
+                <TopBar>
+                    <Typography variant="h6">Code Editor</Typography>
+                </TopBar>
+                <Stack flex={1} overflow={"hidden"}>
+                    <Stack direction="row" height={"100%"}>
+                        <LeftBar
+                            files={files}
+                            click={openFileOrChangeTab}
+                            del={deleteFileClick}
+                        />
+                        <Stack direction="column" height={"100%"}>
+                            <Box
+                                display="flex"
+                                flexDirection="row"
+                                justifyContent="space-between"
+                            >
+                                <EditorTabs
+                                    tabState={tabState}
+                                    tabs={tabs}
+                                    changeTab={changeTab}
+                                    closeTab={closeTab}
+                                />
+                                <Button
+                                    onClick={addFile}
+                                    startIcon={<Add />}
+                                ></Button>
+                            </Box>
+                            {tabs.length == 0 ? (
+                                <EmptyWorkspace newFileClick={addFile} />
+                            ) : (
+                                <CodeMirror
+                                    height="100%"
+                                    width="70vw"
+                                    maxHeight="100%"
+                                    theme={coolGlow}
+                                    extensions={[
+                                        ibSupport,
+                                        keyExtension,
+                                        indentUnit.of("    "),
+                                    ]}
+                                    value={code}
+                                    onChange={(
+                                        value: string,
+                                        _viewUpdate: ViewUpdate
+                                    ) => {
+                                        setCode(value);
+                                        if (currentFile != null)
+                                            currentFile.contents = value;
+                                    }}
+                                    style={{
+                                        flexGrow: 1,
+                                        overflow: "scroll"
+                                    }}
+                                />
+                            )}
+                        </Stack>
+                        {tabs.length != 0 &&
+                            <OutputBar code={code} />
+                        }
                     </Stack>
-                    {tabs.length != 0 && <OutputBar code={code} />}
                 </Stack>
-            </div>
-            <NewFileDialog
-                isOpen={newFileDialogOpen}
-                close={() => setNewFileDialogOpen(false)}
-                dialogOK={handleCreateFile}
-            />
-            <DeleteFileDialog
-                isOpen={delFileIndex != null}
-                close={() => setDelDialogIndex(null)}
-                dialogOK={deleteFileDialogOK}
-            />
+                <NewFileDialog
+                    isOpen={newFileDialogOpen}
+                    close={() => setNewFileDialogOpen(false)}
+                    dialogOK={handleCreateFile}
+                />
+                <DeleteFileDialog
+                    isOpen={delFileIndex != null}
+                    close={() => setDelDialogIndex(null)}
+                    dialogOK={deleteFileDialogOK}
+                />
+            </Stack>
         </>
     );
 };
