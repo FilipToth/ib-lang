@@ -9,11 +9,12 @@ use crate::analysis::{
     operator::Operator,
 };
 
-use super::object_methods::eval_type_method;
+use super::{eval_builtin, object_methods::eval_type_method};
 
 pub struct EvalInfo<'a> {
     pub heap: &'a mut EvalHeap,
     pub output: &'a mut String,
+    pub input_handler: fn() -> String
 }
 
 pub struct EvalHeap {
@@ -137,7 +138,7 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                 // binder should enforce this
                 let lhs = lhs.force_get_int();
                 let rhs = rhs.force_get_int();
-                EvalValue::int(lhs + rhs)   
+                EvalValue::int(lhs + rhs)
             }
         }
         Operator::Subtraction => {
@@ -339,14 +340,20 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
         BoundNodeKind::BoundCallExpression { symbol, args } => {
             eval_call_args(symbol, args, info);
 
-            // no need to clear arguments after executing the block
-            let body = info.heap.get_func(symbol);
-            let ret_value = eval_rec(&body, info);
+            let builtin_eval = eval_builtin::try_eval_builtin(symbol, info);
+            match builtin_eval {
+                Some(val) => val,
+                None => {
+                    // no need to clear arguments after executing the block
+                    let body = info.heap.get_func(symbol);
+                    let ret_value = eval_rec(&body, info);
 
-            match ret_value {
-                EvalValue::Void => EvalValue::void(),
-                EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
-                _ => unreachable!(),
+                    match ret_value {
+                        EvalValue::Void => EvalValue::void(),
+                        EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
+                        _ => unreachable!(),
+                    }
+                }
             }
         }
         BoundNodeKind::ObjectExpression => {
@@ -388,11 +395,12 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
     val
 }
 
-pub fn eval(root: &BoundNode, output: &mut String) {
+pub fn eval(root: &BoundNode, output: &mut String, input_handler: fn() -> String) {
     let mut heap = EvalHeap::new();
     let mut info = EvalInfo {
         heap: &mut heap,
         output: output,
+        input_handler: input_handler
     };
 
     eval_rec(root, &mut info);

@@ -182,14 +182,14 @@ fn lex_string(
 
                 value.push(*next);
                 iter.next();
-            },
+            }
             None => {
                 // TODO: report error, unclosed string
                 break;
-            },
+            }
         }
-    };
-    
+    }
+
     let kind = LexerTokenKind::StringLiteralToken(value);
     return kind;
 }

@@ -1,9 +1,22 @@
-use std::fs;
+use std::{fs, io::stdin};
 
 use eval::eval;
 
 mod analysis;
 mod eval;
+
+fn input_handler() -> String {
+    let mut input = String::new();
+
+    stdin()
+        .read_line(&mut input)
+        .expect("Failed to get user input");
+
+    // remove newline
+    input.pop();
+
+    input
+}
 
 fn parse_file() {
     let contents = fs::read_to_string("test.ib").unwrap();
@@ -15,7 +28,7 @@ fn parse_file() {
     };
 
     // evaluate
-    let output = eval(root);
+    let output = eval(root, input_handler);
     println!("{}", output);
 }
 
