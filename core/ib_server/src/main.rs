@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, sync::Arc};
 
 use auth::auth_middleware;
 use axum::{
@@ -9,15 +9,19 @@ use axum::{
 use rusqlite::Connection;
 use serde::Serialize;
 use sync::{create_file, delete_file, get_files};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::broadcast};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use ws::handle_ws;
 
 extern crate ibc;
 
 pub mod auth;
 pub mod db;
 pub mod sync;
+pub mod ws;
+
+type Broadcaster = Arc<broadcast::Sender<String>>;
 
 #[derive(Serialize)]
 struct Diagnostic {
@@ -62,18 +66,27 @@ async fn main() {
         .allow_origin(Any)
         .allow_headers(Any);
 
+    let (tx, _rx) = broadcast::channel::<String>(100);
+    let tx = Arc::new(tx);
+
     let app = Router::new()
         .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
+        .route("/ws", get(handle_ws))
         .layer(axum::middleware::from_fn(auth_middleware))
-        .layer(ServiceBuilder::new().layer(cors));
+        .layer(ServiceBuilder::new().layer(cors))
+        .layer(Extension(tx));
 
     println!("Listening on port 8080...");
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+fn handle_input() -> String {
+    "".to_string()
 }
 
 async fn execute(body: String) -> Json<RunResult> {
@@ -97,7 +110,7 @@ async fn execute(body: String) -> Json<RunResult> {
         return Json(result);
     };
 
-    let output = ibc::eval::eval(&root);
+    let output = ibc::eval::eval(&root, handle_input);
     let result = RunResult::new(diagnostics, output);
     Json(result)
 }

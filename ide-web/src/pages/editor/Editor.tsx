@@ -154,7 +154,7 @@ const Editor = () => {
 
     const closeTab = (index: number) => {
         const oldFile = tabs[index];
-        const newTabs = tabs.filter((_, i) => i != index)
+        const newTabs = tabs.filter((_, i) => i != index);
 
         let newIndex = tabState > 0 ? tabState - 1 : 0;
         if (currentFile != null && currentFile.id == oldFile.id) {
@@ -162,8 +162,7 @@ const Editor = () => {
             currentFile = newTabs[newIndex];
         }
 
-        if (currentFile != null)
-            setCode(currentFile.contents);
+        if (currentFile != null) setCode(currentFile.contents);
 
         setTabs(newTabs);
         setTabState(newIndex);
@@ -299,14 +298,12 @@ const Editor = () => {
                                     }}
                                     style={{
                                         flexGrow: 1,
-                                        overflow: "scroll"
+                                        overflow: "scroll",
                                     }}
                                 />
                             )}
                         </Stack>
-                        {tabs.length != 0 &&
-                            <OutputBar code={code} />
-                        }
+                        {tabs.length != 0 && <OutputBar code={code} />}
                     </Stack>
                 </Stack>
                 <NewFileDialog
