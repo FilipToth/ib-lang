@@ -20,6 +20,7 @@ pub mod auth;
 pub mod db;
 pub mod sync;
 pub mod ws;
+pub mod eval;
 
 type Broadcaster = Arc<broadcast::Sender<String>>;
 
@@ -70,7 +71,6 @@ async fn main() {
     let tx = Arc::new(tx);
 
     let app = Router::new()
-        .route("/execute", post(execute))
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
@@ -87,32 +87,6 @@ async fn main() {
 
 fn handle_input() -> String {
     "".to_string()
-}
-
-async fn execute(body: String) -> Json<RunResult> {
-    let result = ibc::analysis::analyze(body);
-
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    let errors = result.errors.errors;
-
-    for error in errors {
-        let diagnostic = Diagnostic {
-            message: error.kind.format(),
-            offset_start: error.span.start.char_offset,
-            offset_end: error.span.end.char_offset,
-        };
-
-        diagnostics.push(diagnostic)
-    }
-
-    let Some(root) = result.root else {
-        let result = RunResult::new(diagnostics, "".to_string());
-        return Json(result);
-    };
-
-    let output = ibc::eval::eval(&root, handle_input);
-    let result = RunResult::new(diagnostics, output);
-    Json(result)
 }
 
 async fn diagnostics(

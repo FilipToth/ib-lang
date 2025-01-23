@@ -2,3 +2,7 @@
 name = "ibc"
 version = "0.1.0"
 authors = ["Filip Toth <filip.toth@accelley.com>"]
+edition="2021"
+
+[dependencies]
+async-trait = "0.1.85"
