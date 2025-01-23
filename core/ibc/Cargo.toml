@@ -5,4 +5,5 @@ authors = ["Filip Toth <filip.toth@accelley.com>"]
 edition="2021"
 
 [dependencies]
+async-recursion = "1.1.1"
 async-trait = "0.1.85"
