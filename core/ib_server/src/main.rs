@@ -20,7 +20,6 @@ pub mod auth;
 pub mod db;
 pub mod sync;
 pub mod ws;
-pub mod eval;
 
 type Broadcaster = Arc<broadcast::Sender<String>>;
 
@@ -29,12 +28,6 @@ struct Diagnostic {
     message: String,
     offset_start: usize,
     offset_end: usize,
-}
-
-#[derive(Serialize)]
-struct RunResult {
-    diagnostics: Vec<Diagnostic>,
-    output: String,
 }
 
 #[derive(Serialize)]
@@ -49,15 +42,6 @@ pub struct IbFile {
     pub contents: String,
 }
 
-impl RunResult {
-    fn new(diagnostics: Vec<Diagnostic>, output: String) -> RunResult {
-        RunResult {
-            diagnostics: diagnostics,
-            output: output,
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
     setup_db();
@@ -70,23 +54,22 @@ async fn main() {
     let (tx, _rx) = broadcast::channel::<String>(100);
     let tx = Arc::new(tx);
 
-    let app = Router::new()
+    let protected_router = Router::new()
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
+        .layer(axum::middleware::from_fn(auth_middleware));
+
+    let app = Router::new()
         .route("/ws", get(handle_ws))
-        .layer(axum::middleware::from_fn(auth_middleware))
+        .nest("/api", protected_router)
         .layer(ServiceBuilder::new().layer(cors))
         .layer(Extension(tx));
 
     println!("Listening on port 8080...");
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-fn handle_input() -> String {
-    "".to_string()
 }
 
 async fn diagnostics(

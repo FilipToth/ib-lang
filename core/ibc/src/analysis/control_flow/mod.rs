@@ -1,4 +1,8 @@
-use std::{cell::RefCell, fs, sync::{Arc, Mutex}};
+use std::{
+    cell::RefCell,
+    fs,
+    sync::{Arc, Mutex},
+};
 
 use self::control_flow_graph::ControlFlowNode;
 

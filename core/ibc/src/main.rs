@@ -1,7 +1,10 @@
-use std::{fs, io::{self, BufRead, BufReader}};
+use std::{
+    fs,
+    io::{self, BufRead, BufReader},
+};
 
 use async_trait::async_trait;
-use eval::IBEval;
+use eval::EvalIO;
 
 mod analysis;
 mod eval;
@@ -9,8 +12,8 @@ mod eval;
 struct IBEvaluator;
 
 #[async_trait]
-impl IBEval for IBEvaluator {
-    fn output(&self, msg: String) {
+impl EvalIO for IBEvaluator {
+    async fn output(&self, msg: String) {
         print!("{}", msg);
     }
 
@@ -21,7 +24,7 @@ impl IBEval for IBEvaluator {
 
         match reader.read_line(&mut buffer) {
             Ok(_) => buffer.trim().to_string(),
-            Err(_) => unreachable!()
+            Err(_) => unreachable!(),
         }
     }
 }
