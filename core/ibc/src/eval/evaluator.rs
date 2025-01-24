@@ -299,7 +299,6 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo, ev: &mut impl IBEval) -> Eval
             let value = eval_rec(&expr, info, ev);
 
             let value = format!("{}\n", value.to_string());
-            (ev.)
             String::push_str(info.output, &value);
 
             EvalValue::void()

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::analysis::{operator::Operator, span::Span};
 
@@ -112,17 +112,17 @@ pub enum BoundNodeKind {
     },
     FunctionDeclaration {
         symbol: FunctionSymbol,
-        block: Rc<BoundNode>,
+        block: Arc<BoundNode>,
     },
     ForLoop {
         iterator: VariableSymbol,
         lower_bound: usize,
         upper_bound: usize,
-        block: Rc<BoundNode>,
+        block: Arc<BoundNode>,
     },
     WhileLoop {
         expr: Box<BoundNode>,
-        block: Rc<BoundNode>,
+        block: Arc<BoundNode>,
     },
     BinaryExpression {
         lhs: Box<BoundNode>,
