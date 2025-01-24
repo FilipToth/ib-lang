@@ -7,6 +7,6 @@ pub mod object_methods;
 
 #[async_trait]
 pub trait EvalIO: Send + Sync {
-    async fn output(&self, msg: String);
+    async fn output(&self, output_msg: String);
     async fn input(&self) -> String;
 }

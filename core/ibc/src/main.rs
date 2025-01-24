@@ -13,8 +13,8 @@ struct IBEvaluator;
 
 #[async_trait]
 impl EvalIO for IBEvaluator {
-    async fn output(&self, msg: String) {
-        print!("{}", msg);
+    async fn output(&self, output_msg: String) {
+        print!("{}", output_msg);
     }
 
     async fn input(&self) -> String {

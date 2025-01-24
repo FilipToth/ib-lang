@@ -12,6 +12,7 @@ enum WebSocketMessageKind {
     Execute,
     Output,
     Input,
+    EndExecute,
 }
 
 interface WebSocketMessage {
@@ -21,6 +22,8 @@ interface WebSocketMessage {
 
 const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     const [output, setOutput] = useState("");
+    const [awaitingInput, setAwaitingInput] = useState(false);
+    const [input, setInput] = useState("");
 
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
     const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
@@ -46,9 +49,10 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                 break;
             case WebSocketMessageKind.Input:
                 // not implemented
+                setAwaitingInput(true);
                 break;
             case WebSocketMessageKind.Output:
-                setOutput("Hellou");
+                setOutput(output + msg.payload);
                 break;
         }
     }, [lastMessage]);
@@ -73,6 +77,18 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
         }
     }, [readyState]);
 
+    const sendInput = () => {
+        const msg: WebSocketMessage = {
+            kind: WebSocketMessageKind.Input,
+            payload: input,
+        };
+
+        const msg_raw = JSON.stringify(msg);
+        sendMessage(msg_raw);
+        setAwaitingInput(false);
+        setInput("");
+    };
+
     return (
         <Stack>
             <Button onClick={onClick}>Run</Button>
@@ -93,10 +109,16 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                     },
                 }}
             />
-            <Typography>Awaiting User Input</Typography>
+            {awaitingInput && <Typography>Awaiting User Input</Typography>}
             <Stack direction={"row"}>
-                <TextField multiline />
-                <Button>Send</Button>
+                <TextField
+                    multiline
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                />
+                <Button disabled={!awaitingInput} onClick={sendInput}>
+                    Send
+                </Button>
             </Stack>
         </Stack>
     );

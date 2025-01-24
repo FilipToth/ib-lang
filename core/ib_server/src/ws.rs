@@ -57,10 +57,10 @@ struct WebSocketEvaluator {
 
 #[async_trait]
 impl EvalIO for WebSocketEvaluator {
-    async fn output(&self, msg: String) {
+    async fn output(&self, output_msg: String) {
         let msg = WebsocketMessage {
             kind: WebsocketMessageKind::Output,
-            payload: msg,
+            payload: output_msg,
         };
 
         let msg_raw = serde_json::to_string(&msg).unwrap();
@@ -80,7 +80,14 @@ impl EvalIO for WebSocketEvaluator {
         let msg_raw = serde_json::to_string(&msg).unwrap();
         match send_await_resp(&mut socket, msg_raw).await {
             Ok(msg) => match msg {
-                Some(msg) => msg,
+                Some(msg) => {
+                    let msg: WebsocketMessage = match serde_json::from_str(&msg) {
+                        Ok(msg) => msg,
+                        Err(_) => unreachable!()
+                    };
+
+                    msg.payload
+                },
                 None => unreachable!(),
             },
             Err(_) => unreachable!(),
@@ -125,12 +132,13 @@ async fn execute(body: String, socket: Arc<Mutex<WebSocket>>) {
         unreachable!()
     };
 
-    let mut io = WebSocketEvaluator { socket: socket };
+    let mut io = WebSocketEvaluator { socket: socket.clone() };
     evaluator::eval(&root, &mut io).await;
+
+    let _ = socket.lock().await.send(Message::Close(None)).await;
 }
 
 async fn handle_message(msg: String, socket: Arc<Mutex<WebSocket>>) {
-    println!("{}", msg);
     let msg: WebsocketMessage = match serde_json::from_str(&msg) {
         Ok(msg) => msg,
         Err(_) => {
@@ -143,9 +151,8 @@ async fn handle_message(msg: String, socket: Arc<Mutex<WebSocket>>) {
             // start execution
             execute(msg.payload, socket).await;
         }
-        WebsocketMessageKind::Input => {
-            // input
-        }
+        // inputs handled elsewhere
+        WebsocketMessageKind::Input => {}
         WebsocketMessageKind::Output => {}
     };
 }
@@ -163,7 +170,6 @@ async fn handle_ws_socket(socket: WebSocket, tx: Broadcaster) {
             } => {
                 match msg {
                     Ok(Message::Text(text)) => {
-                        println!("recv: {}", &text);
                         handle_message(text.clone(), Arc::clone(&socket)).await;
 
                         if tx.send(text).is_err() {
@@ -171,7 +177,6 @@ async fn handle_ws_socket(socket: WebSocket, tx: Broadcaster) {
                         }
                     }
                     Ok(Message::Close(_reason)) => {
-                        println!("ws closed");
                         break;
                     }
                     Err(e) => {
@@ -184,7 +189,6 @@ async fn handle_ws_socket(socket: WebSocket, tx: Broadcaster) {
             Ok(msg) = rx.recv() => {
                 let msg = Message::Text(msg);
                 if socket.lock().await.send(msg).await.is_err() {
-                    println!("client disconnected");
                     break;
                 }
             }
