@@ -6,10 +6,9 @@ pub mod object_methods;
 pub mod eval_builtin;
 
 #[async_trait]
-pub trait IBEval {
-    async fn eval(&mut self, root: &BoundNode);
-    fn output(&mut self, msg: String);
-    async fn input(&mut self) -> String;
+pub trait IBEval: Send + Sync {
+    fn output(&self, msg: String);
+    async fn input(&self) -> String;
 }
 
 /* struct Evaluator;

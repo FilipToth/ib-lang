@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
@@ -201,7 +201,7 @@ fn bind_function_declaration(
     let kind = match symbol {
         Some(s) => BoundNodeKind::FunctionDeclaration {
             symbol: s,
-            block: Rc::new(block),
+            block: Arc::new(block),
         },
         None => {
             let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
@@ -239,7 +239,7 @@ fn bind_for_statement(
         iterator: iterator,
         lower_bound: lower_bound,
         upper_bound: upper_bound,
-        block: Rc::new(body),
+        block: Arc::new(body),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, span);
@@ -272,7 +272,7 @@ fn bind_while_statement(
 
     let kind = BoundNodeKind::WhileLoop {
         expr: Box::new(expr),
-        block: Rc::new(body),
+        block: Arc::new(body),
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, span);

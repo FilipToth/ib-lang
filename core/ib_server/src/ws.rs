@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     Extension,
 };
-use futures_util::StreamExt;
+use futures_util::{lock::Mutex, StreamExt};
+use ibc::eval::{evaluator, IBEval};
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
 
 use crate::{Broadcaster, Diagnostic, RunResult};
 
@@ -18,6 +22,36 @@ enum WebsocketMessageKind {
 struct WebsocketMessage {
     kind: WebsocketMessageKind,
     payload: String,
+}
+
+struct WebSocketEvaluator {
+    socket: Arc<Mutex<WebSocket>>
+}
+
+#[async_trait]
+impl IBEval for WebSocketEvaluator {
+    fn output(&self, msg: String) {
+        // send message via WS... this should be async...
+    }
+
+    async fn input(&self) -> String {
+        let msg = WebsocketMessage {
+            kind: WebsocketMessageKind::Input,
+            payload: "".to_string()
+        };
+
+        let mut socket = self.socket.lock().await;
+        let msg_raw = serde_json::to_string(&msg).unwrap();
+        match send_await_resp(&mut socket, msg_raw).await {
+            Ok(msg) => {
+                match msg {
+                    Some(msg) => msg,
+                    None => unreachable!()
+                }
+            },
+            Err(_) => unreachable!()
+        }
+    }
 }
 
 async fn send_await_resp(
@@ -36,7 +70,7 @@ async fn send_await_resp(
     }
 }
 
-async fn execute(body: String, socket: &mut WebSocket) {
+async fn execute(body: String, socket: Arc<Mutex<WebSocket>>) {
     let result = ibc::analysis::analyze(body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -53,26 +87,21 @@ async fn execute(body: String, socket: &mut WebSocket) {
     }
 
     let Some(root) = result.root else {
-        let result = RunResult::new(diagnostics, "".to_string());
-        return;
+        // TODO: Report Error        
+        unreachable!()
     };
 
-    let input_closure = || async {
-        let input_request = WebsocketMessage {
-            kind: WebsocketMessageKind::Input,
-            payload: "".to_string()
-        };
-
-        let raw = serde_json::to_string(&input_request).unwrap();
-        send_await_resp(socket, raw).await;
-        "".to_string()
+    let mut ev = WebSocketEvaluator {
+        socket: socket
     };
+
+    evaluator::eval(&root, &mut ev).await;
 
     // let output = ibc::eval::eval(&root, input_closure).await;
     // let result = RunResult::new(diagnostics, output);
 }
 
-async fn handle_message(msg: String, socket: &mut WebSocket) {
+async fn handle_message(msg: String, socket: Arc<Mutex<WebSocket>>) {
     let msg: WebsocketMessage = match serde_json::from_str(&msg) {
         Ok(msg) => msg,
         Err(_) => unreachable!(),
@@ -99,7 +128,8 @@ async fn handle_ws_socket(mut socket: WebSocket, tx: Broadcaster) {
                 match msg {
                     Ok(Message::Text(text)) => {
                         println!("recv: {}", &text);
-                        handle_message(text.clone(), &mut socket).await;
+                        let socket = Arc::new(Mutex::new(socket));
+                        handle_message(text.clone(), socket).await;
 
                         if tx.send(text).is_err() {
                             break;
