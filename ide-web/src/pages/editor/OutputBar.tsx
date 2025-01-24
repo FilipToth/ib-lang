@@ -1,4 +1,10 @@
-import { Button, Stack, TextField, Typography } from "@mui/material";
+import {
+    Button,
+    CircularProgress,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 
@@ -24,6 +30,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     const [output, setOutput] = useState("");
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
+    const [running, setRunning] = useState(false);
 
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
     const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
@@ -62,6 +69,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
         switch (readyState) {
             case ReadyState.OPEN:
                 // send execute request
+                setRunning(true);
                 const msg: WebSocketMessage = {
                     kind: WebSocketMessageKind.Execute,
                     payload: code,
@@ -73,6 +81,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
             case ReadyState.CLOSING:
             case ReadyState.CLOSED:
                 setSocketUrl(null);
+                setRunning(false);
                 break;
         }
     }, [readyState]);
@@ -91,7 +100,19 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
 
     return (
         <Stack>
-            <Button onClick={onClick}>Run</Button>
+            <Stack direction={"row"}>
+                <Button
+                    onClick={onClick}
+                    fullWidth
+                    sx={{
+                        gap: "10%",
+                    }}
+                    disabled={running}
+                >
+                    <Typography>Run</Typography>
+                    {running && <CircularProgress size={20} />}
+                </Button>
+            </Stack>
             <TextField
                 multiline
                 fullWidth
@@ -105,7 +126,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                     flex: 1,
                     "& .MuiInputBase-root": {
                         height: "100%",
-                        alignItems: "start", // Aligns the text to the top
+                        alignItems: "start",
                     },
                 }}
             />
