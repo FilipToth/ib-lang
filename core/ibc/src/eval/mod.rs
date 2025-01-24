@@ -7,9 +7,8 @@ pub mod eval_builtin;
 
 #[async_trait]
 pub trait IBEval: Send + Sync {
-    async fn eval(root: &BoundNode);
-    fn output(msg: String);
-    async fn input() -> String;
+    fn output(&self, msg: String);
+    async fn input(&self) -> String;
 }
 
 /* struct Evaluator;
