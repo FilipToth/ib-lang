@@ -1,4 +1,4 @@
-@top Program { Block }
+@top Program { Atom* }
 
 @skip { space | LineComment }
 
@@ -11,8 +11,8 @@ Atom {
   ExpressionStatement
 }
 
-IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword IfKeyword }
-FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword FunctionKeyword }
+IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword }
+FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword }
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }

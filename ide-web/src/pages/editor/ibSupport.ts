@@ -4,11 +4,13 @@ import {
     LanguageSupport,
     foldNodeProp,
     foldInside,
-    indentNodeProp,
+    syntaxTree,
+    indentService,
 } from "@codemirror/language";
 import { styleTags, tags as t } from "@lezer/highlight";
 import ibCompletions from "./autocomplete";
 import ibLinter from "./lint";
+import logTree from "./logTree";
 
 const LANG_DEF = LRLanguage.define({
     parser: parser.configure({
@@ -36,11 +38,6 @@ const LANG_DEF = LRLanguage.define({
                 ReturnKeyword: t.keyword,
                 NotKeyword: t.keyword,
             }),
-            indentNodeProp.add({
-                Application: (context) => context.column(context.node.from),
-                Block: (context) =>
-                    context.column(context.node.from) + context.unit,
-            }),
             foldNodeProp.add({
                 Application: foldInside,
             }),
@@ -51,12 +48,41 @@ const LANG_DEF = LRLanguage.define({
     },
 });
 
+const indent = () => {
+    return indentService.of((context, pos) => {
+        const tree = syntaxTree(context.state);
+        const selectedNode = tree.resolveInner(pos, 1);
+        logTree(tree.topNode);
+
+        let node = selectedNode;
+        let indent = 0;
+
+        while (node.parent) {
+            console.log(node.name);
+            if (node.name == "IfStatement") {
+                indent += context.unit;
+            } else if (node.name == "FunctionDeclaration") {
+                indent += context.unit;
+            }
+
+            node = node.parent;
+        }
+
+        return indent;
+    });
+};
+
 const ib = () => {
     const ibAutocomplete = LANG_DEF.data.of({
         autocomplete: ibCompletions,
     });
 
-    const support = new LanguageSupport(LANG_DEF, [ibAutocomplete, ibLinter]);
+    const indentExtension = indent();
+    const support = new LanguageSupport(LANG_DEF, [
+        indentExtension,
+        ibAutocomplete,
+        ibLinter,
+    ]);
     return support;
 };
 

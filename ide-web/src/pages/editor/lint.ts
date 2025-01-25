@@ -2,18 +2,16 @@ import { Diagnostic, linter } from "@codemirror/lint";
 import { Text } from "@codemirror/text";
 import { runDiagnostics } from "services/server";
 import { currentFile } from "./Editor";
+import { syntaxTree } from "@codemirror/language";
+import logTree from "./logTree";
 
 const ibLinter = linter(async (view) => {
-    console.log(currentFile);
     if (currentFile == null) return [];
 
     // try with and without doc see if updates correctly
-    const doc = view.state.doc;
     const ibDiagnostics = await runDiagnostics(currentFile);
-    console.log(ibDiagnostics);
 
     const diagnostics = ibDiagnostics.map((d) => {
-        // const from = charOffset(doc, d.line, d.col);
         const diagnostic: Diagnostic = {
             from: d.offset_start,
             to: d.offset_end,
