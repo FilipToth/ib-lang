@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::{
     binding::types::TypeKind,
@@ -9,14 +9,14 @@ use crate::analysis::{
 use super::control_flow_graph::ControlFlowNode;
 
 fn analyze_func_rec(
-    node: Arc<Mutex<ControlFlowNode>>,
+    node: Rc<RefCell<ControlFlowNode>>,
     span: &Span,
     func_ret_type: &TypeKind,
     errors: &mut ErrorBag,
 ) {
     // walk the tree, all branches should connect to an end node
     // there should be no node where .next is None
-    let node = node.lock().unwrap();
+    let node = node.borrow();
     if node.is_end {
         return;
     }
@@ -29,7 +29,7 @@ fn analyze_func_rec(
     }
 
     if let Some(next) = &node.next {
-        let next_node = next.lock().unwrap();
+        let next_node = next.borrow();
         let next_ref = next.clone();
 
         if next_node.is_end {
@@ -67,7 +67,7 @@ fn analyze_func_rec(
 }
 
 pub fn analyze_func(
-    root: Arc<Mutex<ControlFlowNode>>,
+    root: Rc<RefCell<ControlFlowNode>>,
     loc: &Span,
     func_ret_type: &TypeKind,
     errors: &mut ErrorBag,

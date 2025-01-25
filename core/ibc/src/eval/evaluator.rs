@@ -358,6 +358,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
                 .unwrap()
                 .heap
                 .declare_func(symbol, block.clone());
+
             EvalValue::void()
         }
         BoundNodeKind::BoundCallExpression { symbol, args } => {

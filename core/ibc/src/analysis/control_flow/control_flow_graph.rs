@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::analysis::binding::{
     bound_node::{BoundNode, BoundNodeKind},
@@ -10,22 +10,22 @@ use super::FuncControlFlow;
 pub struct ControlFlowNode {
     pub is_start: bool,
     pub is_end: bool,
-    pub next: Option<Arc<Mutex<ControlFlowNode>>>,
-    pub on_condition: Option<Arc<Mutex<ControlFlowNode>>>,
+    pub next: Option<Rc<RefCell<ControlFlowNode>>>,
+    pub on_condition: Option<Rc<RefCell<ControlFlowNode>>>,
     pub ret_type: Option<TypeKind>,
     graph_label: String,
     graph_id: String,
 }
 
 pub struct ControlFlowSpan {
-    first: Arc<Mutex<ControlFlowNode>>,
-    last: Arc<Mutex<ControlFlowNode>>,
+    first: Rc<RefCell<ControlFlowNode>>,
+    last: Rc<RefCell<ControlFlowNode>>,
 }
 
 impl ControlFlowSpan {
     pub fn new(
-        first: Arc<Mutex<ControlFlowNode>>,
-        last: Arc<Mutex<ControlFlowNode>>,
+        first: Rc<RefCell<ControlFlowNode>>,
+        last: Rc<RefCell<ControlFlowNode>>,
     ) -> ControlFlowSpan {
         ControlFlowSpan {
             first: first,
@@ -35,8 +35,8 @@ impl ControlFlowSpan {
 }
 
 impl ControlFlowNode {
-    fn new(counter: Arc<Mutex<u64>>, label: String) -> ControlFlowNode {
-        let mut count = counter.lock().unwrap();
+    fn new(counter: Rc<RefCell<u64>>, label: String) -> ControlFlowNode {
+        let mut count = counter.borrow_mut();
         *count += 1;
 
         ControlFlowNode {
@@ -95,8 +95,7 @@ impl ControlFlowNode {
 
         if let Some(next) = &self.next {
             let next_id = next
-                .lock()
-                .unwrap()
+                .borrow_mut()
                 .dot_recursive(nodes, connections, conns_condition);
 
             let conn = (node_id.clone(), next_id);
@@ -108,8 +107,7 @@ impl ControlFlowNode {
         if let Some(on_cond) = &self.on_condition {
             let on_cond_id =
                 on_cond
-                    .lock()
-                    .unwrap()
+                    .borrow_mut()
                     .dot_recursive(nodes, connections, conns_condition);
 
             let conn = (node_id.clone(), on_cond_id);
@@ -124,14 +122,14 @@ impl ControlFlowNode {
 
 fn walk(
     node: &BoundNode,
-    prev: Option<Arc<Mutex<ControlFlowNode>>>,
-    end_node: Arc<Mutex<ControlFlowNode>>,
-    counter: Arc<Mutex<u64>>,
+    prev: Option<Rc<RefCell<ControlFlowNode>>>,
+    end_node: Rc<RefCell<ControlFlowNode>>,
+    counter: Rc<RefCell<u64>>,
 ) -> ControlFlowSpan {
     let (next, last) = match &node.kind {
         BoundNodeKind::Block { children } => {
             let block = ControlFlowNode::new(counter.clone(), node.to_string());
-            let block_ptr = Arc::new(Mutex::new(block));
+            let block_ptr = Rc::new(RefCell::new(block));
 
             let mut new_prev = block_ptr.clone();
             for child in children.iter() {
@@ -155,7 +153,7 @@ fn walk(
             new_node.next = Some(end_node);
             new_node.ret_type = Some(node.node_type.clone());
 
-            let node_ref = Arc::new(Mutex::new(new_node));
+            let node_ref = Rc::new(RefCell::new(new_node));
             (node_ref.clone(), node_ref)
         }
         BoundNodeKind::IfStatement {
@@ -165,12 +163,12 @@ fn walk(
         } => {
             let mut if_node = ControlFlowNode::new(counter.clone(), node.to_string());
             let end_if_node = ControlFlowNode::new(counter.clone(), "end if".to_string());
-            let end_if_ref = Arc::new(Mutex::new(end_if_node));
+            let end_if_ref = Rc::new(RefCell::new(end_if_node));
 
             let on_condition_span = walk(&block, None, end_node.clone(), counter.clone());
             if_node.on_condition = Some(on_condition_span.first);
 
-            let mut on_cond_last = on_condition_span.last.lock().unwrap();
+            let mut on_cond_last = on_condition_span.last.borrow_mut();
             if let None = on_cond_last.next {
                 // this path doesn't explicitly return,
                 // thus we connect it to the end if
@@ -182,7 +180,7 @@ fn walk(
                     let span = walk(&e, None, end_node.clone(), counter.clone());
                     if_node.next = Some(span.first);
 
-                    let mut last = span.last.lock().unwrap();
+                    let mut last = span.last.borrow_mut();
                     if let None = last.next {
                         // again, this should be connected to end if
                         last.next = Some(end_if_ref.clone());
@@ -191,33 +189,33 @@ fn walk(
                 None => if_node.next = Some(end_if_ref.clone()),
             };
 
-            let if_ref = Arc::new(Mutex::new(if_node));
+            let if_ref = Rc::new(RefCell::new(if_node));
             (if_ref, end_if_ref)
         }
         _ => {
             let node = ControlFlowNode::new(counter, node.to_string());
-            let node_ref = Arc::new(Mutex::new(node));
+            let node_ref = Rc::new(RefCell::new(node));
             (node_ref.clone(), node_ref)
         }
     };
 
     if let Some(prev_ptr) = prev {
-        prev_ptr.lock().unwrap().next = Some(next.clone());
+        prev_ptr.borrow_mut().next = Some(next.clone());
     }
 
     ControlFlowSpan::new(next, last)
 }
 
-pub fn contruct_graph(func: FuncControlFlow) -> Arc<Mutex<ControlFlowNode>> {
-    let counter = Arc::new(Mutex::new(0 as u64));
+pub fn contruct_graph(func: FuncControlFlow) -> Rc<RefCell<ControlFlowNode>> {
+    let counter = Rc::new(RefCell::new(0 as u64));
 
     let mut start_node = ControlFlowNode::new(counter.clone(), "<Start>".to_string());
     start_node.is_start = true;
-    let start_node_ref = Arc::new(Mutex::new(start_node));
+    let start_node_ref = Rc::new(RefCell::new(start_node));
 
     let mut end_node = ControlFlowNode::new(counter.clone(), "<End>".to_string());
     end_node.is_end = true;
-    let end_node_ref = Arc::new(Mutex::new(end_node));
+    let end_node_ref = Rc::new(RefCell::new(end_node));
 
     let start = func.block;
     walk(&start, Some(start_node_ref.clone()), end_node_ref, counter);

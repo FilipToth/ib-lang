@@ -1,2 +1,5 @@
-x = input()
-output x + " ahaaaa"
+function test()
+    output "Hello, World!"
+end
+
+test()

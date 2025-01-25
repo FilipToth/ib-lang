@@ -85,7 +85,7 @@ impl BoundNode {
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
             BoundNodeKind::StringLiteral(val) => {
-                format!("\"{}\"", val)
+                format!("\\\"{}\\\"", val)
             }
         }
     }

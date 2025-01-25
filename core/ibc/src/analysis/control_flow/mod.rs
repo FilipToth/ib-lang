@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    fs,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 use self::control_flow_graph::ControlFlowNode;
 
@@ -61,12 +57,12 @@ fn scan_for_functions_recursive(
     }
 }
 
-pub fn digraph(graphs: &Vec<Arc<Mutex<ControlFlowNode>>>, path: &str) {
+pub fn digraph(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>, path: &str) {
     let mut dot_graph = "".to_string();
     dot_graph += "digraph controlflow {";
 
     for graph in graphs {
-        let subgraph = graph.lock().unwrap().dot_graph(false);
+        let subgraph = graph.borrow().dot_graph(false);
         dot_graph += subgraph.as_str();
     }
 
@@ -74,11 +70,11 @@ pub fn digraph(graphs: &Vec<Arc<Mutex<ControlFlowNode>>>, path: &str) {
     fs::write(path, dot_graph).expect("Cannot write to file");
 }
 
-pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<Arc<Mutex<ControlFlowNode>>> {
+pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<Rc<RefCell<ControlFlowNode>>> {
     let mut function_declarations: Vec<FuncControlFlow> = Vec::new();
     scan_for_functions_recursive(root, errors, &mut function_declarations);
 
-    let mut graphs: Vec<Arc<Mutex<ControlFlowNode>>> = Vec::new();
+    let mut graphs: Vec<Rc<RefCell<ControlFlowNode>>> = Vec::new();
     for func in function_declarations {
         let span = func.span.clone();
         let ret_type = func.ret_type.clone();
