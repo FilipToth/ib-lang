@@ -1,11 +1,35 @@
-use std::fs;
+use std::{
+    fs,
+    io::{self, BufRead, BufReader},
+};
 
-use eval::eval;
+use async_trait::async_trait;
+use eval::EvalIO;
 
 mod analysis;
 mod eval;
 
-fn parse_file() {
+struct IBEvaluator;
+
+#[async_trait]
+impl EvalIO for IBEvaluator {
+    async fn output(&self, output_msg: String) {
+        print!("{}", output_msg);
+    }
+
+    async fn input(&self) -> String {
+        let stdin = io::stdin();
+        let mut reader = BufReader::new(stdin);
+        let mut buffer = String::new();
+
+        match reader.read_line(&mut buffer) {
+            Ok(_) => buffer.trim().to_string(),
+            Err(_) => unreachable!(),
+        }
+    }
+}
+
+async fn parse_file() {
     let contents = fs::read_to_string("test.ib").unwrap();
     let result = analysis::analyze(contents);
     result.errors.report();
@@ -15,10 +39,10 @@ fn parse_file() {
     };
 
     // evaluate
-    let output = eval(root);
-    println!("{}", output);
+    eval::evaluator::eval(root, &mut IBEvaluator).await;
 }
 
-fn main() {
-    parse_file();
+#[tokio::main]
+async fn main() {
+    parse_file().await;
 }

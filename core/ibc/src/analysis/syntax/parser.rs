@@ -142,6 +142,13 @@ impl<'a> Parser<'a> {
                         let token = SyntaxToken::new(kind, span);
                         Some(token)
                     }
+                    LexerTokenKind::StringLiteralToken(val) => {
+                        self.tokens.next();
+
+                        let kind = SyntaxKind::StringLiteralExpression(val.clone());
+                        let token = SyntaxToken::new(kind, span);
+                        Some(token)
+                    }
                     LexerTokenKind::TrueKeyword => {
                         // consume token
                         self.tokens.next();

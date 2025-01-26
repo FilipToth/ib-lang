@@ -30,6 +30,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
+    "react-use-websocket": "^4.11.1",
     "thememirror": "^2.0.1",
     "typescript": "^4.9.5",
     "uuid": "^11.0.3",

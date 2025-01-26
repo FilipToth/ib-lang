@@ -1,0 +1,56 @@
+---
+sidebar_position: 1
+---
+
+# Basic Language Features
+
+This chapter presents the foundational constructs of IB Pseudocode (IBL), offering a comprehensive framework for understanding and effectively utilizing its features.
+
+## Types
+
+In IBL, every entity is assigned a specific type that defines its permissible operations and the nature of values it can store. While IBL includes an `Any` type that bypasses type-checking, explicitly declaring the types of parameters and return values is strongly recommended to enhance clarity, robustness, and maintainability. The primary types in IBL are:
+
+- **`Int`**: Represents an integer, a whole number without fractional components.
+- **`String`**: Represents a sequence of characters or textual data.
+- **`Boolean`**: Encodes a logical value, either `true` or `false`.
+- **`Array`, `Collection`, `Stack`, `Queue`**: Represent structured data types for storing collections of objects. Their specific functionalities and use cases are discussed in later chapters.
+- **`Void`**: Signifies the absence of a return value from a function.
+- **`Any`**: A universal type that disables type enforcement, allowing flexibility at the expense of type safety.
+
+## Operations
+
+IBL supports a variety of binary and unary operations that enable manipulation and computation of values. These operations are integral to program functionality and are classified as follows:
+
+### Binary Operations
+
+Binary operations act on two operands to produce a resultant value. The supported operations include:
+
+- **Addition (`+`)**: Computes the sum of two operands. Example: `1 + 3`.
+- **Subtraction (`-`)**: Calculates the difference between two operands. Example: `10 - 30`.
+- **Multiplication (`*`)**: Determines the product of two operands. Example: `5 * 9`.
+- **Division (`/`)**: Performs integer division of one operand by another. Example: `10 / 3`. Note that IBL exclusively supports integer arithmetic; thus, `10 / 3` results in `3` rather than a fractional value.
+- **Comparison (`<`, `>`)**: Evaluates the relative magnitude of two operands. For instance, `a < b` checks whether `a` is less than `b`, while `a > b` checks whether `a` is greater than `b`. These operations return a `Boolean` value.
+- **Equality (`==`)**: Compares two entities for equivalence. Example: `10 == (5 + 5)` evaluates to `true`, while `5 == (10 + 10)` evaluates to `false`.
+- **String Concatenation**: Join two objects of type `String` (or a string and an `Any` object) together using the `+` operator. Example: `"Result: " + (54 * 6)` evaluates to `Result: 324`.
+
+:::tip Precision Note
+IBL does not currently support floating-point arithmetic. All numerical computations are constrained to integers. For example, `10 / 3` evaluates to `3`.
+:::
+
+### Unary Operations
+
+Unary operations involve a single operand and yield a transformed result. Key unary operations include:
+
+- **Negation (`-`)**: Converts a positive operand to its negative counterpart or negates the value of an expression. Examples: `-10`, `-(10 + 30)`.
+- **Logical Negation (`!`)**: Inverts the truth value of a `Boolean` operand. Examples: `!false` evaluates to `true`, `!true` evaluates to `false`, and `!(false || true)` evaluates to `false`.
+
+## Execution (Control Flow)
+
+Execution in IBL follows a sequential paradigm, where statements within a module (file) are executed in the order they appear. For example:
+
+```python
+output 1 + 10
+output false
+```
+
+In this code, the evaluator first computes the expression 1 + 10 and outputs the result. It then proceeds to execute output false. Later chapters will introduce advanced control flow constructs, such as conditional branches and iterative loops, enabling more sophisticated programming logic.

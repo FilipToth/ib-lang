@@ -76,7 +76,7 @@ impl Operator {
                 return Some(TypeKind::Int);
             }
             Operator::Addition => {
-                if rhs_type == TypeKind::String && lhs_type == TypeKind::String {
+                if rhs_type == TypeKind::String || lhs_type == TypeKind::String {
                     return Some(TypeKind::String);
                 } else if rhs_type == TypeKind::Int && lhs_type == TypeKind::Int {
                     return Some(TypeKind::Int);

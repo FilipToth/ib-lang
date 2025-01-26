@@ -1,0 +1,63 @@
+---
+sidebar_position: 6
+---
+
+# Scopes / Blocks
+
+Here, we will introduce the idea of a scope.
+
+## What is a Scope?
+
+A scope is a context in which variables, functions, and other objects are defined. A scope contains variables and their values, and variables can only be accessed if defined
+in the current scope (or in an above scope). Each module (file) defines a global scope which acts as a global context for variables and functions, which can be referenced
+from everywhere in the file.
+
+## Creating Scopes
+
+A scope is created whenever a new code block is created. When declaring a for loop or a while loop, the code after the loop declaration and before the `end` is run within
+a new scope.
+
+```python
+loop while true
+    # new scope
+end
+```
+
+When declaring an if statement, the body is also run within a new scope.
+
+```python
+if x > 50 then
+    # new scope
+end
+```
+
+Functions also evaluate their bodies in new scopes (but more on that later).
+
+## Referencing Variables inside Scopes
+
+The primary function of scopes is to separate variables and functions from different contexts. You cannot declare a variable inside of a scope and then use it outside of the scope.
+
+```python
+loop for index from 0 to 10
+    output index # this is OK
+
+    if index > 5 then
+        output index * 2 # this is also OK, since index is defined in the parent scope
+    end
+end
+
+output index + 1 # this is not OK and will result in an error, since index is defined in the loop scope
+```
+
+Same goes for user-defined variables.
+
+```python
+loop for index from 0 to 10
+    my_var = index * 2
+    if index > 5 then
+        output index # this is OK
+    end
+end
+
+output my_var # this will error
+```

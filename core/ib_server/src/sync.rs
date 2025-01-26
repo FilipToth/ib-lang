@@ -6,7 +6,10 @@ use std::{
 
 use rusqlite::Connection;
 
-use crate::{db::{get_filename_uid, remove_file}, IbFile};
+use crate::{
+    db::{get_filename_uid, remove_file},
+    IbFile,
+};
 
 // TODO: Delete file requests
 

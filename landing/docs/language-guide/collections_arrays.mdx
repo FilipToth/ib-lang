@@ -1,0 +1,131 @@
+---
+sidebar_position: 7
+---
+
+# Collections & Arrays
+
+Here you will learn about Collections & Arrays, which are objects in IBL that hold references
+to multiple other objects.
+
+## Creating Collections
+
+You can create a collection in the following way
+```python
+col = new Collection()
+```
+Collections and arrays store items (elements) in an ordered manner, and one can append items to
+a collection, remove items, or get the number of items in the collection. Collections also provide
+a head for easy item access.
+
+### Appending Items
+
+Append items using the `addItem` method, which takes the item as a reference.
+```python
+col.addItem(123)
+```
+will append `123` to the collection. The item will be added as the last item in the collection.
+
+### Empty-ness of Collections
+
+You can check if a collection is empty with the `isEmpty` method.
+```python
+col = new Collection()
+output col.isEmpty() # will print `true`
+
+col.addItem(123)
+output col.isEmpty() # will print `false`
+```
+
+### Head Pointer
+
+A collection also implements a head pointer, which holds a reference to an item within the collection.
+At first, the pointer will point to the first element in the collection, and you can get its value using the
+`getItem` method.
+
+```python
+col = new Collection()
+col.addItem("Hello")
+
+output col.getItem() # Outputs "Hello", as the first col item
+```
+
+:::danger Empty Collections
+If a collection is empty, calling the `getItem` method will result in a **runtime error**. This will
+be patched in a later update.
+:::
+
+Calling the `getItem` method also increments the index of the head pointer, thus it moves onto the second value.
+```python
+col = new Collection()
+col.addItem("Hello 1")
+col.addItem("Hello 2")
+
+output col.getItem() # "Hello 1"
+output col.getItem() # "Hello 2"
+```
+
+One can also reset the head pointer, doing so will move the pointer to point to the first item in the collection.
+One can also check whether the collection has a next element (element after the head pointer) with the `hasNext` method,
+which returns a `Bool`. It's advised to check `hasNext` before calling `getItem` in order to avoid
+runtime errors.
+
+## Arrays
+
+An array is similar to a collection in that it holds multiple objects, but an array doesn't have
+a head pointer. You can initialize an array in the following way:
+
+```python
+arr = new Array()
+```
+
+### Adding Array Elements
+
+You can add elements to an array with the `push` method, which takes the element as an argument,
+and works similarly to the `addItem` method in the `Collection` type.
+
+```python
+arr.addItem("I am an Array Element")
+```
+
+### Accessing Array Elements
+
+To get an element from an array, you will need to know its index - or the position of the element
+within the array. Then, you can use the `get` method, which takes the index as an argument,
+to get the element out of the array.
+
+```python
+arr = new Array()
+
+arr.push("Element 1")
+arr.push("Element 2")
+arr.push("Element 3")
+
+output arr.get(1) # prints "Element 2"
+output arr.get(2) # prints "Element 3"
+output arr.get(0) # prints "Element 1"
+```
+
+You can also get the number of elements in an array using the `len` method, which returns
+an `Int` representing the number of elements. E.g. calling `arr.len()` in our example would
+return `3`.
+
+
+## Generic Parameters
+
+You can also enable type checking for collections and arrays using generic parameters. Previously,
+the `get` and `getItem` methods returned an object of type `Any` and the `push` and `addItem` methods accept
+an argument of `Any`. Stating a generic parameter when declaring an array or a collection will enable type checking
+and make sure that these methods accept an argument of a type that matches that of the generic parameter.
+
+```python
+# create a string array
+# push will take an argument of `String` and
+# get will return an object of type `String`
+col = new Array<String>()
+
+# create a string collection
+# addItem will take an argument of `String` and
+# getItem will return an object of type `String`
+col = new Collection<String>()
+```
+
