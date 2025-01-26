@@ -27,6 +27,13 @@ export const
   OutputKeyword = 27,
   ReturnStatement = 28,
   ReturnKeyword = 29,
-  VariableAssignment = 30,
-  AssignmentOperator = 31,
-  ExpressionStatement = 32
+  ForStatement = 30,
+  LoopKeyword = 31,
+  ForKeyword = 32,
+  FromKeyword = 33,
+  ToKeyword = 34,
+  WhileStatement = 35,
+  WhileKeyword = 36,
+  VariableAssignment = 37,
+  AssignmentOperator = 38,
+  ExpressionStatement = 39

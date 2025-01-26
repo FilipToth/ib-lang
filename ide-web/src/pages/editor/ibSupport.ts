@@ -37,6 +37,11 @@ const LANG_DEF = LRLanguage.define({
                 FunctionKeyword: t.keyword,
                 ReturnKeyword: t.keyword,
                 NotKeyword: t.keyword,
+                LoopKeyword: t.keyword,
+                ForKeyword: t.keyword,
+                FromKeyword: t.keyword,
+                ToKeyword: t.keyword,
+                WhileKeyword: t.keyword,
             }),
             foldNodeProp.add({
                 Application: foldInside,

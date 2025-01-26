@@ -161,6 +161,48 @@ const applyFunctionCompletion = (
     view.dispatch(transaction);
 };
 
+const applyForCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4);
+    const indent = " ".repeat(indents);
+
+    const insertion = `loop for  from  to\n\n${indent}end`;
+    const newPos = from + 9;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
+const applyWhileCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4);
+    const indent = " ".repeat(indents);
+
+    const insertion = `loop while \n\n${indent}end`;
+    const newPos = from + 11;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
 const ibCompletions = (context: CompletionContext) => {
     let word = context.matchBefore(/\w*/);
     if (word?.from == word?.to && !context.explicit) return null;
@@ -195,6 +237,16 @@ const ibCompletions = (context: CompletionContext) => {
             { label: "Int", type: "type" },
             { label: "String", type: "type" },
             { label: "Boolean", type: "type" },
+            {
+                label: "loop for",
+                apply: applyForCompletion,
+                type: "keyword",
+            },
+            {
+                label: "loop while",
+                apply: applyWhileCompletion,
+                type: "keyword",
+            },
             ...symbolOptions,
         ],
     };
