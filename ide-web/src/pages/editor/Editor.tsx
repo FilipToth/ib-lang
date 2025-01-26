@@ -1,6 +1,6 @@
 import CodeMirror, { Prec, ViewUpdate, keymap } from "@uiw/react-codemirror";
 import { coolGlow } from "thememirror";
-import ib from "./ibSupport";
+import { ib } from "./ibSupport";
 import { indentLess, indentMore, indentWithTab } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";

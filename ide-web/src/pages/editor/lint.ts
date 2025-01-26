@@ -1,9 +1,6 @@
 import { Diagnostic, linter } from "@codemirror/lint";
-import { Text } from "@codemirror/text";
 import { runDiagnostics } from "services/server";
 import { currentFile } from "./Editor";
-import { syntaxTree } from "@codemirror/language";
-import logTree from "./logTree";
 
 const ibLinter = linter(async (view) => {
     if (currentFile == null) return [];
