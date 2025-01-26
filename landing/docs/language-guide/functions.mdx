@@ -1,0 +1,82 @@
+---
+sidebar_position: 9
+---
+
+# Functions
+
+Here you will learn about functions, which provide a way for the user to reuse parts of the code and
+structure it in a more re-usable manner. A function is esentially a pointer to a piece of code. Calling
+the function executes the piece of code (function body) that the function is pointing to (moves the instruction pointer).
+
+## Defining Functions
+
+You can define a function in the following way:
+
+```python
+function my_func()
+    output "Hello, World!"
+end
+```
+
+The function can then be called, which executes its inner function body. Doing `my_func()` will result
+in `"Hello, World!"` getting printed to the standard output. Functions are usually created to re-use repetitive
+components of your code.
+
+## Function Parameters
+
+Functions can also take in parameters, much like mathematical functions. Parameters establish local
+variables in the function body, and when calling the function, each argument corresponds to
+a parameter in the function.
+
+```python
+function my_func(text: String)
+    output text
+end
+```
+
+This establishes `text` as a parameter of type `String` and declares the `text` variable in the
+local function scope, thus it can be used in the function body. Then, when calling the function,
+you must supply an object of type `String` in the call expression: `my_func("Hello")`.
+
+:::tip Untyped Parameters
+You also don't have to provide a type annotation when declaring a parameter in the function.
+The parameter will have a type of `Any`.
+```
+function my_func(text, another_parameter: Int) end
+```
+:::
+
+## Function Returns
+
+Functions can also be defined to return a value. After executing a function, the call expression will resolve
+into a value of the type of the function return.
+
+```python
+function my_func(x: Int) -> Int
+    return x * 2
+end
+```
+
+This defined a function that takes in an integer value and returns the doubled value. Thus, calling
+`my_func(4)` will result in `8`. Doing `output my_func(2)` will print `4` to the standard output. Note that
+function returns will always have to have an explicit type annotation (you can use the `Any` type). The
+return then exits the execution of the function body.
+
+## Recursion
+
+IBL also supports function calling themselved out of their function body (recursion).
+
+```
+function my_func(i: Int)
+    if i > 50 then
+        return
+    end
+
+    my_func(i + 1)
+end
+```
+
+:::danger Infinite Recursion
+Recursing a function without any break-outs of the recursion loop will result in infinite
+recursion and will trigger a runtime error.
+:::

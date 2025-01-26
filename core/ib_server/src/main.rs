@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, sync::Arc};
 
 use auth::auth_middleware;
 use axum::{
@@ -9,27 +9,25 @@ use axum::{
 use rusqlite::Connection;
 use serde::Serialize;
 use sync::{create_file, delete_file, get_files};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::broadcast};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use ws::handle_ws;
 
 extern crate ibc;
 
 pub mod auth;
 pub mod db;
 pub mod sync;
+pub mod ws;
+
+type Broadcaster = Arc<broadcast::Sender<String>>;
 
 #[derive(Serialize)]
 struct Diagnostic {
     message: String,
     offset_start: usize,
     offset_end: usize,
-}
-
-#[derive(Serialize)]
-struct RunResult {
-    diagnostics: Vec<Diagnostic>,
-    output: String,
 }
 
 #[derive(Serialize)]
@@ -44,15 +42,6 @@ pub struct IbFile {
     pub contents: String,
 }
 
-impl RunResult {
-    fn new(diagnostics: Vec<Diagnostic>, output: String) -> RunResult {
-        RunResult {
-            diagnostics: diagnostics,
-            output: output,
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
     setup_db();
@@ -62,44 +51,25 @@ async fn main() {
         .allow_origin(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        .route("/execute", post(execute))
+    let (tx, _rx) = broadcast::channel::<String>(100);
+    let tx = Arc::new(tx);
+
+    let protected_router = Router::new()
         .route("/diagnostics", post(diagnostics))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
-        .layer(axum::middleware::from_fn(auth_middleware))
-        .layer(ServiceBuilder::new().layer(cors));
+        .layer(axum::middleware::from_fn(auth_middleware));
+
+    let app = Router::new()
+        .route("/ws", get(handle_ws))
+        .nest("/api", protected_router)
+        .layer(ServiceBuilder::new().layer(cors))
+        .layer(Extension(tx));
 
     println!("Listening on port 8080...");
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn execute(body: String) -> Json<RunResult> {
-    let result = ibc::analysis::analyze(body);
-
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    let errors = result.errors.errors;
-
-    for error in errors {
-        let diagnostic = Diagnostic {
-            message: error.kind.format(),
-            offset_start: error.span.start.char_offset,
-            offset_end: error.span.end.char_offset,
-        };
-
-        diagnostics.push(diagnostic)
-    }
-
-    let Some(root) = result.root else {
-        let result = RunResult::new(diagnostics, "".to_string());
-        return Json(result);
-    };
-
-    let output = ibc::eval::eval(&root);
-    let result = RunResult::new(diagnostics, output);
-    Json(result)
 }
 
 async fn diagnostics(

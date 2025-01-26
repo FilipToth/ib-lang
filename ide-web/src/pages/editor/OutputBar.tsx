@@ -1,23 +1,118 @@
-import { Button, Stack, TextField } from "@mui/material";
-import { FunctionComponent, useRef, useState } from "react";
-import { runCode } from "services/server";
+import {
+    Button,
+    CircularProgress,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material";
+import { FunctionComponent, useEffect, useRef, useState } from "react";
+import useWebSocket, { ReadyState } from "react-use-websocket";
+
+const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
 interface OutputProps {
     code: string;
 }
 
+enum WebSocketMessageKind {
+    Execute,
+    Output,
+    Input,
+    EndExecute,
+}
+
+interface WebSocketMessage {
+    kind: WebSocketMessageKind;
+    payload: string;
+}
+
 const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     const [output, setOutput] = useState("");
+    const [awaitingInput, setAwaitingInput] = useState(false);
+    const [input, setInput] = useState("");
+    const [running, setRunning] = useState(false);
+
+    const [sockerUrl, setSocketUrl] = useState<string | null>(null);
+    const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
 
     const onClick = async () => {
         setOutput("");
-        const codeOutput = await runCode(code);
-        setOutput(codeOutput);
+        if (WS_URL == undefined) {
+            console.error("Wrong env config, websockets url is undefined");
+            return;
+        }
+
+        setSocketUrl(WS_URL);
+    };
+
+    useEffect(() => {
+        // new message
+        if (lastMessage == null) return;
+
+        const msg: WebSocketMessage = JSON.parse(lastMessage.data);
+        switch (msg.kind) {
+            case WebSocketMessageKind.Execute:
+                // server not supposed to send execute requests
+                break;
+            case WebSocketMessageKind.Input:
+                // not implemented
+                setAwaitingInput(true);
+                break;
+            case WebSocketMessageKind.Output:
+                setOutput(output + msg.payload);
+                break;
+        }
+    }, [lastMessage]);
+
+    useEffect(() => {
+        // socket state changed
+        switch (readyState) {
+            case ReadyState.OPEN:
+                // send execute request
+                setRunning(true);
+                const msg: WebSocketMessage = {
+                    kind: WebSocketMessageKind.Execute,
+                    payload: code,
+                };
+
+                const msg_raw = JSON.stringify(msg);
+                sendMessage(msg_raw);
+                break;
+            case ReadyState.CLOSING:
+            case ReadyState.CLOSED:
+                setSocketUrl(null);
+                setRunning(false);
+                break;
+        }
+    }, [readyState]);
+
+    const sendInput = () => {
+        const msg: WebSocketMessage = {
+            kind: WebSocketMessageKind.Input,
+            payload: input,
+        };
+
+        const msg_raw = JSON.stringify(msg);
+        sendMessage(msg_raw);
+        setAwaitingInput(false);
+        setInput("");
     };
 
     return (
         <Stack>
-            <Button onClick={onClick}>Run</Button>
+            <Stack direction={"row"}>
+                <Button
+                    onClick={onClick}
+                    fullWidth
+                    sx={{
+                        gap: "10%",
+                    }}
+                    disabled={running}
+                >
+                    <Typography>Run</Typography>
+                    {running && <CircularProgress size={20} />}
+                </Button>
+            </Stack>
             <TextField
                 multiline
                 fullWidth
@@ -31,10 +126,21 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                     flex: 1,
                     "& .MuiInputBase-root": {
                         height: "100%",
-                        alignItems: "start", // Aligns the text to the top
+                        alignItems: "start",
                     },
                 }}
             />
+            {awaitingInput && <Typography>Awaiting User Input</Typography>}
+            <Stack direction={"row"}>
+                <TextField
+                    multiline
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                />
+                <Button disabled={!awaitingInput} onClick={sendInput}>
+                    Send
+                </Button>
+            </Stack>
         </Stack>
     );
 };

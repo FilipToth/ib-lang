@@ -8,9 +8,9 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/manual_test/target/debug/manual_test",
+            "program": "${workspaceFolder}/core/ibc/target/debug/ibc",
             "args": [],
-            "cwd": "${workspaceFolder}/manual_test"
+            "cwd": "${workspaceFolder}/core/ibc"
         }
     ]
 }

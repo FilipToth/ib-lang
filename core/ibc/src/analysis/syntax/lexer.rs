@@ -36,6 +36,7 @@ pub enum LexerTokenKind {
     DotToken,
     IntegerLiteralToken(i64),
     IdentifierToken(String),
+    StringLiteralToken(String),
 
     IfKeyword,
     ThenKeyword,
@@ -157,6 +158,42 @@ fn lex_rolling(
     lex_identifier_or_keyword(value)
 }
 
+fn lex_string(
+    iter: &mut Peekable<Chars>,
+    column: &mut usize,
+    char_offset: &mut usize,
+) -> LexerTokenKind {
+    // current value is "
+    let mut value = String::new();
+
+    loop {
+        let peek = iter.peek();
+        match peek {
+            Some(next) => {
+                if *next == '\"' {
+                    iter.next();
+                    break;
+                }
+
+                // TODO: Handle line breaks
+
+                *column += 1;
+                *char_offset += 1;
+
+                value.push(*next);
+                iter.next();
+            }
+            None => {
+                // TODO: report error, unclosed string
+                break;
+            }
+        }
+    }
+
+    let kind = LexerTokenKind::StringLiteralToken(value);
+    return kind;
+}
+
 pub fn lex(content: String) -> Vec<LexerToken> {
     let mut tokens: Vec<LexerToken> = vec![];
     let mut chars = content.chars().peekable();
@@ -220,6 +257,7 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                 continue;
             }
             '\r' => continue,
+            '"' => lex_string(&mut chars, &mut column, &mut char_offset),
             _ => lex_rolling(&mut chars, current, &mut column, &mut char_offset),
         };
 

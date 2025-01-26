@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs, rc::Rc};
+use std::{cell::RefCell, fs, rc::Rc, sync::Arc};
 
 use self::control_flow_graph::ControlFlowNode;
 
@@ -15,7 +15,7 @@ pub mod control_flow_analyzer;
 pub mod control_flow_graph;
 
 pub struct FuncControlFlow {
-    block: Rc<BoundNode>,
+    block: Arc<BoundNode>,
     ret_type: TypeKind,
     span: Span,
 }

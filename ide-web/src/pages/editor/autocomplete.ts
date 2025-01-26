@@ -1,8 +1,12 @@
-import { CompletionContext, completeFromList } from "@codemirror/autocomplete";
+import {
+    Completion,
+    CompletionContext,
+    completeFromList,
+} from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
 import { SyntaxNode, Tree } from "@lezer/common";
-import { EditorState } from "@uiw/react-codemirror";
-import logTree from "./logTree";
+import { EditorView, TransactionSpec } from "@uiw/react-codemirror";
+import { getIndent } from "./ibSupport";
 
 interface Symbol {
     name: string;
@@ -115,6 +119,90 @@ const checkForParametersRecursive = (
     checkForParametersRecursive(param.nextSibling, context, symbols);
 };
 
+const applyIfCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4) - 4;
+    const indent = " ".repeat(indents);
+
+    const insertion = `if  then\n\n${indent}end`;
+    const newPos = from + 3;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
+const applyFunctionCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4);
+    const indent = " ".repeat(indents);
+
+    const insertion = `function ()\n\n${indent}end`;
+    const newPos = from + 9;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
+const applyForCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4);
+    const indent = " ".repeat(indents);
+
+    const insertion = `loop for  from  to\n\n${indent}end`;
+    const newPos = from + 9;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
+const applyWhileCompletion = (
+    view: EditorView,
+    _completion: Completion,
+    from: number,
+    to: number
+) => {
+    const tree = syntaxTree(view.state);
+    const indents = getIndent(tree, from, 4);
+    const indent = " ".repeat(indents);
+
+    const insertion = `loop while \n\n${indent}end`;
+    const newPos = from + 11;
+
+    const transaction: TransactionSpec = {
+        changes: { from: from, to: to, insert: insertion },
+        selection: { anchor: newPos },
+    };
+
+    view.dispatch(transaction);
+};
+
 const ibCompletions = (context: CompletionContext) => {
     let word = context.matchBefore(/\w*/);
     if (word?.from == word?.to && !context.explicit) return null;
@@ -129,18 +217,36 @@ const ibCompletions = (context: CompletionContext) => {
     return {
         from: word?.from,
         options: [
-            { label: "if", type: "keyword" },
+            {
+                label: "if ... then",
+                apply: applyIfCompletion,
+                type: "keyword",
+            },
             { label: "then", type: "keyword" },
             { label: "end", type: "keyword" },
             { label: "else", type: "keyword" },
             { label: "output", type: "keyword" },
-            { label: "function", type: "keyword" },
+            {
+                label: "function ...()",
+                apply: applyFunctionCompletion,
+                type: "keyword",
+            },
             { label: "return", type: "keyword" },
             { label: "not", type: "keyword" },
             { label: "Void", type: "type" },
             { label: "Int", type: "type" },
             { label: "String", type: "type" },
             { label: "Boolean", type: "type" },
+            {
+                label: "loop for",
+                apply: applyForCompletion,
+                type: "keyword",
+            },
+            {
+                label: "loop while",
+                apply: applyWhileCompletion,
+                type: "keyword",
+            },
             ...symbolOptions,
         ],
     };

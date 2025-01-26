@@ -27,6 +27,7 @@ pub enum SyntaxKind {
     },
     IntegerLiteralExpression(i64),
     BooleanLiteralExpression(bool),
+    StringLiteralExpression(String),
     BinaryExpression {
         lhs: Box<SyntaxToken>,
         op: Operator,

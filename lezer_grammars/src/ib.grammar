@@ -1,4 +1,4 @@
-@top Program { Block }
+@top Program { Atom* }
 
 @skip { space | LineComment }
 
@@ -7,15 +7,19 @@ Atom {
   FunctionDeclaration |
   OutputStatement |
   ReturnStatement |
+  ForStatement |
+  WhileStatement |
   VariableAssignment |
   ExpressionStatement
 }
 
-IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword IfKeyword }
-FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword FunctionKeyword }
+IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword }
+FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword }
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }
+ForStatement { LoopKeyword ForKeyword Identifier FromKeyword Expression ToKeyword Expression Block EndKeyword }
+WhileStatement { LoopKeyword WhileKeyword Expression Block EndKeyword }
 
 VariableAssignment { Identifier AssignmentOperator Expression }
 
@@ -48,6 +52,11 @@ OutputKeyword { @specialize<Identifier, "output" | "OUTPUT"> }
 FunctionKeyword { @specialize<Identifier, "function" | "FUNCTION"> }
 ReturnKeyword { @specialize<Identifier, "return" | "RETURN"> }
 NotKeyword { @specialize<Identifier, "not" | "NOT"> }
+LoopKeyword { @specialize<Identifier, "loop" | "LOOP"> }
+ForKeyword { @specialize<Identifier, "for" | "FOR"> }
+FromKeyword { @specialize<Identifier, "from" | "FROM"> }
+ToKeyword { @specialize<Identifier, "to" | "TO"> }
+WhileKeyword { @specialize<Identifier, "while" | "WHILE"> }
 
 TypeAnnotation { @specialize<Identifier,
   "Void" |

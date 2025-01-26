@@ -1,4 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
+use std::{
+    collections::HashMap,
+    mem,
+    sync::{Arc, Mutex},
+};
+
+use async_recursion::async_recursion;
 
 use crate::analysis::{
     binding::{
@@ -9,11 +15,10 @@ use crate::analysis::{
     operator::Operator,
 };
 
-use super::object_methods::eval_type_method;
+use super::{eval_builtin, object_methods::eval_type_method, EvalIO};
 
-pub struct EvalInfo<'a> {
-    pub heap: &'a mut EvalHeap,
-    pub output: &'a mut String,
+pub struct EvalInfo {
+    pub heap: EvalHeap,
 }
 
 pub struct EvalHeap {
@@ -21,7 +26,7 @@ pub struct EvalHeap {
     // memory, no need for us to make
     // our own heap
     variables: HashMap<u64, EvalValue>,
-    functions: HashMap<u64, Rc<BoundNode>>,
+    functions: HashMap<u64, Arc<BoundNode>>,
 }
 
 impl EvalHeap {
@@ -43,12 +48,12 @@ impl EvalHeap {
         value.clone()
     }
 
-    pub fn declare_func(&mut self, symbol: &FunctionSymbol, body: Rc<BoundNode>) {
+    pub fn declare_func(&mut self, symbol: &FunctionSymbol, body: Arc<BoundNode>) {
         let id = symbol.symbol_id;
         self.functions.insert(id, body);
     }
 
-    pub fn get_func(&self, symbol: &FunctionSymbol) -> Rc<BoundNode> {
+    pub fn get_func(&self, symbol: &FunctionSymbol) -> Arc<BoundNode> {
         let id = &symbol.symbol_id;
         let body = &self.functions[id];
         body.clone()
@@ -62,7 +67,7 @@ pub enum EvalValue {
     Bool(bool),
     String(String),
     // used for non-primitive types
-    Object(Rc<RefCell<ObjectState>>),
+    Object(Arc<Mutex<ObjectState>>),
     // used to return in
     // the eval rec function
     Return(Box<EvalValue>),
@@ -124,10 +129,21 @@ impl EvalValue {
 fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue {
     match op {
         Operator::Addition => {
-            // addition is only defined on integers
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::int(lhs + rhs)
+            if let EvalValue::String(lhs_val) = &lhs {
+                let rhs_val = rhs.to_string();
+                let val = format!("{}{}", lhs_val, rhs_val);
+                EvalValue::String(val)
+            } else if let EvalValue::String(rhs_val) = &rhs {
+                let lhs_val = lhs.to_string();
+                let val = format!("{}{}", lhs_val, rhs_val);
+                EvalValue::String(val)
+            } else {
+                // addition on integers,
+                // binder should enforce this
+                let lhs = lhs.force_get_int();
+                let rhs = rhs.force_get_int();
+                EvalValue::int(lhs + rhs)
+            }
         }
         Operator::Subtraction => {
             // subtraction is only defined on integers
@@ -207,37 +223,48 @@ fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
     }
 }
 
-fn eval_call_args(symbol: &FunctionSymbol, args: &Box<Vec<BoundNode>>, info: &mut EvalInfo) {
+async fn eval_call_args(
+    symbol: &FunctionSymbol,
+    args: &Box<Vec<BoundNode>>,
+    info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
+) {
     let num_params = symbol.parameters.len();
     for index in 0..num_params {
         let param = &symbol.parameters[index];
         let arg = &args[index];
 
         let symbol = &param.symbol;
-        let value = eval_rec(arg, info);
-        info.heap.assign_var(symbol, value);
+        let value = eval_rec(arg, info.clone(), io).await;
+        info.lock().unwrap().heap.assign_var(symbol, value);
     }
 }
 
-fn eval_for_loop(
+async fn eval_for_loop(
     iterator: &VariableSymbol,
     lower_bound: usize,
     upper_bound: usize,
-    body: Rc<BoundNode>,
-    info: &mut EvalInfo,
+    body: Arc<BoundNode>,
+    info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     for index in lower_bound..upper_bound {
         let index_val = EvalValue::Int(index as i64);
-        info.heap.assign_var(iterator, index_val);
-        eval_rec(&body, info);
+        info.lock().unwrap().heap.assign_var(iterator, index_val);
+        eval_rec(&body, info.clone(), io).await;
     }
 
     EvalValue::void()
 }
 
-fn eval_while_loop(expr: &BoundNode, body: Rc<BoundNode>, info: &mut EvalInfo) -> EvalValue {
+async fn eval_while_loop(
+    expr: &BoundNode,
+    body: Arc<BoundNode>,
+    info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
+) -> EvalValue {
     loop {
-        let expr_eval = eval_rec(expr, info);
+        let expr_eval = eval_rec(expr, info.clone(), io).await;
         let EvalValue::Bool(expr_eval) = expr_eval else {
             unreachable!()
         };
@@ -246,18 +273,19 @@ fn eval_while_loop(expr: &BoundNode, body: Rc<BoundNode>, info: &mut EvalInfo) -
             break;
         }
 
-        eval_rec(&body, info);
+        eval_rec(&body, info.clone(), io).await;
     }
 
     EvalValue::void()
 }
 
-fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
+#[async_recursion]
+async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl EvalIO) -> EvalValue {
     let val = match &node.kind {
-        BoundNodeKind::Module { block } => eval_rec(&block, info),
+        BoundNodeKind::Module { block } => eval_rec(&block, info, io).await,
         BoundNodeKind::Block { children } => {
             for child in children.iter() {
-                let val = eval_rec(child, info);
+                let val = eval_rec(child, info.clone(), io).await;
                 if let EvalValue::Return(_) = &val {
                     return val;
                 }
@@ -266,35 +294,38 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             EvalValue::void()
         }
         BoundNodeKind::AssignmentExpression { symbol, value } => {
-            let value = eval_rec(&value, info);
-            info.heap.assign_var(symbol, value.clone());
+            let value = eval_rec(&value, info.clone(), io).await;
+            info.lock().unwrap().heap.assign_var(symbol, value.clone());
 
             value
         }
-        BoundNodeKind::ReferenceExpression(reference) => info.heap.get_var(&reference),
+        BoundNodeKind::ReferenceExpression(reference) => {
+            info.lock().unwrap().heap.get_var(&reference)
+        }
         BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
-            let lhs_val = eval_rec(&lhs, info);
-            let rhs_val = eval_rec(&rhs, info);
+            let lhs_val = eval_rec(&lhs, info.clone(), io).await;
+            let rhs_val = eval_rec(&rhs, info, io).await;
             eval_binary_expr(lhs_val, op, rhs_val)
         }
         BoundNodeKind::UnaryExpression { op, rhs } => {
-            let rhs_val = eval_rec(&rhs, info);
+            let rhs_val = eval_rec(&rhs, info, io).await;
             eval_unary_expr(rhs_val, op)
         }
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
+        BoundNodeKind::StringLiteral(val) => EvalValue::string(val.clone()),
         BoundNodeKind::OutputStatement { expr } => {
-            let value = eval_rec(&expr, info);
+            let value = eval_rec(&expr, info, io).await;
 
             let value = format!("{}\n", value.to_string());
-            String::push_str(info.output, &value);
+            io.output(value).await;
 
             EvalValue::void()
         }
         BoundNodeKind::ReturnStatement { expr } => {
             // create special return value
             let val = if let Some(expr) = expr {
-                eval_rec(&expr, info)
+                eval_rec(&expr, info, io).await
             } else {
                 EvalValue::void()
             };
@@ -306,11 +337,13 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             block,
             else_block,
         } => {
-            let cond_value = eval_rec(&condition, info).force_get_bool();
+            let cond_value = eval_rec(&condition, info.clone(), io)
+                .await
+                .force_get_bool();
             let value = if cond_value {
-                eval_rec(&block, info)
+                eval_rec(&block, info, io).await
             } else if let Some(else_block) = else_block {
-                eval_rec(else_block, info)
+                eval_rec(else_block, info, io).await
             } else {
                 EvalValue::void()
             };
@@ -321,36 +354,46 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             }
         }
         BoundNodeKind::FunctionDeclaration { symbol, block } => {
-            info.heap.declare_func(symbol, block.clone());
+            info.lock()
+                .unwrap()
+                .heap
+                .declare_func(symbol, block.clone());
+
             EvalValue::void()
         }
         BoundNodeKind::BoundCallExpression { symbol, args } => {
-            eval_call_args(symbol, args, info);
+            eval_call_args(symbol, args, info.clone(), io).await;
 
-            // no need to clear arguments after executing the block
-            let body = info.heap.get_func(symbol);
-            let ret_value = eval_rec(&body, info);
+            let builtin_eval = eval_builtin::try_eval_builtin(symbol, info.clone(), io).await;
+            match builtin_eval {
+                Some(val) => val,
+                None => {
+                    // no need to clear arguments after executing the block
+                    let body = info.lock().unwrap().heap.get_func(symbol);
+                    let ret_value = eval_rec(&body, info.clone(), io).await;
 
-            match ret_value {
-                EvalValue::Void => EvalValue::void(),
-                EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
-                _ => unreachable!(),
+                    match ret_value {
+                        EvalValue::Void => EvalValue::void(),
+                        EvalValue::Return(ret_value) => ret_value.as_ref().clone(),
+                        _ => unreachable!(),
+                    }
+                }
             }
         }
         BoundNodeKind::ObjectExpression => {
             let node_type = node.node_type.clone();
             let object = get_object_state(node_type);
 
-            EvalValue::Object(Rc::new(RefCell::new(object)))
+            EvalValue::Object(Arc::new(Mutex::new(object)))
         }
         BoundNodeKind::ObjectMemberExpression { base, next } => {
-            let base_value = eval_rec(&base, info);
+            let base_value = eval_rec(&base, info.clone(), io).await;
 
             // next should either be a reference or a call ;D
             // values are also objects, but they don't hold state?
             match &next.kind {
                 BoundNodeKind::BoundCallExpression { symbol, args } => {
-                    eval_call_args(&symbol, &args, info);
+                    eval_call_args(&symbol, &args, info.clone(), io).await;
                     eval_type_method(base_value, symbol, info)
                 }
                 _ => unreachable!(),
@@ -361,27 +404,28 @@ fn eval_rec(node: &BoundNode, info: &mut EvalInfo) -> EvalValue {
             lower_bound,
             upper_bound,
             block,
-        } => eval_for_loop(
-            iterator,
-            lower_bound.clone(),
-            upper_bound.clone(),
-            block.clone(),
-            info,
-        ),
+        } => {
+            eval_for_loop(
+                iterator,
+                lower_bound.clone(),
+                upper_bound.clone(),
+                block.clone(),
+                info,
+                io,
+            )
+            .await
+        }
         BoundNodeKind::WhileLoop { expr, block } => {
-            eval_while_loop(expr.clone(), block.clone(), info)
+            eval_while_loop(expr, block.clone(), info, io).await
         }
     };
 
     val
 }
 
-pub fn eval(root: &BoundNode, output: &mut String) {
-    let mut heap = EvalHeap::new();
-    let mut info = EvalInfo {
-        heap: &mut heap,
-        output: output,
-    };
+pub async fn eval(root: &BoundNode, io: &mut impl EvalIO) {
+    let heap = EvalHeap::new();
+    let info = EvalInfo { heap: heap };
 
-    eval_rec(root, &mut info);
+    eval_rec(root, Arc::new(Mutex::new(info)), io).await;
 }

@@ -1,1 +1,5 @@
-output 10 > 5
+function test()
+    output "Hello, World!"
+end
+
+test()
