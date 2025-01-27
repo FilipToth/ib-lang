@@ -59,7 +59,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                 setAwaitingInput(true);
                 break;
             case WebSocketMessageKind.Output:
-                setOutput(output + msg.payload);
+                setOutput((val) => val += msg.payload);
                 break;
         }
     }, [lastMessage]);
