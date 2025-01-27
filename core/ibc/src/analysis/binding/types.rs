@@ -8,6 +8,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TypeKind {
+    Any,
     Void,
     Int,
     String,
@@ -32,6 +33,7 @@ pub struct TypeMethodParamRepresentation {
 impl TypeKind {
     pub fn to_string(&self) -> String {
         match &self {
+            TypeKind::Any => "Any".to_string(),
             TypeKind::Void => "Void".to_string(),
             TypeKind::Int => "Int".to_string(),
             TypeKind::String => "String".to_string(),
@@ -228,6 +230,7 @@ pub fn get_type(
     errors: &mut ErrorBag,
 ) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
+        "Any" => TypeKind::Any,
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
         "String" => TypeKind::String,

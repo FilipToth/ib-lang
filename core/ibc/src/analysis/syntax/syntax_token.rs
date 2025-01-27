@@ -62,7 +62,7 @@ pub enum SyntaxKind {
     },
     Parameter {
         identifier: String,
-        type_annotation: String,
+        type_annotation: Option<String>,
     },
     FunctionDeclaration {
         identifier: String,

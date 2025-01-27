@@ -640,18 +640,19 @@ impl<'a> Parser<'a> {
                 None => return None,
             };
 
-            if !self.expect_next_token(LexerTokenKind::ColonToken) {
-                let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
-                errors.add(error_kind, peek.span);
-                return None;
-            }
-
-            let type_annotation = match self.parse_identifier() {
-                Some((i, _)) => i,
-                None => {
-                    let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
-                    errors.add(error_kind, peek.span);
-                    return None;
+            let type_annotation = {
+                if self.expect_next_token_peek(LexerTokenKind::ColonToken) {
+                    let _ = self.expect_next_token(LexerTokenKind::ColonToken);
+                    match self.parse_identifier() {
+                        Some((i, _)) => Some(i),
+                        None => {
+                            let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
+                            errors.add(error_kind, peek.span);
+                            return None;
+                        }
+                    }
+                } else {
+                    None
                 }
             };
 

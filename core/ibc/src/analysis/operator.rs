@@ -59,9 +59,17 @@ impl Operator {
         let rhs_type = rhs.node_type.clone();
         let lhs_type = lhs.node_type.clone();
 
+        // whether type checking is disabled for this operation.
+        let disabled = lhs_type == TypeKind::Any || rhs_type == TypeKind::Any;
+
         let span = rhs.span.clone();
         match self {
             Operator::Subtraction | Operator::Multiplication | Operator::Division => {
+                let ret = Some(TypeKind::Int);
+                if disabled {
+                    return ret;
+                }
+
                 if rhs_type != TypeKind::Int || lhs_type != TypeKind::Int {
                     let err = ErrorKind::BinaryOPeratorNotDefinedOnType {
                         op: self.clone(),
@@ -73,9 +81,13 @@ impl Operator {
                     return None;
                 }
 
-                return Some(TypeKind::Int);
+                ret
             }
             Operator::Addition => {
+                if disabled {
+                    return Some(TypeKind::Any);
+                }
+
                 if rhs_type == TypeKind::String || lhs_type == TypeKind::String {
                     return Some(TypeKind::String);
                 } else if rhs_type == TypeKind::Int && lhs_type == TypeKind::Int {
@@ -92,6 +104,11 @@ impl Operator {
                 None
             }
             Operator::Equality => {
+                let ret = Some(TypeKind::Boolean);
+                if disabled {
+                    return ret;
+                }
+
                 if rhs_type != lhs_type {
                     let err = ErrorKind::EqualityNonMatchingTypes {
                         lhs: lhs_type,
@@ -102,9 +119,14 @@ impl Operator {
                     return None;
                 }
 
-                Some(TypeKind::Boolean)
+                ret
             }
             Operator::LesserThan | Operator::GreaterThan => {
+                let ret = Some(TypeKind::Boolean);
+                if disabled {
+                    return ret;
+                }
+
                 if rhs_type != TypeKind::Int || lhs_type != TypeKind::Int {
                     let err = ErrorKind::BinaryOPeratorNotDefinedOnType {
                         op: self.clone(),
@@ -116,7 +138,7 @@ impl Operator {
                     return None;
                 }
 
-                return Some(TypeKind::Boolean);
+                ret
             }
             _ => unreachable!(),
         }

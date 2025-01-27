@@ -1,5 +1,5 @@
-function test()
-    output "Hello, World!"
+function test(x)
+    output x * 2
 end
 
-test()
+test("test")
