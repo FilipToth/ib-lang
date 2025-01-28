@@ -67,7 +67,7 @@ pub enum EvalValue {
     Bool(bool),
     String(String),
     // used for non-primitive types
-    Object(Arc<Mutex<ObjectState>>),
+    Object(Arc<tokio::sync::Mutex<ObjectState>>),
     // used to return in
     // the eval rec function
     Return(Box<EvalValue>),
@@ -437,7 +437,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             let node_type = node.node_type.clone();
             let object = get_object_state(node_type);
 
-            EvalValue::Object(Arc::new(Mutex::new(object)))
+            EvalValue::Object(Arc::new(tokio::sync::Mutex::new(object)))
         }
         BoundNodeKind::ObjectMemberExpression { base, next } => {
             let base_value = eval_rec(&base, info.clone(), io).await;

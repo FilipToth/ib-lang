@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::analysis::binding::{
     symbols::FunctionSymbol,
-    types::{ArrayState, CollectionState, ObjectState, QueueState, StackState},
+    types::{ArrayState, CollectionState, ObjectState},
 };
 
 use super::{
@@ -41,7 +41,7 @@ async fn execute_array_method(
                 Some(v) => v.clone(),
                 None => {
                     let msg = "Getting element from an empty array".to_string();
-                    io.runtime_error(msg);
+                    io.runtime_error(msg).await;
                     return EvalValue::Error;
                 }
             }
@@ -100,7 +100,7 @@ async fn execute_collection_method(
 }
 
 async fn execute_stack_method(
-    state: &mut StackState,
+    state: &mut ArrayState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
     io: &mut impl EvalIO,
@@ -130,7 +130,7 @@ async fn execute_stack_method(
 }
 
 async fn execute_queue_method(
-    state: &mut QueueState,
+    state: &mut ArrayState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
     io: &mut impl EvalIO,
@@ -160,12 +160,12 @@ async fn execute_queue_method(
 }
 
 async fn execute_object_method(
-    state: Arc<Mutex<ObjectState>>,
+    state: Arc<tokio::sync::Mutex<ObjectState>>,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
     io: &mut impl EvalIO,
 ) -> EvalValue {
-    let mut state = state.lock().unwrap();
+    let mut state = state.lock().await;
     match &mut *state {
         ObjectState::Array(state) => execute_array_method(state, symbol, info, io).await,
         ObjectState::Collection(state) => execute_collection_method(state, symbol, info, io).await,
@@ -181,7 +181,9 @@ pub async fn eval_type_method(
     io: &mut impl EvalIO,
 ) -> EvalValue {
     match &mut value {
-        EvalValue::Object(state) => execute_object_method(state.clone(), symbol, info.clone(), io).await,
+        EvalValue::Object(state) => {
+            execute_object_method(state.clone(), symbol, info.clone(), io).await
+        }
         _ => unimplemented!(),
     }
 }

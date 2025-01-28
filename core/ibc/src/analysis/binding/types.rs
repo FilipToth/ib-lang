@@ -309,11 +309,9 @@ pub fn get_type(
 pub enum ObjectState {
     Array(ArrayState),
     Collection(CollectionState),
-    Stack(StackState),
-    Queue(QueueState),
+    Stack(ArrayState),
+    Queue(ArrayState),
 }
-
-unsafe impl Send for ObjectState {}
 
 #[derive(Debug, Clone)]
 pub struct ArrayState {
@@ -343,38 +341,12 @@ impl CollectionState {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct StackState {
-    pub internal: Vec<EvalValue>,
-}
-
-impl StackState {
-    fn new() -> Self {
-        StackState {
-            internal: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct QueueState {
-    pub internal: Vec<EvalValue>,
-}
-
-impl QueueState {
-    fn new() -> Self {
-        QueueState {
-            internal: Vec::new(),
-        }
-    }
-}
-
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
         TypeKind::Array(_) => ObjectState::Array(ArrayState::new()),
         TypeKind::Collection(_) => ObjectState::Collection(CollectionState::new()),
-        TypeKind::Stack(_) => ObjectState::Stack(StackState::new()),
-        TypeKind::Queue(_) => ObjectState::Queue(QueueState::new()),
+        TypeKind::Stack(_) => ObjectState::Stack(ArrayState::new()),
+        TypeKind::Queue(_) => ObjectState::Queue(ArrayState::new()),
         _ => unreachable!(),
     }
 }
