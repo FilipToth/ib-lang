@@ -1,6 +1,8 @@
 import {
+    Alert,
     Button,
     CircularProgress,
+    Snackbar,
     Stack,
     TextField,
     Typography,
@@ -18,7 +20,7 @@ enum WebSocketMessageKind {
     Execute,
     Output,
     Input,
-    EndExecute,
+    RuntimeError,
 }
 
 interface WebSocketMessage {
@@ -31,6 +33,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
     const [running, setRunning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
     const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
@@ -59,7 +62,14 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                 setAwaitingInput(true);
                 break;
             case WebSocketMessageKind.Output:
-                setOutput((val) => val += msg.payload);
+                setOutput((val) => (val += msg.payload));
+                break;
+            case WebSocketMessageKind.RuntimeError:
+                // display error
+                setError("Runtime Error: " + msg.payload);
+                setTimeout(() => {
+                    setError(null);
+                }, 4000);
                 break;
         }
     }, [lastMessage]);
@@ -99,49 +109,59 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     };
 
     return (
-        <Stack>
-            <Stack direction={"row"}>
-                <Button
-                    onClick={onClick}
-                    fullWidth
-                    sx={{
-                        gap: "10%",
-                    }}
-                    disabled={running}
-                >
-                    <Typography>Run</Typography>
-                    {running && <CircularProgress size={20} />}
-                </Button>
-            </Stack>
-            <TextField
-                multiline
-                fullWidth
-                value={output}
-                slotProps={{
-                    input: {
-                        readOnly: true,
-                    },
-                }}
-                sx={{
-                    flex: 1,
-                    "& .MuiInputBase-root": {
-                        height: "100%",
-                        alignItems: "start",
-                    },
-                }}
-            />
-            {awaitingInput && <Typography>Awaiting User Input</Typography>}
-            <Stack direction={"row"}>
+        <>
+            <Snackbar
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                open={error != null}
+            >
+                <Alert severity="error" variant="filled">
+                    {error}
+                </Alert>
+            </Snackbar>
+            <Stack>
+                <Stack direction={"row"}>
+                    <Button
+                        onClick={onClick}
+                        fullWidth
+                        sx={{
+                            gap: "10%",
+                        }}
+                        disabled={running}
+                    >
+                        <Typography>Run</Typography>
+                        {running && <CircularProgress size={20} />}
+                    </Button>
+                </Stack>
                 <TextField
                     multiline
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    fullWidth
+                    value={output}
+                    slotProps={{
+                        input: {
+                            readOnly: true,
+                        },
+                    }}
+                    sx={{
+                        flex: 1,
+                        "& .MuiInputBase-root": {
+                            height: "100%",
+                            alignItems: "start",
+                        },
+                    }}
                 />
-                <Button disabled={!awaitingInput} onClick={sendInput}>
-                    Send
-                </Button>
+                {awaitingInput && <Typography>Awaiting User Input</Typography>}
+                <Stack direction={"row"}>
+                    <TextField
+                        multiline
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                    />
+                    <Button disabled={!awaitingInput} onClick={sendInput}>
+                        Send
+                    </Button>
+                </Stack>
             </Stack>
-        </Stack>
+        </>
     );
 };
 
