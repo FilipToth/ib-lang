@@ -313,6 +313,8 @@ pub enum ObjectState {
     Queue(QueueState),
 }
 
+unsafe impl Send for ObjectState {}
+
 #[derive(Debug, Clone)]
 pub struct ArrayState {
     pub internal: Vec<EvalValue>,

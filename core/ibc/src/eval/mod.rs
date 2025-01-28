@@ -8,4 +8,5 @@ pub mod object_methods;
 pub trait EvalIO: Send + Sync {
     async fn output(&self, output_msg: String);
     async fn input(&self) -> String;
+    async fn runtime_error(&self, msg: String);
 }

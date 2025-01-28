@@ -5,12 +5,16 @@ use crate::analysis::binding::{
     types::{ArrayState, CollectionState, ObjectState, QueueState, StackState},
 };
 
-use super::evaluator::{EvalInfo, EvalValue};
+use super::{
+    evaluator::{EvalInfo, EvalValue},
+    EvalIO,
+};
 
-fn execute_array_method(
+async fn execute_array_method(
     state: &mut ArrayState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     match symbol.identifier.as_str() {
         "push" => {
@@ -26,13 +30,19 @@ fn execute_array_method(
 
             let index_value = match index_value {
                 EvalValue::Int(i) => i as usize,
-                _ => unreachable!(),
+                _ => {
+                    let msg = "Attempting to call Array.get with a non-integer index".to_string();
+                    io.runtime_error(msg).await;
+                    return EvalValue::Error;
+                }
             };
 
             match state.internal.get(index_value) {
                 Some(v) => v.clone(),
                 None => {
-                    panic!("Runtime error");
+                    let msg = "Getting element from an empty array".to_string();
+                    io.runtime_error(msg);
+                    return EvalValue::Error;
                 }
             }
         }
@@ -44,10 +54,11 @@ fn execute_array_method(
     }
 }
 
-fn execute_collection_method(
+async fn execute_collection_method(
     state: &mut CollectionState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     match symbol.identifier.as_str() {
         "hasNext" => {
@@ -63,7 +74,9 @@ fn execute_collection_method(
                     v.clone()
                 }
                 None => {
-                    panic!("Runtime error");
+                    let msg = "Getting item from an empty collection".to_string();
+                    io.runtime_error(msg).await;
+                    return EvalValue::Error;
                 }
             }
         }
@@ -86,10 +99,11 @@ fn execute_collection_method(
     }
 }
 
-fn execute_stack_method(
+async fn execute_stack_method(
     state: &mut StackState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     match symbol.identifier.as_str() {
         "push" => {
@@ -101,7 +115,11 @@ fn execute_stack_method(
         }
         "pop" => match state.internal.pop() {
             Some(v) => v,
-            None => panic!("Runtime error"),
+            None => {
+                let msg = "Popping element from an empty stack".to_string();
+                io.runtime_error(msg).await;
+                return EvalValue::Error;
+            }
         },
         "isEmpty" => {
             let res = state.internal.len() == 0;
@@ -111,10 +129,11 @@ fn execute_stack_method(
     }
 }
 
-fn execute_queue_method(
+async fn execute_queue_method(
     state: &mut QueueState,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     match symbol.identifier.as_str() {
         "enqueue" => {
@@ -126,7 +145,11 @@ fn execute_queue_method(
         }
         "dequeue" => match state.internal.pop() {
             Some(v) => v,
-            None => panic!("Runtime error"),
+            None => {
+                let msg = "Dequeuing from an empty array".to_string();
+                io.runtime_error(msg).await;
+                return EvalValue::Error;
+            }
         },
         "isEmpty" => {
             let res = state.internal.len() == 0;
@@ -136,27 +159,29 @@ fn execute_queue_method(
     }
 }
 
-fn execute_object_method(
+async fn execute_object_method(
     state: Arc<Mutex<ObjectState>>,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     let mut state = state.lock().unwrap();
     match &mut *state {
-        ObjectState::Array(state) => execute_array_method(state, symbol, info),
-        ObjectState::Collection(state) => execute_collection_method(state, symbol, info),
-        ObjectState::Stack(state) => execute_stack_method(state, symbol, info),
-        ObjectState::Queue(state) => execute_queue_method(state, symbol, info),
+        ObjectState::Array(state) => execute_array_method(state, symbol, info, io).await,
+        ObjectState::Collection(state) => execute_collection_method(state, symbol, info, io).await,
+        ObjectState::Stack(state) => execute_stack_method(state, symbol, info, io).await,
+        ObjectState::Queue(state) => execute_queue_method(state, symbol, info, io).await,
     }
 }
 
-pub fn eval_type_method(
+pub async fn eval_type_method(
     mut value: EvalValue,
     symbol: &FunctionSymbol,
     info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
 ) -> EvalValue {
     match &mut value {
-        EvalValue::Object(state) => execute_object_method(state.clone(), symbol, info.clone()),
+        EvalValue::Object(state) => execute_object_method(state.clone(), symbol, info.clone(), io).await,
         _ => unimplemented!(),
     }
 }

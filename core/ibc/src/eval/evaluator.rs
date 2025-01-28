@@ -71,6 +71,9 @@ pub enum EvalValue {
     // used to return in
     // the eval rec function
     Return(Box<EvalValue>),
+    // used to indicate that
+    // a runtime error has occured
+    Error,
 }
 
 impl EvalValue {
@@ -98,35 +101,73 @@ impl EvalValue {
             EvalValue::String(val) => val.clone(),
             EvalValue::Object(_) => unreachable!(),
             EvalValue::Return(_) => unreachable!(),
+            EvalValue::Error => "?".to_string(),
         }
     }
 
-    fn force_get_int(&self) -> i64 {
+    async fn get_int(&self, io: &mut impl EvalIO) -> Option<i64> {
         let EvalValue::Int(val) = self else {
-            unreachable!()
+            let msg = format!("Expected integer, got {}", self.to_string());
+            io.runtime_error(msg).await;
+            return None;
         };
 
-        val.clone()
+        Some(val.clone())
     }
 
-    fn force_get_bool(&self) -> bool {
+    async fn get_bool(&self, io: &mut impl EvalIO) -> Option<bool> {
         let EvalValue::Bool(val) = self else {
-            unreachable!()
+            let msg = format!("Expected bool, got {}", self.to_string());
+            io.runtime_error(msg).await;
+            return None;
         };
 
-        val.clone()
+        Some(val.clone())
     }
 
-    fn force_get_string(&self) -> String {
+    async fn get_string(&self, io: &mut impl EvalIO) -> Option<String> {
         let EvalValue::String(val) = self else {
-            unreachable!()
+            let msg = format!("Expected string, got {}", self.to_string());
+            io.runtime_error(msg).await;
+            return None;
         };
 
-        val.clone()
+        Some(val.clone())
     }
 }
 
-fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue {
+async fn eval_int_only_binexpr(
+    lhs: EvalValue,
+    op: &Operator,
+    rhs: EvalValue,
+    io: &mut impl EvalIO,
+) -> EvalValue {
+    let lhs = match lhs.get_int(io).await {
+        Some(l) => l,
+        None => return EvalValue::Error,
+    };
+
+    let rhs = match rhs.get_int(io).await {
+        Some(r) => r,
+        None => return EvalValue::Error,
+    };
+
+    match op {
+        Operator::Subtraction => EvalValue::int(lhs - rhs),
+        Operator::Multiplication => EvalValue::int(lhs * rhs),
+        Operator::Division => EvalValue::int(lhs / rhs),
+        Operator::LesserThan => EvalValue::bool(lhs < rhs),
+        Operator::GreaterThan => EvalValue::bool(lhs > rhs),
+        _ => unreachable!(),
+    }
+}
+
+async fn eval_binary_expr(
+    lhs: EvalValue,
+    op: &Operator,
+    rhs: EvalValue,
+    io: &mut impl EvalIO,
+) -> EvalValue {
     match op {
         Operator::Addition => {
             if let EvalValue::String(lhs_val) = &lhs {
@@ -139,30 +180,28 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
                 EvalValue::String(val)
             } else {
                 // addition on integers,
-                // binder should enforce this
-                let lhs = lhs.force_get_int();
-                let rhs = rhs.force_get_int();
+                // binder should enforce
+                // this, or push runtime
+                // error on mismatched
+                // any type
+                let lhs = match lhs.get_int(io).await {
+                    Some(l) => l,
+                    None => return EvalValue::Error,
+                };
+
+                let rhs = match rhs.get_int(io).await {
+                    Some(r) => r,
+                    None => return EvalValue::Error,
+                };
+
                 EvalValue::int(lhs + rhs)
             }
         }
-        Operator::Subtraction => {
-            // subtraction is only defined on integers
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::int(lhs - rhs)
-        }
-        Operator::Multiplication => {
-            // multiplication is only defined on integers
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::int(lhs * rhs)
-        }
-        Operator::Division => {
-            // division is only defined on integers
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::int(lhs / rhs)
-        }
+        Operator::Subtraction
+        | Operator::Multiplication
+        | Operator::Division
+        | Operator::LesserThan
+        | Operator::GreaterThan => eval_int_only_binexpr(lhs, op, rhs, io).await,
         Operator::Equality => {
             // check if same variant
             if mem::discriminant(&lhs) != mem::discriminant(&rhs) {
@@ -172,32 +211,33 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
             match lhs {
                 EvalValue::Void => unreachable!(),
                 EvalValue::Int(lhs) => {
-                    let rhs = rhs.force_get_int();
+                    let rhs = match rhs.get_int(io).await {
+                        Some(r) => r,
+                        None => return EvalValue::Error,
+                    };
+
                     EvalValue::Bool(rhs == lhs)
                 }
                 EvalValue::Bool(lhs) => {
-                    let rhs = rhs.force_get_bool();
+                    let rhs = match rhs.get_bool(io).await {
+                        Some(r) => r,
+                        None => return EvalValue::Error,
+                    };
+
                     EvalValue::Bool(rhs == lhs)
                 }
                 EvalValue::String(lhs) => {
-                    let rhs = rhs.force_get_string();
+                    let rhs = match rhs.get_string(io).await {
+                        Some(r) => r,
+                        None => return EvalValue::Error,
+                    };
+
                     EvalValue::Bool(rhs == lhs)
                 }
                 EvalValue::Object(_) => unreachable!(),
                 EvalValue::Return(_) => unreachable!(),
+                EvalValue::Error => return EvalValue::Error,
             }
-        }
-        Operator::LesserThan => {
-            // rhs and lhs are ints
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::bool(lhs < rhs)
-        }
-        Operator::GreaterThan => {
-            // rhs and lhs are ints
-            let lhs = lhs.force_get_int();
-            let rhs = rhs.force_get_int();
-            EvalValue::bool(lhs > rhs)
         }
         _ => {
             unreachable!("Not a binary operator")
@@ -205,17 +245,21 @@ fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue) -> EvalValue 
     }
 }
 
-fn eval_unary_expr(rhs_val: EvalValue, op: &Operator) -> EvalValue {
+async fn eval_unary_expr(rhs_val: EvalValue, op: &Operator, io: &mut impl EvalIO) -> EvalValue {
     match op {
         Operator::Not => {
             // only defined on bools
-            let rhs = rhs_val.force_get_bool();
-            EvalValue::Bool(!rhs)
+            match rhs_val.get_bool(io).await {
+                Some(r) => EvalValue::Bool(!r),
+                None => EvalValue::Error,
+            }
         }
         Operator::Subtraction => {
             // only defined on ints
-            let rhs = rhs_val.force_get_int();
-            EvalValue::Int(-rhs)
+            match rhs_val.get_int(io).await {
+                Some(r) => EvalValue::Int(-r),
+                None => EvalValue::Error,
+            }
         }
         _ => {
             unreachable!("Not a unary operator")
@@ -305,11 +349,11 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
             let lhs_val = eval_rec(&lhs, info.clone(), io).await;
             let rhs_val = eval_rec(&rhs, info, io).await;
-            eval_binary_expr(lhs_val, op, rhs_val)
+            eval_binary_expr(lhs_val, op, rhs_val, io).await
         }
         BoundNodeKind::UnaryExpression { op, rhs } => {
             let rhs_val = eval_rec(&rhs, info, io).await;
-            eval_unary_expr(rhs_val, op)
+            eval_unary_expr(rhs_val, op, io).await
         }
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
@@ -339,7 +383,16 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         } => {
             let cond_value = eval_rec(&condition, info.clone(), io)
                 .await
-                .force_get_bool();
+                .get_bool(io)
+                .await;
+
+            let cond_value = match cond_value {
+                Some(c) => c,
+                None => {
+                    return EvalValue::Error;
+                }
+            };
+
             let value = if cond_value {
                 eval_rec(&block, info, io).await
             } else if let Some(else_block) = else_block {
@@ -394,7 +447,8 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             match &next.kind {
                 BoundNodeKind::BoundCallExpression { symbol, args } => {
                     eval_call_args(&symbol, &args, info.clone(), io).await;
-                    eval_type_method(base_value, symbol, info)
+                    eval_type_method(base_value, symbol, info, io).await;
+                    EvalValue::Void
                 }
                 _ => unreachable!(),
             }

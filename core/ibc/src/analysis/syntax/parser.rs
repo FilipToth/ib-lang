@@ -646,7 +646,8 @@ impl<'a> Parser<'a> {
                     match self.parse_identifier() {
                         Some((i, _)) => Some(i),
                         None => {
-                            let error_kind = ErrorKind::ExpectedToken("type annotation".to_string());
+                            let error_kind =
+                                ErrorKind::ExpectedToken("type annotation".to_string());
                             errors.add(error_kind, peek.span);
                             return None;
                         }

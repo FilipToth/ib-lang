@@ -1,5 +1,6 @@
 function test(x)
-    output x * 2
+    queue = new Stack<Int>()
+    queue.pop()
 end
 
-test("test")
+test(false)
