@@ -6,6 +6,7 @@ import { syntaxTree } from "@codemirror/language";
 import { SyntaxNode, Tree } from "@lezer/common";
 import { EditorView, TransactionSpec } from "@uiw/react-codemirror";
 import { getIndent } from "./ibSupport";
+import { Text } from "@codemirror/text";
 
 interface Symbol {
     name: string;
@@ -64,9 +65,13 @@ const resolveSymbolsInScope = (
         identifierNode?.to
     );
 
+    const document = context.view?.state.doc!;
+
     let kind = null;
     if (node.name == "VariableAssignment") {
         kind = "variable";
+
+        const type = getVariableDeclarationType(document, node);
     } else if (node.name == "FunctionDeclaration") {
         kind = "function";
     } else {
@@ -80,6 +85,24 @@ const resolveSymbolsInScope = (
     if (scopeChild.nextSibling == null) return;
 
     resolveSymbolsInScope(scopeChild.nextSibling, context, symbols);
+};
+
+const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
+    const expr = varNode.getChild("Expression");
+    if (expr == null)
+        return null;
+
+    const objInstantiation = expr.getChild("ObjectInstantiationExpression");
+    if (objInstantiation == null) {
+        console.log("Obj instamtiation is null");
+        return null;
+    }
+
+    const typeNodes = objInstantiation.getChildren("TypeAnnotation");
+    const typeNode = typeNodes[0];
+    
+    const typeName = document.sliceString(typeNode.from, typeNode.to);
+    return typeName;
 };
 
 const checkForParameters = (
@@ -209,7 +232,6 @@ const ibCompletions = (context: CompletionContext) => {
     const tree = syntaxTree(context.state);
     const symbols = resolveSymbols(tree, context, word?.text);
 
-    console.log(symbols);
     const symbolOptions = symbols.map((symbol) => {
         return { label: symbol.name, type: symbol.type };
     });
