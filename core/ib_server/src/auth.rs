@@ -2,19 +2,16 @@ use std::collections::HashMap;
 
 use axum::{
     extract::Request,
-    http::{self, HeaderMap, HeaderValue, StatusCode},
-    middleware::{self, Next},
+    http::{HeaderMap, HeaderValue, StatusCode},
+    middleware::Next,
     response::Response,
-    routing::get,
-    Router,
 };
 use reqwest::header::AUTHORIZATION;
-use serde::Serialize;
 
 async fn ping_auth_backend(jwt: &str) -> Option<String> {
     let client = reqwest::Client::new();
     let authorization = format!("Bearer {}", jwt);
-    let url = "http://auth-server:8081/auth";
+    let url = "http://localhost:8081/auth";
 
     let mut headers = HeaderMap::new();
     headers.insert(

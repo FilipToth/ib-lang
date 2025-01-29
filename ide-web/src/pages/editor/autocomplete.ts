@@ -1,7 +1,6 @@
 import {
     Completion,
     CompletionContext,
-    completeFromList,
 } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
 import { SyntaxNode, Tree } from "@lezer/common";
@@ -42,7 +41,7 @@ const resolveSymbols = (
 };
 
 const getScopesRecursive = (node: SyntaxNode, scopes: SyntaxNode[]) => {
-    if (node.name == "Block") scopes.push(node);
+    if (node.name == "Block" || node.name == "Program") scopes.push(node);
 
     if (node.parent == null) return;
 
@@ -210,6 +209,7 @@ const ibCompletions = (context: CompletionContext) => {
     const tree = syntaxTree(context.state);
     const symbols = resolveSymbols(tree, context, word?.text);
 
+    console.log(symbols);
     const symbolOptions = symbols.map((symbol) => {
         return { label: symbol.name, type: symbol.type };
     });

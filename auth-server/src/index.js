@@ -42,6 +42,10 @@ app.get("/auth", async (req, res) => {
     }
 });
 
+app.get("/ping", async (req, res) => {
+    res.send({ msg: "pong" });
+});
+
 app.listen(port, () => {
     console.log(`listening on port ${port}...`);
 });
