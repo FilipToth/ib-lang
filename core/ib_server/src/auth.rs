@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env};
 
 use axum::{
     extract::Request,
@@ -11,7 +11,7 @@ use reqwest::header::AUTHORIZATION;
 async fn ping_auth_backend(jwt: &str) -> Option<String> {
     let client = reqwest::Client::new();
     let authorization = format!("Bearer {}", jwt);
-    let url = "http://localhost:8081/auth";
+    let url = env::var("AUTH_BACKEND_URL").unwrap();
 
     let mut headers = HeaderMap::new();
     headers.insert(
