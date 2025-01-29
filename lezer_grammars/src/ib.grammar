@@ -3,14 +3,14 @@
 @skip { space | LineComment }
 
 Atom {
-  IfStatement |
-  FunctionDeclaration |
-  OutputStatement |
-  ReturnStatement |
-  ForStatement |
-  WhileStatement |
-  VariableAssignment |
-  ExpressionStatement
+  IfStatement
+  | FunctionDeclaration
+  | OutputStatement
+  | ReturnStatement
+  | ForStatement
+  | WhileStatement
+  | VariableAssignment
+  | ExpressionStatement
 }
 
 IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword }
@@ -29,18 +29,20 @@ Parameter { Identifier ":" TypeAnnotation }
 ParameterList { "(" (Parameter ("," Parameter)*)? ")" }
 
 Expression {
-  CallExpression |
-  ReferenceEpxression |
-  Boolean |
-  String |
-  Number |
-  MiscOperator |
-  TypeAnnotation |
-  NotKeyword
+  ReferenceEpxression
+  | CallExpression
+  | ObjectInstantiationExpression
+  | Boolean
+  | String
+  | Number
+  | MiscOperator
+  | TypeAnnotation
+  | NotKeyword
 }
 
 ReferenceEpxression { Identifier }
 CallExpression { Identifier "(" (Atom*)? ")" }
+ObjectInstantiationExpression { NewKeyword TypeAnnotation ("<" TypeAnnotation ">") "(" ")" }
 
 Boolean { @specialize<Identifier, "true" | "false"> }
 
@@ -57,12 +59,17 @@ ForKeyword { @specialize<Identifier, "for" | "FOR"> }
 FromKeyword { @specialize<Identifier, "from" | "FROM"> }
 ToKeyword { @specialize<Identifier, "to" | "TO"> }
 WhileKeyword { @specialize<Identifier, "while" | "WHILE"> }
+NewKeyword { @specialize<Identifier, "new" | "NEW"> }
 
 TypeAnnotation { @specialize<Identifier,
-  "Void" |
-  "Int" |
-  "String" |
-  "Boolean"
+  "Void"
+  | "Int"
+  | "String"
+  | "Boolean"
+  | "Array"
+  | "Collection"
+  | "Stack"
+  | "Queue"
 >}
 
 @tokens {

@@ -447,8 +447,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             match &next.kind {
                 BoundNodeKind::BoundCallExpression { symbol, args } => {
                     eval_call_args(&symbol, &args, info.clone(), io).await;
-                    eval_type_method(base_value, symbol, info, io).await;
-                    EvalValue::Void
+                    eval_type_method(base_value, symbol, info, io).await
                 }
                 _ => unreachable!(),
             }
