@@ -1,7 +1,4 @@
-import {
-    Completion,
-    CompletionContext,
-} from "@codemirror/autocomplete";
+import { Completion, CompletionContext } from "@codemirror/autocomplete";
 import { syntaxTree } from "@codemirror/language";
 import { SyntaxNode, Tree } from "@lezer/common";
 import { EditorView, TransactionSpec } from "@uiw/react-codemirror";
@@ -10,7 +7,8 @@ import { Text } from "@codemirror/text";
 
 interface Symbol {
     name: string;
-    type: string;
+    kind: string;
+    typeName: string | null;
 }
 
 const resolveSymbols = (
@@ -68,10 +66,11 @@ const resolveSymbolsInScope = (
     const document = context.view?.state.doc!;
 
     let kind = null;
+    let typeName = null;
+
     if (node.name == "VariableAssignment") {
         kind = "variable";
-
-        const type = getVariableDeclarationType(document, node);
+        typeName = getVariableDeclarationType(document, node);
     } else if (node.name == "FunctionDeclaration") {
         kind = "function";
     } else {
@@ -79,7 +78,7 @@ const resolveSymbolsInScope = (
     }
 
     if (identifier != null && kind != null) {
-        symbols.push({ name: identifier, type: kind });
+        symbols.push({ name: identifier, kind: kind, typeName: typeName });
     }
 
     if (scopeChild.nextSibling == null) return;
@@ -89,8 +88,7 @@ const resolveSymbolsInScope = (
 
 const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
     const expr = varNode.getChild("Expression");
-    if (expr == null)
-        return null;
+    if (expr == null) return null;
 
     const objInstantiation = expr.getChild("ObjectInstantiationExpression");
     if (objInstantiation == null) {
@@ -100,7 +98,7 @@ const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
 
     const typeNodes = objInstantiation.getChildren("TypeAnnotation");
     const typeNode = typeNodes[0];
-    
+
     const typeName = document.sliceString(typeNode.from, typeNode.to);
     return typeName;
 };
@@ -132,7 +130,12 @@ const checkForParametersRecursive = (
             identifierNode?.to
         );
 
-        const symbol: Symbol = { name: identifier, type: "variable" };
+        const symbol: Symbol = {
+            name: identifier,
+            kind: "variable",
+            typeName: null,
+        };
+
         symbols.push(symbol);
     }
 
@@ -233,7 +236,7 @@ const ibCompletions = (context: CompletionContext) => {
     const symbols = resolveSymbols(tree, context, word?.text);
 
     const symbolOptions = symbols.map((symbol) => {
-        return { label: symbol.name, type: symbol.type };
+        return { label: symbol.name, type: symbol.kind };
     });
 
     return {

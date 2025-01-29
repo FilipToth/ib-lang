@@ -70,6 +70,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                 setTimeout(() => {
                     setError(null);
                 }, 4000);
+
                 break;
         }
     }, [lastMessage]);
