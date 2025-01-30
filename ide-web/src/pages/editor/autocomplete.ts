@@ -8,8 +8,31 @@ import { Text } from "@codemirror/text";
 interface Symbol {
     name: string;
     kind: string;
-    typeName: string | null;
+    type: string | null;
 }
+
+const getTypeSymbols = (type: string | null) => {
+    if (type == null) return [];
+
+    const symbols = [];
+    switch (type) {
+        case "Stack":
+            const push: Symbol = { name: "push", kind: "function", type: null };
+            const pop: Symbol = { name: "pop", kind: "function", type: null };
+            const isEmpty: Symbol = {
+                name: "isEmpty",
+                kind: "function",
+                type: null,
+            };
+
+            symbols.push(push);
+            symbols.push(pop);
+            symbols.push(isEmpty);
+            break;
+    }
+
+    return symbols;
+};
 
 const resolveSymbols = (
     tree: Tree,
@@ -27,6 +50,30 @@ const resolveSymbols = (
 
         checkForParameters(scope, context, symbols);
         resolveSymbolsInScope(scope.firstChild, context, symbols);
+    }
+
+    const parentNode = nodeBefore.parent!;
+    if (parentNode.name == "MemberAccessExpression") {
+        const expr = parentNode.parent!;
+        const exprStatement = expr.parent!;
+        const atom = exprStatement.parent!;
+
+        const prevAtom = atom.prevSibling;
+        const prevExprStatement = prevAtom?.firstChild;
+        const prevExpr = prevExprStatement?.firstChild;
+        const prev = prevExpr?.firstChild!;
+
+        if (prev.name != "ReferenceExpression") {
+            // resolve symbol
+            const prevText = context.state.doc.sliceString(prev.from, prev.to);
+            const matching = symbols.filter((s) => s.name == prevText);
+
+            if (matching.length != 0) {
+                const first = matching[0];
+                const typeMethods = getTypeSymbols(first.type);
+                symbols.push(...typeMethods);
+            }
+        }
     }
 
     const resolvedSymbols: Symbol[] = [];
@@ -66,11 +113,12 @@ const resolveSymbolsInScope = (
     const document = context.view?.state.doc!;
 
     let kind = null;
-    let typeName = null;
+    let type = null;
 
     if (node.name == "VariableAssignment") {
         kind = "variable";
-        typeName = getVariableDeclarationType(document, node);
+
+        const type = getVariableDeclarationType(document, node);
     } else if (node.name == "FunctionDeclaration") {
         kind = "function";
     } else {
@@ -78,7 +126,7 @@ const resolveSymbolsInScope = (
     }
 
     if (identifier != null && kind != null) {
-        symbols.push({ name: identifier, kind: kind, typeName: typeName });
+        symbols.push({ name: identifier, kind: kind, type: type });
     }
 
     if (scopeChild.nextSibling == null) return;
@@ -91,12 +139,11 @@ const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
     if (expr == null) return null;
 
     const objInstantiation = expr.getChild("ObjectInstantiationExpression");
-    if (objInstantiation == null) {
-        console.log("Obj instamtiation is null");
-        return null;
-    }
+    if (objInstantiation == null) return null;
 
     const typeNodes = objInstantiation.getChildren("TypeAnnotation");
+    if (typeNodes.length == 0) return null;
+
     const typeNode = typeNodes[0];
 
     const typeName = document.sliceString(typeNode.from, typeNode.to);
@@ -133,9 +180,8 @@ const checkForParametersRecursive = (
         const symbol: Symbol = {
             name: identifier,
             kind: "variable",
-            typeName: null,
+            type: null,
         };
-
         symbols.push(symbol);
     }
 
@@ -236,6 +282,7 @@ const ibCompletions = (context: CompletionContext) => {
     const symbols = resolveSymbols(tree, context, word?.text);
 
     const symbolOptions = symbols.map((symbol) => {
+        return { label: symbol.name, type: symbol.kind };
         return { label: symbol.name, type: symbol.kind };
     });
 
