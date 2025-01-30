@@ -44,7 +44,7 @@ Expression {
 ReferenceEpxression { Identifier }
 CallExpression { Identifier "(" (Atom*)? ")" }
 ObjectInstantiationExpression { NewKeyword TypeAnnotation ("<" TypeAnnotation ">") "(" ")" }
-MemberAccessExpression { "." (CallExpression | Identifier) }
+MemberAccessExpression { Expression "." (CallExpression | Identifier) }
 
 Boolean { @specialize<Identifier, "true" | "false"> }
 

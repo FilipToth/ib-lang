@@ -4,6 +4,7 @@ import { SyntaxNode, Tree } from "@lezer/common";
 import { EditorView, TransactionSpec } from "@uiw/react-codemirror";
 import { getIndent } from "./ibSupport";
 import { Text } from "@codemirror/text";
+import logTree from "./logTree";
 
 interface Symbol {
     name: string;
@@ -59,6 +60,8 @@ const resolveSymbols = (
         const atom = exprStatement.parent!;
 
         const prevAtom = atom.prevSibling;
+        logTree(tree.topNode, context.view?.state.doc!);
+
         const prevExprStatement = prevAtom?.firstChild;
         const prevExpr = prevExprStatement?.firstChild;
         const prev = prevExpr?.firstChild!;
@@ -119,6 +122,8 @@ const resolveSymbolsInScope = (
         kind = "variable";
 
         const type = getVariableDeclarationType(document, node);
+        const typeSymbols = getTypeSymbols(type);
+        symbols.push(...typeSymbols);
     } else if (node.name == "FunctionDeclaration") {
         kind = "function";
     } else {
@@ -145,7 +150,6 @@ const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
     if (typeNodes.length == 0) return null;
 
     const typeNode = typeNodes[0];
-
     const typeName = document.sliceString(typeNode.from, typeNode.to);
     return typeName;
 };
@@ -279,10 +283,11 @@ const ibCompletions = (context: CompletionContext) => {
     if (word?.from == word?.to && !context.explicit) return null;
 
     const tree = syntaxTree(context.state);
+    logTree(tree.topNode, context.view?.state.doc!);
+
     const symbols = resolveSymbols(tree, context, word?.text);
 
     const symbolOptions = symbols.map((symbol) => {
-        return { label: symbol.name, type: symbol.kind };
         return { label: symbol.name, type: symbol.kind };
     });
 
@@ -309,6 +314,10 @@ const ibCompletions = (context: CompletionContext) => {
             { label: "Int", type: "type" },
             { label: "String", type: "type" },
             { label: "Boolean", type: "type" },
+            { label: "Array", type: "type" },
+            { label: "Collection", type: "type" },
+            { label: "Stack", type: "type" },
+            { label: "Queue", type: "type" },
             {
                 label: "loop for",
                 apply: applyForCompletion,
