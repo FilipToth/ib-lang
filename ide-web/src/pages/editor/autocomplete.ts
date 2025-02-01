@@ -4,7 +4,6 @@ import { SyntaxNode, Tree } from "@lezer/common";
 import { EditorView, TransactionSpec } from "@uiw/react-codemirror";
 import { getIndent } from "./ibSupport";
 import { Text } from "@codemirror/text";
-import logTree from "./logTree";
 
 interface Symbol {
     name: string;
@@ -35,6 +34,33 @@ const getTypeSymbols = (type: string | null) => {
     return symbols;
 };
 
+const getMemberExprSymbols = (
+    identifier: SyntaxNode,
+    doc: Text,
+    existingSymbols: Symbol[]
+) => {
+    // expr.identifier
+    const expr = identifier.prevSibling!;
+
+    // actual expressio, e.g. reference expression
+    const actualExpr = expr.firstChild;
+    if (actualExpr == null) return [];
+
+    if (actualExpr.name != "ReferenceExpression") {
+        // resolve symbol
+        const prevText = doc.sliceString(actualExpr.from, actualExpr.to);
+        const matching = existingSymbols.filter((s) => s.name == prevText);
+
+        if (matching.length == 0) return [];
+
+        const first = matching[0];
+        const typeMethods = getTypeSymbols(first.type);
+        return typeMethods;
+    }
+
+    return [];
+};
+
 const resolveSymbols = (
     tree: Tree,
     context: CompletionContext,
@@ -55,28 +81,14 @@ const resolveSymbols = (
 
     const parentNode = nodeBefore.parent!;
     if (parentNode.name == "MemberAccessExpression") {
-        const expr = parentNode.parent!;
-        const exprStatement = expr.parent!;
-        const atom = exprStatement.parent!;
+        // nodeBefore is identifier
+        const typeSymbols = getMemberExprSymbols(
+            nodeBefore,
+            context.view?.state.doc!,
+            symbols
+        );
 
-        const prevAtom = atom.prevSibling;
-        logTree(tree.topNode, context.view?.state.doc!);
-
-        const prevExprStatement = prevAtom?.firstChild;
-        const prevExpr = prevExprStatement?.firstChild;
-        const prev = prevExpr?.firstChild!;
-
-        if (prev.name != "ReferenceExpression") {
-            // resolve symbol
-            const prevText = context.state.doc.sliceString(prev.from, prev.to);
-            const matching = symbols.filter((s) => s.name == prevText);
-
-            if (matching.length != 0) {
-                const first = matching[0];
-                const typeMethods = getTypeSymbols(first.type);
-                symbols.push(...typeMethods);
-            }
-        }
+        symbols.push(...typeSymbols);
     }
 
     const resolvedSymbols: Symbol[] = [];
@@ -283,8 +295,6 @@ const ibCompletions = (context: CompletionContext) => {
     if (word?.from == word?.to && !context.explicit) return null;
 
     const tree = syntaxTree(context.state);
-    logTree(tree.topNode, context.view?.state.doc!);
-
     const symbols = resolveSymbols(tree, context, word?.text);
 
     const symbolOptions = symbols.map((symbol) => {
@@ -309,6 +319,7 @@ const ibCompletions = (context: CompletionContext) => {
                 type: "keyword",
             },
             { label: "return", type: "keyword" },
+            { label: "new", type: "keyword" },
             { label: "not", type: "keyword" },
             { label: "Void", type: "type" },
             { label: "Int", type: "type" },
