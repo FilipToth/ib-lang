@@ -16,6 +16,7 @@ enum WebsocketMessageKind {
     Execute = 0,
     Output = 1,
     Input = 2,
+    RuntimeError = 3,
 }
 
 impl<'de> Deserialize<'de> for WebsocketMessageKind {
@@ -27,6 +28,7 @@ impl<'de> Deserialize<'de> for WebsocketMessageKind {
             0 => Ok(WebsocketMessageKind::Execute),
             1 => Ok(WebsocketMessageKind::Output),
             2 => Ok(WebsocketMessageKind::Input),
+            3 => Ok(WebsocketMessageKind::RuntimeError),
             _ => Err(serde::de::Error::custom(format!(
                 "{} is an invalid value for WebSocketMessageKind",
                 value
@@ -93,6 +95,19 @@ impl EvalIO for WebSocketEvaluator {
             Err(_) => unreachable!(),
         }
     }
+
+    async fn runtime_error(&self, msg: String) {
+        let msg = WebsocketMessage {
+            kind: WebsocketMessageKind::RuntimeError,
+            payload: msg
+        };
+
+        let msg_raw = serde_json::to_string(&msg).unwrap();
+        let msg = Message::Text(msg_raw);
+
+        let mut socket = self.socket.lock().await;
+        let _ = socket.send(msg).await;
+    }
 }
 
 async fn send_await_resp(
@@ -151,9 +166,10 @@ async fn handle_message(msg: String, socket: Arc<Mutex<WebSocket>>) {
             // start execution
             execute(msg.payload, socket).await;
         }
-        // inputs handled elsewhere
+        // server only accepts execute requests
         WebsocketMessageKind::Input => {}
-        WebsocketMessageKind::Output => {}
+        WebsocketMessageKind::Output => {},
+        WebsocketMessageKind::RuntimeError => {}
     };
 }
 

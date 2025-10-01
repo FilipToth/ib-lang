@@ -10,29 +10,8 @@ use crate::analysis::{
 use super::{
     bound_node::{BoundNode, BoundNodeKind, BoundParameter},
     bound_scope::BoundScope,
-    symbols::VariableSymbol,
     types::{get_type, TypeKind},
 };
-
-fn bind_module(
-    block: &SyntaxToken,
-    scope: Rc<RefCell<BoundScope>>,
-    errors: &mut ErrorBag,
-    span: Span,
-) -> Option<BoundNode> {
-    let block = match bind(block, scope, errors) {
-        Some(b) => b,
-        None => return None,
-    };
-
-    let node_type = block.node_type.clone();
-    let kind = BoundNodeKind::Module {
-        block: Box::new(block),
-    };
-
-    let node = BoundNode::new(kind, node_type, span);
-    Some(node)
-}
 
 fn bind_block(
     children: &Vec<SyntaxToken>,
@@ -295,9 +274,12 @@ fn bind_params(
             return None;
         };
 
-        let param_type = match get_type(type_annotation.clone(), None, &span, errors) {
-            Some(t) => t,
-            None => return None,
+        let param_type = match type_annotation {
+            Some(t) => match get_type(t.clone(), None, &span, errors) {
+                Some(t) => t,
+                None => return None,
+            },
+            None => TypeKind::Any,
         };
 
         // declare in scope
@@ -472,7 +454,10 @@ fn bind_call_expression(
             None => return None,
         };
 
-        if param.param_type != bound_arg.node_type {
+        if param.param_type != bound_arg.node_type
+            && param.param_type != TypeKind::Any
+            && bound_arg.node_type != TypeKind::Any
+        {
             let kind = ErrorKind::MismatchedArgTypes {
                 id: identifier.clone(),
                 expected: param.param_type.clone(),

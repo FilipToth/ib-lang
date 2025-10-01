@@ -8,6 +8,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TypeKind {
+    Any,
     Void,
     Int,
     String,
@@ -32,6 +33,7 @@ pub struct TypeMethodParamRepresentation {
 impl TypeKind {
     pub fn to_string(&self) -> String {
         match &self {
+            TypeKind::Any => "Any".to_string(),
             TypeKind::Void => "Void".to_string(),
             TypeKind::Int => "Int".to_string(),
             TypeKind::String => "String".to_string(),
@@ -228,6 +230,7 @@ pub fn get_type(
     errors: &mut ErrorBag,
 ) -> Option<TypeKind> {
     let type_kind = match identifier.as_str() {
+        "Any" => TypeKind::Any,
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
         "String" => TypeKind::String,
@@ -306,8 +309,8 @@ pub fn get_type(
 pub enum ObjectState {
     Array(ArrayState),
     Collection(CollectionState),
-    Stack(StackState),
-    Queue(QueueState),
+    Stack(ArrayState),
+    Queue(ArrayState),
 }
 
 #[derive(Debug, Clone)]
@@ -338,38 +341,12 @@ impl CollectionState {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct StackState {
-    pub internal: Vec<EvalValue>,
-}
-
-impl StackState {
-    fn new() -> Self {
-        StackState {
-            internal: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct QueueState {
-    pub internal: Vec<EvalValue>,
-}
-
-impl QueueState {
-    fn new() -> Self {
-        QueueState {
-            internal: Vec::new(),
-        }
-    }
-}
-
 pub fn get_object_state(tp: TypeKind) -> ObjectState {
     match tp {
         TypeKind::Array(_) => ObjectState::Array(ArrayState::new()),
         TypeKind::Collection(_) => ObjectState::Collection(CollectionState::new()),
-        TypeKind::Stack(_) => ObjectState::Stack(StackState::new()),
-        TypeKind::Queue(_) => ObjectState::Queue(QueueState::new()),
+        TypeKind::Stack(_) => ObjectState::Stack(ArrayState::new()),
+        TypeKind::Queue(_) => ObjectState::Queue(ArrayState::new()),
         _ => unreachable!(),
     }
 }

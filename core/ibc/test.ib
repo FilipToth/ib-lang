@@ -1,5 +1,6 @@
-function test()
-    output "Hello, World!"
+function test(x)
+    queue = new Stack<Int>()
+    queue.pop()
 end
 
-test()
+test(false)

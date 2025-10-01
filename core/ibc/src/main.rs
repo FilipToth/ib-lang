@@ -27,6 +27,10 @@ impl EvalIO for IBEvaluator {
             Err(_) => unreachable!(),
         }
     }
+
+    async fn runtime_error(&self, msg: String) {
+        println!("Runtime Error: {}", msg);
+    }
 }
 
 async fn parse_file() {

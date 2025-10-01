@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
     Extension, Json, Router,
 };
+use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
 use sync::{create_file, delete_file, get_files};
@@ -15,6 +16,7 @@ use tower_http::cors::{Any, CorsLayer};
 use ws::handle_ws;
 
 extern crate ibc;
+extern crate dotenv;
 
 pub mod auth;
 pub mod db;
@@ -44,6 +46,7 @@ pub struct IbFile {
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     setup_db();
 
     let cors = CorsLayer::new()
