@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   auth-server:
     build:
@@ -11,11 +9,26 @@ services:
     ports:
       - "8081:8081"
     restart: always
+    # Only needed once you call Admin APIs beyond verifyIdToken(). Drop a
+    # service-account JSON at auth-server/secrets/ and uncomment both blocks.
+    # environment:
+    #   GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    # volumes:
+    #   - ./auth-server/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+
   ib-core:
     build:
       context: ./core
       dockerfile: Dockerfile
     container_name: ib-core
+    environment:
+      # Set here rather than read from core/ib_server/.env for two reasons:
+      # the container's workdir is /usr/src/ibcore while the file lands in
+      # ib_server/ (dotenv only searches upward, so it is never found), and
+      # localhost inside this container is not the auth-server container.
+      AUTH_BACKEND_URL: http://auth-server:8081/auth
+    depends_on:
+      - auth-server
     volumes:
       - ib-data:/usr/src/ibcore/data
     expose:
