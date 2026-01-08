@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path, sync::Arc};
+use std::{collections::HashMap, fs, path::Path};
 
 use auth::auth_middleware;
 use axum::{
@@ -10,7 +10,8 @@ use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
 use sync::{create_file, delete_file, get_files};
-use tokio::{net::TcpListener, sync::broadcast};
+use throttle::Throttle;
+use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use ws::handle_ws;
@@ -21,9 +22,8 @@ extern crate dotenv;
 pub mod auth;
 pub mod db;
 pub mod sync;
+pub mod throttle;
 pub mod ws;
-
-type Broadcaster = Arc<broadcast::Sender<String>>;
 
 #[derive(Serialize)]
 struct Diagnostic {
@@ -54,8 +54,7 @@ async fn main() {
         .allow_origin(Any)
         .allow_headers(Any);
 
-    let (tx, _rx) = broadcast::channel::<String>(100);
-    let tx = Arc::new(tx);
+    let throttle = Throttle::new();
 
     let protected_router = Router::new()
         .route("/diagnostics", post(diagnostics))
@@ -65,10 +64,10 @@ async fn main() {
         .layer(axum::middleware::from_fn(auth_middleware));
 
     let app = Router::new()
-        .route("/ws", get(handle_ws))
+        .route("/wss", get(handle_ws))
         .nest("/api", protected_router)
         .layer(ServiceBuilder::new().layer(cors))
-        .layer(Extension(tx));
+        .layer(Extension(throttle));
 
     println!("Listening on port 8080...");
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();

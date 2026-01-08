@@ -8,7 +8,10 @@ use axum::{
 };
 use reqwest::header::AUTHORIZATION;
 
-async fn ping_auth_backend(jwt: &str) -> Option<String> {
+/// Verifies a Firebase ID token with the auth-server and returns the uid.
+/// Returns `None` for any failure: unreachable backend, malformed response,
+/// or a token the backend rejected.
+pub async fn verify_jwt(jwt: &str) -> Option<String> {
     let client = reqwest::Client::new();
     let authorization = format!("Bearer {}", jwt);
     let url = env::var("AUTH_BACKEND_URL").unwrap();
@@ -27,15 +30,8 @@ async fn ping_auth_backend(jwt: &str) -> Option<String> {
         }
     };
 
-    let resp = match resp.json::<HashMap<String, String>>().await {
-        Ok(resp) => resp,
-        Err(_) => return None,
-    };
-
-    let uid = match resp.get("uid") {
-        Some(uid) => uid,
-        None => return None,
-    };
+    let resp = resp.json::<HashMap<String, String>>().await.ok()?;
+    let uid = resp.get("uid")?;
 
     Some(uid.clone())
 }
@@ -51,7 +47,7 @@ pub async fn auth_middleware(mut req: Request, next: Next) -> Result<Response, S
         return Err(StatusCode::UNAUTHORIZED);
     };
 
-    match ping_auth_backend(jwt).await {
+    match verify_jwt(jwt).await {
         Some(uid) => {
             req.extensions_mut().insert(uid);
             Ok(next.run(req).await)

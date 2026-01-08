@@ -9,11 +9,13 @@ import {
 } from "@mui/material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
+import { auth } from "services/firebase";
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
 interface OutputProps {
     code: string;
+    fileId: string | undefined;
 }
 
 enum WebSocketMessageKind {
@@ -26,9 +28,10 @@ enum WebSocketMessageKind {
 interface WebSocketMessage {
     kind: WebSocketMessageKind;
     payload: string;
+    file_id?: string;
 }
 
-const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
+const OutputBar: FunctionComponent<OutputProps> = ({ code, fileId }) => {
     const [output, setOutput] = useState("");
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
@@ -38,6 +41,11 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
     const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
 
+    const showError = (msg: string) => {
+        setError(msg);
+        setTimeout(() => setError(null), 4000);
+    };
+
     const onClick = async () => {
         setOutput("");
         if (WS_URL == undefined) {
@@ -45,7 +53,21 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
             return;
         }
 
-        setSocketUrl(WS_URL);
+        if (fileId == undefined) {
+            showError("Open a file before running.");
+            return;
+        }
+
+        // the socket is authenticated with the same Firebase ID token the REST
+        // API uses; it goes in the query string because the browser WebSocket
+        // API cannot set request headers
+        const jwt = await auth.currentUser?.getIdToken();
+        if (jwt == undefined) {
+            showError("You are signed out. Sign in again to run code.");
+            return;
+        }
+
+        setSocketUrl(`${WS_URL}?token=${encodeURIComponent(jwt)}`);
     };
 
     useEffect(() => {
@@ -84,6 +106,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code }) => {
                 const msg: WebSocketMessage = {
                     kind: WebSocketMessageKind.Execute,
                     payload: code,
+                    file_id: fileId,
                 };
 
                 const msg_raw = JSON.stringify(msg);

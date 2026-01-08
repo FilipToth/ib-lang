@@ -1,15 +1,22 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::Query,
+    http::StatusCode,
+    response::{IntoResponse, Response},
     Extension,
 };
 use futures_util::{lock::Mutex, StreamExt};
 use ibc::eval::{evaluator, EvalIO};
 use serde::{Deserialize, Serialize, Serializer};
 
-use crate::{Broadcaster, Diagnostic};
+use crate::auth::verify_jwt;
+use crate::db::get_filename_uid;
+use crate::throttle::{ConnectionGuard, Throttle};
+use crate::Diagnostic;
 
 #[derive(Debug, Clone, Copy)]
 enum WebsocketMessageKind {
@@ -51,6 +58,10 @@ impl Serialize for WebsocketMessageKind {
 struct WebsocketMessage {
     kind: WebsocketMessageKind,
     payload: String,
+    /// Set on Execute requests so the server can verify the caller owns the
+    /// file. Absent on the messages the server sends back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    file_id: Option<String>,
 }
 
 struct WebSocketEvaluator {
@@ -63,6 +74,7 @@ impl EvalIO for WebSocketEvaluator {
         let msg = WebsocketMessage {
             kind: WebsocketMessageKind::Output,
             payload: output_msg,
+            file_id: None,
         };
 
         let msg_raw = serde_json::to_string(&msg).unwrap();
@@ -76,6 +88,7 @@ impl EvalIO for WebSocketEvaluator {
         let msg = WebsocketMessage {
             kind: WebsocketMessageKind::Input,
             payload: "".to_string(),
+            file_id: None,
         };
 
         let mut socket = self.socket.lock().await;
@@ -99,7 +112,8 @@ impl EvalIO for WebSocketEvaluator {
     async fn runtime_error(&self, msg: String) {
         let msg = WebsocketMessage {
             kind: WebsocketMessageKind::RuntimeError,
-            payload: msg
+            payload: msg,
+            file_id: None,
         };
 
         let msg_raw = serde_json::to_string(&msg).unwrap();
@@ -123,6 +137,22 @@ async fn send_await_resp(
         Some(Err(e)) => Err(e),
         Some(_) => Ok(None),
         None => Ok(None),
+    }
+}
+
+/// Sends a RuntimeError frame to the client. Used for refusals that are the
+/// caller's fault, so the IDE can show a message instead of the socket just
+/// dropping.
+async fn refuse(socket: &Arc<Mutex<WebSocket>>, reason: &str) {
+    let msg = WebsocketMessage {
+        kind: WebsocketMessageKind::RuntimeError,
+        payload: reason.to_string(),
+        file_id: None,
+    };
+
+    if let Ok(raw) = serde_json::to_string(&msg) {
+        let mut socket = socket.lock().await;
+        let _ = socket.send(Message::Text(raw)).await;
     }
 }
 
@@ -153,68 +183,109 @@ async fn execute(body: String, socket: Arc<Mutex<WebSocket>>) {
     let _ = socket.lock().await.send(Message::Close(None)).await;
 }
 
-async fn handle_message(msg: String, socket: Arc<Mutex<WebSocket>>) {
+async fn handle_message(
+    msg: String,
+    socket: Arc<Mutex<WebSocket>>,
+    uid: &str,
+    throttle: &Throttle,
+) {
     let msg: WebsocketMessage = match serde_json::from_str(&msg) {
         Ok(msg) => msg,
         Err(_) => {
-            unreachable!()
-        },
+            refuse(&socket, "Malformed message").await;
+            return;
+        }
     };
 
     match msg.kind {
         WebsocketMessageKind::Execute => {
-            // start execution
+            let Some(file_id) = msg.file_id else {
+                refuse(&socket, "Execute request is missing a file id").await;
+                return;
+            };
+
+            // the caller must own the file it is asking us to run
+            let Some(file) = get_filename_uid(file_id) else {
+                refuse(&socket, "No such file").await;
+                return;
+            };
+
+            if file.uid != uid {
+                refuse(&socket, "No such file").await;
+                return;
+            }
+
+            if !throttle.try_execute(uid) {
+                refuse(&socket, "Too many runs, please wait a moment").await;
+                return;
+            }
+
             execute(msg.payload, socket).await;
         }
         // server only accepts execute requests
         WebsocketMessageKind::Input => {}
-        WebsocketMessageKind::Output => {},
+        WebsocketMessageKind::Output => {}
         WebsocketMessageKind::RuntimeError => {}
     };
 }
 
-async fn handle_ws_socket(socket: WebSocket, tx: Broadcaster) {
+async fn handle_ws_socket(
+    socket: WebSocket,
+    uid: String,
+    throttle: Throttle,
+    // held for the lifetime of the connection; releases the slot on drop
+    _guard: ConnectionGuard,
+) {
     let socket = Arc::new(Mutex::new(socket));
-    let mut rx = tx.subscribe();
 
     loop {
-        tokio::select! {
-            // Wait for message received
-            Some(msg) = async {
-                let mut socket_lock = socket.lock().await;
-                socket_lock.next().await
-            } => {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        handle_message(text.clone(), Arc::clone(&socket)).await;
+        // the lock is scoped so it is released before the message is handled
+        let msg = {
+            let mut socket_lock = socket.lock().await;
+            socket_lock.next().await
+        };
 
-                        if tx.send(text).is_err() {
-                            break;
-                        }
-                    }
-                    Ok(Message::Close(_reason)) => {
-                        break;
-                    }
-                    Err(e) => {
-                        println!("ws error: {}", e);
-                        break;
-                    }
-                    _ => {}
-                }
+        // stream ended, the peer is gone
+        let Some(msg) = msg else {
+            break;
+        };
+
+        match msg {
+            Ok(Message::Text(text)) => {
+                handle_message(text, Arc::clone(&socket), &uid, &throttle).await;
             }
-            Ok(msg) = rx.recv() => {
-                let msg = Message::Text(msg);
-                if socket.lock().await.send(msg).await.is_err() {
-                    break;
-                }
+            Ok(Message::Close(_reason)) => {
+                break;
             }
+            Err(e) => {
+                println!("ws error: {}", e);
+                break;
+            }
+            _ => {}
         }
     }
 }
 
 pub async fn handle_ws(
     ws: WebSocketUpgrade,
-    Extension(tx): Extension<Broadcaster>,
-) -> impl axum::response::IntoResponse {
-    ws.on_upgrade(|socket| handle_ws_socket(socket, tx))
+    Query(params): Query<HashMap<String, String>>,
+    Extension(throttle): Extension<Throttle>,
+) -> Response {
+    // The browser WebSocket API cannot set request headers, so the Firebase
+    // ID token travels as a query parameter rather than in Authorization.
+    let Some(token) = params.get("token") else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+
+    let Some(uid) = verify_jwt(token).await else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+
+    // Reserve a slot before upgrading, so a flood is rejected as a cheap HTTP
+    // response instead of becoming a live socket.
+    let Some(guard) = throttle.try_connect(&uid) else {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    };
+
+    ws.on_upgrade(move |socket| handle_ws_socket(socket, uid, throttle, guard))
 }

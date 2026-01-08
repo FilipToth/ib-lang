@@ -303,7 +303,12 @@ const Editor = () => {
                                 />
                             )}
                         </Stack>
-                        {tabs.length != 0 && <OutputBar code={code} />}
+                        {tabs.length != 0 && (
+                            <OutputBar
+                                code={code}
+                                fileId={tabs[tabState]?.id}
+                            />
+                        )}
                     </Stack>
                 </Stack>
                 <NewFileDialog
