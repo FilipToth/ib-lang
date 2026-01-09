@@ -121,102 +121,137 @@ impl Drop for ConnectionGuard {
 mod tests {
     use super::*;
 
+    /// Opens `count` connections for `uid` and returns the guards, which the
+    /// caller must keep alive for the slots to stay reserved.
+    fn fill_user(throttle: &Throttle, uid: &str, count: usize) -> Vec<ConnectionGuard> {
+        let mut held: Vec<ConnectionGuard> = Vec::new();
+
+        for _ in 0..count {
+            let guard = throttle.try_connect(uid).expect("should be under the cap");
+            held.push(guard);
+        }
+
+        held
+    }
+
     #[test]
     fn caps_connections_per_user() {
-        let t = Throttle::new();
-        let mut held = Vec::new();
-        for _ in 0..MAX_CONNECTIONS_PER_USER {
-            held.push(t.try_connect("alice").expect("under the cap"));
-        }
-        assert!(t.try_connect("alice").is_none(), "cap must reject the next");
+        let throttle = Throttle::new();
+        let _held = fill_user(&throttle, "alice", MAX_CONNECTIONS_PER_USER);
+
+        assert!(
+            throttle.try_connect("alice").is_none(),
+            "the connection past the cap must be rejected"
+        );
     }
 
     #[test]
     fn one_user_cannot_starve_another() {
-        let t = Throttle::new();
-        let mut held = Vec::new();
-        for _ in 0..MAX_CONNECTIONS_PER_USER {
-            held.push(t.try_connect("alice").unwrap());
-        }
-        assert!(t.try_connect("alice").is_none());
-        assert!(t.try_connect("bob").is_some(), "bob has his own budget");
+        let throttle = Throttle::new();
+        let _held = fill_user(&throttle, "alice", MAX_CONNECTIONS_PER_USER);
+
+        assert!(throttle.try_connect("alice").is_none());
+        assert!(
+            throttle.try_connect("bob").is_some(),
+            "bob has his own budget"
+        );
     }
 
     #[test]
     fn dropping_a_guard_frees_the_slot() {
-        let t = Throttle::new();
-        let mut held = Vec::new();
-        for _ in 0..MAX_CONNECTIONS_PER_USER {
-            held.push(t.try_connect("alice").unwrap());
-        }
-        assert!(t.try_connect("alice").is_none());
+        let throttle = Throttle::new();
+        let mut held = fill_user(&throttle, "alice", MAX_CONNECTIONS_PER_USER);
+
+        assert!(throttle.try_connect("alice").is_none());
+
         held.pop();
-        assert!(t.try_connect("alice").is_some(), "slot returns on drop");
+
+        assert!(
+            throttle.try_connect("alice").is_some(),
+            "the slot must come back when its guard drops"
+        );
     }
 
     #[test]
     fn enforces_global_connection_cap() {
-        let t = Throttle::new();
-        let mut held = Vec::new();
-        // fill to exactly the global cap, using as many users as that takes
+        let throttle = Throttle::new();
+        let mut held: Vec<ConnectionGuard> = Vec::new();
         let mut user = 0;
+
+        // fill to exactly the global cap, taking as many users as that needs
         while held.len() < MAX_TOTAL_CONNECTIONS {
             let name = format!("user{}", user);
+
             while held.len() < MAX_TOTAL_CONNECTIONS {
-                match t.try_connect(&name) {
-                    Some(g) => held.push(g),
-                    None => break, // this user hit the per-user cap
-                }
+                let guard = match throttle.try_connect(&name) {
+                    Some(g) => g,
+                    // this user is at their own cap, move to the next one
+                    None => break,
+                };
+
+                held.push(guard);
             }
+
             user += 1;
         }
+
         assert_eq!(held.len(), MAX_TOTAL_CONNECTIONS);
         assert!(
-            t.try_connect("late-arrival").is_none(),
-            "global cap must reject a fresh user once full"
+            throttle.try_connect("late-arrival").is_none(),
+            "a fresh user must still be rejected once the server is full"
         );
     }
 
     #[test]
     fn execute_budget_is_spent_then_refused() {
-        let t = Throttle::new();
+        let throttle = Throttle::new();
+
         for i in 0..MAX_EXECUTES_PER_WINDOW {
-            assert!(t.try_execute("alice"), "execute {} should pass", i);
+            assert!(throttle.try_execute("alice"), "execute {} should pass", i);
         }
-        assert!(!t.try_execute("alice"), "budget is spent");
-        assert!(t.try_execute("bob"), "per-user, not global");
+
+        assert!(!throttle.try_execute("alice"), "the budget is spent");
+        assert!(
+            throttle.try_execute("bob"),
+            "the budget is per-user, not global"
+        );
     }
 
     #[test]
     fn execute_budget_refills_as_the_window_slides() {
-        let t = Throttle::new();
+        let throttle = Throttle::new();
+        let stale = Instant::now() - EXECUTE_WINDOW - Duration::from_secs(1);
+
+        // spend the whole budget, backdated to before the window opened
         {
-            let mut lock = t.inner.lock().unwrap();
+            let mut lock = throttle.inner.lock().unwrap();
             let bucket = lock.users.entry("alice".to_string()).or_default();
-            // spend the whole budget, backdated past the window
-            let stale = Instant::now() - EXECUTE_WINDOW - Duration::from_secs(1);
+
             for _ in 0..MAX_EXECUTES_PER_WINDOW {
                 bucket.executes.push_back(stale);
             }
         }
+
         assert!(
-            t.try_execute("alice"),
+            throttle.try_execute("alice"),
             "entries older than the window must be evicted"
         );
     }
 
     #[test]
     fn releasing_every_slot_reclaims_the_user_entry() {
-        let t = Throttle::new();
+        let throttle = Throttle::new();
+
         {
-            let _g = t.try_connect("alice").unwrap();
-            assert_eq!(t.inner.lock().unwrap().users.len(), 1);
+            let _guard = throttle.try_connect("alice").unwrap();
+            let lock = throttle.inner.lock().unwrap();
+
+            assert_eq!(lock.users.len(), 1);
         }
-        assert_eq!(
-            t.inner.lock().unwrap().users.len(),
-            0,
-            "idle users must not accumulate"
-        );
-        assert_eq!(t.inner.lock().unwrap().total_connections, 0);
+
+        let lock = throttle.inner.lock().unwrap();
+
+        assert_eq!(lock.users.len(), 0, "idle users must not accumulate");
+        assert_eq!(lock.total_connections, 0);
     }
 }

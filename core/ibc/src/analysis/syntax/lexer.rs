@@ -251,6 +251,22 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             ':' => LexerTokenKind::ColonToken,
             '.' => LexerTokenKind::DotToken,
             ' ' => continue,
+            '#' => {
+                // line comment: consume through to the end of the line. The
+                // newline is deliberately left in the iterator so the '\n'
+                // arm below still does the line/column bookkeeping.
+                while let Some(next) = chars.peek() {
+                    if *next == '\n' {
+                        break;
+                    }
+
+                    column += 1;
+                    char_offset += 1;
+                    chars.next();
+                }
+
+                continue;
+            }
             '\n' => {
                 line += 1;
                 column = 0;
@@ -269,4 +285,110 @@ pub fn lex(content: String) -> Vec<LexerToken> {
     }
 
     tokens
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Lexes `src` and keeps just the token kinds, which is what most of these
+    /// assertions care about.
+    fn kinds(src: &str) -> Vec<LexerTokenKind> {
+        let tokens = lex(src.to_string());
+        let mut kinds: Vec<LexerTokenKind> = Vec::new();
+
+        for token in tokens {
+            kinds.push(token.kind);
+        }
+
+        kinds
+    }
+
+    #[test]
+    fn comment_produces_no_tokens() {
+        assert!(kinds("# just a comment").is_empty());
+    }
+
+    #[test]
+    fn comment_only_file_is_empty() {
+        assert!(kinds("# one\n# two\n# three").is_empty());
+    }
+
+    #[test]
+    fn comment_does_not_swallow_the_next_line() {
+        assert_eq!(
+            kinds("# a comment\noutput 1"),
+            vec![
+                LexerTokenKind::OutputKeyword,
+                LexerTokenKind::IntegerLiteralToken(1),
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_comment_after_code_is_ignored() {
+        assert_eq!(
+            kinds("output 1 # explain the output"),
+            vec![
+                LexerTokenKind::OutputKeyword,
+                LexerTokenKind::IntegerLiteralToken(1),
+            ]
+        );
+    }
+
+    #[test]
+    fn comment_at_eof_without_newline_terminates() {
+        let expected = vec![
+            LexerTokenKind::OutputKeyword,
+            LexerTokenKind::IntegerLiteralToken(1),
+        ];
+
+        assert_eq!(kinds("output 1 #"), expected);
+    }
+
+    #[test]
+    fn hash_inside_a_string_is_not_a_comment() {
+        assert_eq!(
+            kinds("output \"# not a comment\""),
+            vec![
+                LexerTokenKind::OutputKeyword,
+                LexerTokenKind::StringLiteralToken("# not a comment".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn comment_keeps_line_numbers_correct() {
+        // the token on the second line must report line 1, not line 0
+        let tokens = lex("# comment\noutput".to_string());
+        assert_eq!(tokens.len(), 1);
+
+        let start = tokens[0].span.start;
+        assert_eq!(start.line, 1);
+    }
+
+    #[test]
+    fn comment_keeps_char_offsets_correct() {
+        // the IDE underlines diagnostics by offset, so a comment must not
+        // shift the offsets of the tokens that follow it
+        let tokens = lex("# hi\noutput".to_string());
+        assert_eq!(tokens.len(), 1);
+
+        // "# hi\n" is 5 characters, so 'output' starts at offset 5
+        let start = tokens[0].span.start;
+        assert_eq!(start.char_offset, 5);
+    }
+
+    #[test]
+    fn code_before_and_after_a_comment_line_both_lex() {
+        assert_eq!(
+            kinds("output 1\n# middle\noutput 2"),
+            vec![
+                LexerTokenKind::OutputKeyword,
+                LexerTokenKind::IntegerLiteralToken(1),
+                LexerTokenKind::OutputKeyword,
+                LexerTokenKind::IntegerLiteralToken(2),
+            ]
+        );
+    }
 }
