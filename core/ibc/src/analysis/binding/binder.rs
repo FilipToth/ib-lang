@@ -29,10 +29,7 @@ fn bind_block(
 
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
-        let bound_child = match bind(child, scope_ref.clone(), errors) {
-            Some(n) => n,
-            None => return None,
-        };
+        let bound_child = bind(child, scope_ref.clone(), errors)?;
 
         bound.push(bound_child);
     }
@@ -51,10 +48,7 @@ fn bind_output_statement(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let expr = match bind(expr, scope, errors) {
-        Some(expr) => expr,
-        None => return None,
-    };
+    let expr = bind(expr, scope, errors)?;
 
     let kind = BoundNodeKind::OutputStatement {
         expr: Box::new(expr),
@@ -72,10 +66,7 @@ fn bind_return_statement(
 ) -> Option<BoundNode> {
     let (ret_type, expr) = match ret_expr {
         Some(ret_expr) => {
-            let ret_expr = match bind(ret_expr, scope.clone(), errors) {
-                Some(e) => e,
-                None => return None,
-            };
+            let ret_expr = bind(ret_expr, scope.clone(), errors)?;
 
             let ret_type = ret_expr.node_type.clone();
             let ret_expr = Some(Box::new(ret_expr));
@@ -97,10 +88,7 @@ fn bind_if_statement(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let condition = match bind(condition, scope.clone(), errors) {
-        Some(cond) => cond,
-        None => return None,
-    };
+    let condition = bind(condition, scope.clone(), errors)?;
 
     if condition.node_type != TypeKind::Boolean {
         errors.add(
@@ -110,16 +98,10 @@ fn bind_if_statement(
         return None;
     }
 
-    let block = match bind(next, scope.clone(), errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let block = bind(next, scope.clone(), errors)?;
 
     let else_block = match else_next {
-        Some(e) => match bind(e, scope, errors) {
-            Some(e) => Some(Box::new(e)),
-            None => return None,
-        },
+        Some(e) => Some(Box::new(bind(e, scope, errors)?)),
         None => None,
     };
 
@@ -145,11 +127,7 @@ fn bind_function_declaration(
     let func_scope = BoundScope::new(scope.clone());
     let func_scope_ref = Rc::new(RefCell::new(func_scope));
 
-    let params = bind_params(params, func_scope_ref.clone(), errors);
-    let params = match params {
-        Some(p) => p,
-        None => return None,
-    };
+    let params = bind_params(params, func_scope_ref.clone(), errors)?;
 
     let ret_type = match ret_type {
         Some(t) => t,
@@ -157,20 +135,14 @@ fn bind_function_declaration(
     }
     .to_string();
 
-    let ret_type = match get_type(ret_type, None, &span, errors) {
-        Some(t) => t,
-        None => return None,
-    };
+    let ret_type = get_type(ret_type, None, &span, errors)?;
 
     let block_span = block.span.clone();
     let SyntaxKind::Scope { subtokens } = &block.kind else {
         return None;
     };
 
-    let block = match bind_block(&subtokens, func_scope_ref, false, errors, block_span) {
-        Some(b) => b,
-        None => return None,
-    };
+    let block = bind_block(&subtokens, func_scope_ref, false, errors, block_span)?;
 
     let symbol =
         scope
@@ -203,16 +175,10 @@ fn bind_for_statement(
     span: Span,
 ) -> Option<BoundNode> {
     let mut loop_scope = BoundScope::new(scope);
-    let iterator = match loop_scope.assign_variable(identifier, TypeKind::Int) {
-        Some(s) => s,
-        None => return None,
-    };
+    let iterator = loop_scope.assign_variable(identifier, TypeKind::Int)?;
 
     let loop_scope = Rc::new(RefCell::new(loop_scope));
-    let body = match bind(body, loop_scope, errors) {
-        Some(b) => b,
-        None => return None,
-    };
+    let body = bind(body, loop_scope, errors)?;
 
     let kind = BoundNodeKind::ForLoop {
         iterator: iterator,
@@ -232,10 +198,7 @@ fn bind_while_statement(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let expr = match bind(expr, scope.clone(), errors) {
-        Some(e) => e,
-        None => return None,
-    };
+    let expr = bind(expr, scope.clone(), errors)?;
 
     let expr_type = expr.node_type.clone();
     if expr_type != TypeKind::Boolean {
@@ -244,10 +207,7 @@ fn bind_while_statement(
         return None;
     }
 
-    let body = match bind(body, scope, errors) {
-        Some(b) => b,
-        None => return None,
-    };
+    let body = bind(body, scope, errors)?;
 
     let kind = BoundNodeKind::WhileLoop {
         expr: Box::new(expr),
@@ -275,10 +235,7 @@ fn bind_params(
         };
 
         let param_type = match type_annotation {
-            Some(t) => match get_type(t.clone(), None, &span, errors) {
-                Some(t) => t,
-                None => return None,
-            },
+            Some(t) => get_type(t.clone(), None, &span, errors)?,
             None => TypeKind::Any,
         };
 
@@ -312,20 +269,11 @@ fn bind_binary_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let lhs = match bind(lhs, scope.clone(), errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let lhs = bind(lhs, scope.clone(), errors)?;
 
-    let rhs = match bind(rhs, scope, errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let rhs = bind(rhs, scope, errors)?;
 
-    let op_type = match op.return_type_binary(&lhs, &rhs, errors) {
-        Some(t) => t,
-        None => return None,
-    };
+    let op_type = op.return_type_binary(&lhs, &rhs, errors)?;
 
     let kind = BoundNodeKind::BinaryExpression {
         lhs: Box::new(lhs),
@@ -344,15 +292,9 @@ fn bind_unary_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let rhs = match bind(rhs, scope, errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let rhs = bind(rhs, scope, errors)?;
 
-    let op_type = match op.return_type_unary(&rhs, errors) {
-        Some(t) => t,
-        None => return None,
-    };
+    let op_type = op.return_type_unary(&rhs, errors)?;
 
     let kind = BoundNodeKind::UnaryExpression {
         op: op.clone(),
@@ -388,10 +330,7 @@ fn bind_assignment_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let value = match bind(value, scope.clone(), errors) {
-        Some(v) => v,
-        None => return None,
-    };
+    let value = bind(value, scope.clone(), errors)?;
 
     let node_type = value.node_type.clone();
     let symbol = scope
@@ -449,10 +388,7 @@ fn bind_call_expression(
         let param = &params[index];
         let arg = &args[index];
 
-        let bound_arg = match bind(arg, scope.clone(), errors) {
-            Some(a) => a,
-            None => return None,
-        };
+        let bound_arg = bind(arg, scope.clone(), errors)?;
 
         if param.param_type != bound_arg.node_type
             && param.param_type != TypeKind::Any
@@ -508,10 +444,7 @@ fn bind_object_member_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let base_node = match bind(base, scope.clone(), errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let base_node = bind(base, scope.clone(), errors)?;
 
     // create a scope with all object member methods
     // and the run regular binding with that scope
@@ -523,10 +456,7 @@ fn bind_object_member_expression(
         let mut scope_mut = scope.borrow_mut();
 
         for param in method.params {
-            let param = match scope_mut.assign_variable(param.identifier, param.param_type) {
-                Some(p) => p,
-                None => return None,
-            };
+            let param = scope_mut.assign_variable(param.identifier, param.param_type)?;
 
             let param_type = param.var_type.clone();
             let bound_parameter = BoundParameter {
@@ -540,10 +470,7 @@ fn bind_object_member_expression(
         object_scope.declare_function(method.identifier, params, method.ret_type);
     }
 
-    let next = match bind(next, Rc::new(RefCell::new(object_scope)), errors) {
-        Some(n) => n,
-        None => return None,
-    };
+    let next = bind(next, Rc::new(RefCell::new(object_scope)), errors)?;
 
     let node_type = next.node_type.clone();
     let kind = BoundNodeKind::ObjectMemberExpression {
@@ -563,10 +490,7 @@ fn bind_instantiation_expression(
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let instantiation_type = match get_type(type_name.clone(), type_param, &span, errors) {
-        Some(t) => t,
-        None => return None,
-    };
+    let instantiation_type = get_type(type_name.clone(), type_param, &span, errors)?;
 
     if args.len() != 0 {
         // we don't support constructors with arguments yet

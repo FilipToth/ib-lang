@@ -237,10 +237,7 @@ pub fn get_type(
         "Boolean" => TypeKind::Boolean,
         "Array" => {
             let generic = match generic {
-                Some(id) => match get_type(id, None, span, errors) {
-                    Some(t) => t,
-                    None => return None,
-                },
+                Some(id) => get_type(id, None, span, errors)?,
                 None => {
                     let kind = ErrorKind::ExpectsGenericTypeParam("Array".to_string());
                     errors.add(kind, span.clone());
@@ -252,10 +249,7 @@ pub fn get_type(
         }
         "Collection" => {
             let generic = match generic {
-                Some(id) => match get_type(id, None, span, errors) {
-                    Some(t) => t,
-                    None => return None,
-                },
+                Some(id) => get_type(id, None, span, errors)?,
                 None => {
                     let kind = ErrorKind::ExpectsGenericTypeParam("Collection".to_string());
                     errors.add(kind, span.clone());
@@ -267,10 +261,7 @@ pub fn get_type(
         }
         "Stack" => {
             let generic = match generic {
-                Some(id) => match get_type(id, None, span, errors) {
-                    Some(t) => t,
-                    None => return None,
-                },
+                Some(id) => get_type(id, None, span, errors)?,
                 None => {
                     let kind = ErrorKind::ExpectsGenericTypeParam("Stack".to_string());
                     errors.add(kind, span.clone());
@@ -282,10 +273,7 @@ pub fn get_type(
         }
         "Queue" => {
             let generic = match generic {
-                Some(id) => match get_type(id, None, span, errors) {
-                    Some(t) => t,
-                    None => return None,
-                },
+                Some(id) => get_type(id, None, span, errors)?,
                 None => {
                     let kind = ErrorKind::ExpectsGenericTypeParam("Queue".to_string());
                     errors.add(kind, span.clone());

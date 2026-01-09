@@ -31,10 +31,7 @@ impl<'a> Parser<'a> {
         parent_precedence: usize,
         errors: &mut ErrorBag,
     ) -> Option<SyntaxToken> {
-        let unary_precedence = match self.tokens.peek() {
-            Some(t) => t.kind.unary_operator_precedence(),
-            None => return None,
-        };
+        let unary_precedence = self.tokens.peek()?.kind.unary_operator_precedence();
 
         let mut lhs = if unary_precedence != 0 && unary_precedence >= parent_precedence {
             // unary expression
@@ -50,10 +47,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let rhs = match self.parse_binary_expression(unary_precedence, errors) {
-                Some(r) => r,
-                None => return None,
-            };
+            let rhs = self.parse_binary_expression(unary_precedence, errors)?;
 
             let unary_kind = SyntaxKind::UnaryExpression {
                 op: operator,
@@ -201,10 +195,7 @@ impl<'a> Parser<'a> {
         match peek.kind {
             LexerTokenKind::OpenParenthesisToken => {
                 // call expression
-                let arguments = match self.parse_argument_list(errors) {
-                    Some(a) => a,
-                    None => return None,
-                };
+                let arguments = self.parse_argument_list(errors)?;
 
                 let last_loc = match arguments.last() {
                     Some(t) => t.span.end,
@@ -340,10 +331,7 @@ impl<'a> Parser<'a> {
         let mut prev_comma = false;
 
         loop {
-            let peek = match self.tokens.peek() {
-                Some(p) => p,
-                None => return None,
-            };
+            let peek = self.tokens.peek()?;
 
             if let LexerTokenKind::CloseParenthesisToken = peek.kind {
                 let peek_span = peek.span.clone();
@@ -358,10 +346,7 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            let expr = match self.parse_expression(errors) {
-                Some(e) => e,
-                None => return None,
-            };
+            let expr = self.parse_expression(errors)?;
 
             let peek = match self.tokens.peek() {
                 Some(p) => p,
@@ -537,10 +522,7 @@ impl<'a> Parser<'a> {
         };
 
         // parameter list
-        let parameters = match self.parse_parameter_list(errors) {
-            Some(p) => p,
-            None => return None,
-        };
+        let parameters = self.parse_parameter_list(errors)?;
 
         let mut return_type: Option<String> = None;
         if self.expect_next_token_peek(LexerTokenKind::ArrowToken) {
@@ -608,10 +590,7 @@ impl<'a> Parser<'a> {
         let mut prev_comma = false;
 
         loop {
-            let peek = match self.tokens.peek() {
-                Some(t) => t.clone(),
-                None => return None,
-            };
+            let peek = self.tokens.peek()?.clone();
 
             match peek.kind {
                 LexerTokenKind::CloseParenthesisToken => {
@@ -635,10 +614,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            let (identifier, loc) = match self.parse_identifier() {
-                Some(i) => i,
-                None => return None,
-            };
+            let (identifier, loc) = self.parse_identifier()?;
 
             let type_annotation = {
                 if self.expect_next_token_peek(LexerTokenKind::ColonToken) {
@@ -799,10 +775,7 @@ impl<'a> Parser<'a> {
     fn parse_while_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let while_keyword = self.tokens.next().unwrap();
 
-        let expr = match self.parse_expression(errors) {
-            Some(e) => e,
-            None => return None,
-        };
+        let expr = self.parse_expression(errors)?;
 
         let body = match self.parse_scope(errors) {
             Some(b) => b,
@@ -831,9 +804,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-        let peek = self.tokens.peek();
-
-        let Some(peek) = peek else { return None };
+        let peek = self.tokens.peek()?;
         match peek.kind {
             LexerTokenKind::OutputKeyword => self.parse_output_statement(errors),
             LexerTokenKind::IfKeyword => self.parse_if_statement(errors),
@@ -872,12 +843,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_identifier(&mut self) -> Option<(String, Span)> {
-        match self.tokens.next() {
-            Some(t) => match &t.kind {
-                LexerTokenKind::IdentifierToken(id) => Some((id.clone(), t.span.clone())),
-                _ => return None,
-            },
-            None => return None,
+        let t = self.tokens.next()?;
+        match &t.kind {
+            LexerTokenKind::IdentifierToken(id) => Some((id.clone(), t.span.clone())),
+            _ => None,
         }
     }
 
