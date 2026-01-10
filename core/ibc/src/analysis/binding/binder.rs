@@ -165,15 +165,38 @@ fn bind_function_declaration(
     Some(node)
 }
 
+/// Binds one loop bound in the enclosing scope and checks it yields an Int.
+fn bind_loop_bound(
+    bound: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+) -> Option<BoundNode> {
+    let bound = bind(bound, scope, errors)?;
+
+    let bound_type = bound.node_type.clone();
+    if bound_type != TypeKind::Int && bound_type != TypeKind::Any {
+        let kind = ErrorKind::LoopBoundMustBeInt(bound_type);
+        errors.add(kind, bound.span);
+        return None;
+    }
+
+    Some(bound)
+}
+
 fn bind_for_statement(
     identifier: String,
-    lower_bound: usize,
-    upper_bound: usize,
+    lower_bound: &SyntaxToken,
+    upper_bound: &SyntaxToken,
     body: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
+    // the bounds are evaluated once, before the loop variable exists, so they
+    // bind in the enclosing scope rather than the loop's own
+    let lower_bound = bind_loop_bound(lower_bound, scope.clone(), errors)?;
+    let upper_bound = bind_loop_bound(upper_bound, scope.clone(), errors)?;
+
     let mut loop_scope = BoundScope::new(scope);
     let iterator = loop_scope.assign_variable(identifier, TypeKind::Int)?;
 
@@ -182,8 +205,37 @@ fn bind_for_statement(
 
     let kind = BoundNodeKind::ForLoop {
         iterator: iterator,
-        lower_bound: lower_bound,
-        upper_bound: upper_bound,
+        lower_bound: Box::new(lower_bound),
+        upper_bound: Box::new(upper_bound),
+        block: Arc::new(body),
+    };
+
+    let node = BoundNode::new(kind, TypeKind::Void, span);
+    Some(node)
+}
+
+/// `loop until X` runs while X is false. Binding mirrors the while loop; the
+/// inversion happens at evaluation.
+fn bind_until_statement(
+    expr: &SyntaxToken,
+    body: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let expr = bind(expr, scope.clone(), errors)?;
+
+    let expr_type = expr.node_type.clone();
+    if expr_type != TypeKind::Boolean {
+        let kind = ErrorKind::ConditionMustBeBoolean(expr_type);
+        errors.add(kind, expr.span);
+        return None;
+    }
+
+    let body = bind(body, scope, errors)?;
+
+    let kind = BoundNodeKind::UntilLoop {
+        expr: Box::new(expr),
         block: Arc::new(body),
     };
 
@@ -553,8 +605,8 @@ pub fn bind(
             body,
         } => bind_for_statement(
             identifier.clone(),
-            lower_bound.clone(),
-            upper_bound.clone(),
+            &lower_bound,
+            &upper_bound,
             &body,
             scope,
             errors,
@@ -562,6 +614,9 @@ pub fn bind(
         ),
         SyntaxKind::WhileLoop { expr, body } => {
             bind_while_statement(&expr, &body, scope, errors, span)
+        }
+        SyntaxKind::UntilLoop { expr, body } => {
+            bind_until_statement(&expr, &body, scope, errors, span)
         }
         SyntaxKind::BinaryExpression { lhs, op, rhs } => {
             bind_binary_expression(&lhs, &op, &rhs, scope, errors, span)

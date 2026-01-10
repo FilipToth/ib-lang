@@ -76,11 +76,15 @@ pub enum SyntaxKind {
     },
     ForLoop {
         identifier: String,
-        lower_bound: usize,
-        upper_bound: usize,
+        lower_bound: Box<SyntaxToken>,
+        upper_bound: Box<SyntaxToken>,
         body: Box<SyntaxToken>,
     },
     WhileLoop {
+        expr: Box<SyntaxToken>,
+        body: Box<SyntaxToken>,
+    },
+    UntilLoop {
         expr: Box<SyntaxToken>,
         body: Box<SyntaxToken>,
     },

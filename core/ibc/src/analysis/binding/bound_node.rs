@@ -50,13 +50,16 @@ impl BoundNode {
                 format!(
                     "loop {} from {} to {} {} end",
                     iterator.identifier,
-                    lower_bound,
-                    upper_bound,
+                    lower_bound.to_string(),
+                    upper_bound.to_string(),
                     block.to_string()
                 )
             }
             BoundNodeKind::WhileLoop { expr, block } => {
                 format!("loop while {} {} end", expr.to_string(), block.to_string())
+            }
+            BoundNodeKind::UntilLoop { expr, block } => {
+                format!("loop until {} {} end", expr.to_string(), block.to_string())
             }
             BoundNodeKind::FunctionDeclaration { symbol, block: _ } => {
                 format!(
@@ -116,11 +119,15 @@ pub enum BoundNodeKind {
     },
     ForLoop {
         iterator: VariableSymbol,
-        lower_bound: usize,
-        upper_bound: usize,
+        lower_bound: Box<BoundNode>,
+        upper_bound: Box<BoundNode>,
         block: Arc<BoundNode>,
     },
     WhileLoop {
+        expr: Box<BoundNode>,
+        block: Arc<BoundNode>,
+    },
+    UntilLoop {
         expr: Box<BoundNode>,
         block: Arc<BoundNode>,
     },

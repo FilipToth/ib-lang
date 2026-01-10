@@ -9,6 +9,7 @@ Atom {
   | ReturnStatement
   | ForStatement
   | WhileStatement
+  | UntilStatement
   | VariableAssignment
   | ExpressionStatement
 }
@@ -18,8 +19,9 @@ FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword 
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }
-ForStatement { LoopKeyword ForKeyword Identifier FromKeyword Expression ToKeyword Expression Block EndKeyword }
+ForStatement { LoopKeyword ForKeyword? Identifier FromKeyword Expression* ToKeyword Expression Block EndKeyword }
 WhileStatement { LoopKeyword WhileKeyword Expression Block EndKeyword }
+UntilStatement { LoopKeyword UntilKeyword Expression Block EndKeyword }
 
 VariableAssignment { Identifier AssignmentOperator Expression }
 
@@ -69,6 +71,7 @@ ForKeyword { @specialize<Identifier, "for" | "FOR"> }
 FromKeyword { @specialize<Identifier, "from" | "FROM"> }
 ToKeyword { @specialize<Identifier, "to" | "TO"> }
 WhileKeyword { @specialize<Identifier, "while" | "WHILE"> }
+UntilKeyword { @specialize<Identifier, "until" | "UNTIL"> }
 NewKeyword { @specialize<Identifier, "new" | "NEW"> }
 
 TypeAnnotation { @specialize<Identifier,
@@ -91,7 +94,7 @@ TypeAnnotation { @specialize<Identifier,
 
   LineComment { "#" ![\n]* }
 
-  MiscOperator { "==" | "!=" | ">=" | "<=" | "+" | "-" | "*" | "/" }
+  MiscOperator { "==" | "!=" | ">=" | "<=" | ">" | "<" | "+" | "-" | "*" | "/" }
 
   AssignmentOperator { "=" }
 

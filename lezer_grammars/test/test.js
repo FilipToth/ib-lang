@@ -37,6 +37,51 @@ function assertParses(code) {
     assert.deepEqual(errors, [], `${JSON.stringify(code)} should parse cleanly`);
 }
 
+describe("loops", () => {
+    it("parses a counted loop with and without the optional for", () => {
+        assertParses("loop N from 0 to 5\n  output N\nend");
+        assertParses("loop for N from 0 to 5\n  output N\nend");
+    });
+
+    it("tags the optional for as ForKeyword when present", () => {
+        const withFor = nodeNames("loop for N from 0 to 5\n  output N\nend");
+        assert.ok(withFor.includes("ForKeyword"));
+
+        const withoutFor = nodeNames("loop N from 0 to 5\n  output N\nend");
+        assert.ok(!withoutFor.includes("ForKeyword"));
+        assert.ok(withoutFor.includes("ForStatement"));
+    });
+
+    it("parses an until loop in either case", () => {
+        for (const kw of ["until", "UNTIL"]) {
+            assertParses(`loop ${kw} F > 3\n  output F\nend`);
+
+            const names = nodeNames(`loop ${kw} F > 3\n  output F\nend`);
+            assert.ok(
+                names.includes("UntilKeyword"),
+                `${kw} should produce UntilKeyword, got ${names.join(",")}`
+            );
+            assert.ok(names.includes("UntilStatement"));
+        }
+    });
+
+    it("still parses while loops", () => {
+        const names = nodeNames("loop while C < 3\n  output C\nend");
+        assert.ok(names.includes("WhileKeyword"));
+        assert.ok(names.includes("WhileStatement"));
+    });
+
+    it("does not mistake identifiers starting with a loop keyword", () => {
+        for (const name of ["untilled", "forever", "whiles"]) {
+            const names = nodeNames(`${name} = 1`);
+            assert.ok(
+                names.includes("Identifier"),
+                `${name} should stay an Identifier, got ${names.join(",")}`
+            );
+        }
+    });
+});
+
 describe("operators", () => {
     it("parses the symbol operators", () => {
         for (const op of ["+", "-", "*", "/", "==", "!=", ">=", "<="]) {
@@ -96,8 +141,15 @@ describe("operators", () => {
         }
     });
 
-    it("parses generic instantiation alongside the new <= and >= tokens", () => {
+    it("parses comparison operators", () => {
+        for (const op of [">", "<", ">=", "<="]) {
+            assertParses(`if A ${op} B then\n  output A\nend`);
+        }
+    });
+
+    it("parses generic instantiation alongside the comparison tokens", () => {
         assertParses("S = new Stack<Int>()");
+        assertParses("Q = new Queue<String>()");
         assertParses("if A <= B then\n  output A\nend");
         assertParses("if A >= B then\n  output A\nend");
     });

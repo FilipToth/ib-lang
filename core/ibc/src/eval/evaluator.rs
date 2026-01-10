@@ -334,15 +334,61 @@ async fn eval_call_args(
 
 async fn eval_for_loop(
     iterator: &VariableSymbol,
-    lower_bound: usize,
-    upper_bound: usize,
+    lower_bound: &BoundNode,
+    upper_bound: &BoundNode,
     body: Arc<BoundNode>,
     info: Arc<Mutex<EvalInfo>>,
     io: &mut impl EvalIO,
 ) -> EvalValue {
-    for index in lower_bound..upper_bound {
-        let index_val = EvalValue::Int(index as i64);
+    // both bounds are evaluated once, before the first iteration, so mutating
+    // a variable used in a bound inside the body cannot change the trip count
+    let lower_bound = match eval_rec(lower_bound, info.clone(), io)
+        .await
+        .get_int(io)
+        .await
+    {
+        Some(l) => l,
+        None => return EvalValue::Error,
+    };
+
+    let upper_bound = match eval_rec(upper_bound, info.clone(), io)
+        .await
+        .get_int(io)
+        .await
+    {
+        Some(u) => u,
+        None => return EvalValue::Error,
+    };
+
+    // the spec's from/to loop includes its upper bound: `loop COUNT from 0 to 5`
+    // runs for 0..=5, which is what makes `from 0 to COUNT-1` visit COUNT items
+    for index in lower_bound..=upper_bound {
+        let index_val = EvalValue::Int(index);
         info.lock().unwrap().heap.assign_var(iterator, index_val);
+        eval_rec(&body, info.clone(), io).await;
+    }
+
+    EvalValue::void()
+}
+
+/// `loop until X` is the inverse of `loop while X`: the condition is tested
+/// before each iteration and the loop runs while it is false.
+async fn eval_until_loop(
+    expr: &BoundNode,
+    body: Arc<BoundNode>,
+    info: Arc<Mutex<EvalInfo>>,
+    io: &mut impl EvalIO,
+) -> EvalValue {
+    loop {
+        let expr_eval = eval_rec(expr, info.clone(), io).await;
+        let EvalValue::Bool(expr_eval) = expr_eval else {
+            unreachable!()
+        };
+
+        if expr_eval {
+            break;
+        }
+
         eval_rec(&body, info.clone(), io).await;
     }
 
@@ -508,13 +554,16 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         } => {
             eval_for_loop(
                 iterator,
-                lower_bound.clone(),
-                upper_bound.clone(),
+                lower_bound,
+                upper_bound,
                 block.clone(),
                 info,
                 io,
             )
             .await
+        }
+        BoundNodeKind::UntilLoop { expr, block } => {
+            eval_until_loop(expr, block.clone(), info, io).await
         }
         BoundNodeKind::WhileLoop { expr, block } => {
             eval_while_loop(expr, block.clone(), info, io).await

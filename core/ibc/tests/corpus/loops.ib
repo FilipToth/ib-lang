@@ -1,0 +1,87 @@
+# Every loop form, in one program.
+
+# --- counted loop: the spec writes `loop N from ...`, and `for` stays
+#     accepted for programs written against the older syntax ---
+loop N from 0 to 3
+    output N
+end
+loop for N from 0 to 3
+    output N
+end
+
+# --- the upper bound is inclusive, per the spec's from/to flowchart ---
+loop N from 1 to 1
+    output N
+end
+loop N from 2 to 5
+    output N
+end
+
+# --- while loop: runs while the condition holds ---
+C = 0
+loop while C < 3
+    output C
+    C = C + 1
+end
+
+# --- until loop: the inverse, runs while the condition is false ---
+F = 1
+loop until F > 3
+    output F
+    F = F + 1
+end
+
+# --- until is tested before the first pass, so an already-true
+#     condition runs the body zero times ---
+G = 9
+loop until G > 3
+    output "never"
+end
+output "after-until"
+
+# --- nesting ---
+loop I from 0 to 1
+    loop J from 0 to 1
+        output I + J
+    end
+end
+
+# --- bounds are full expressions, not just literals ---
+COUNT = 4
+loop POS from 0 to COUNT - 1
+    output POS
+end
+
+A = 2
+B = 5
+loop N from A to B
+    output N
+end
+
+loop N from 1 + 1 to 2 * 3
+    output N
+end
+
+# --- a lower bound above the upper bound runs zero times ---
+loop N from 5 to 3
+    output "never"
+end
+output "after-empty"
+
+# --- bounds are evaluated once, before the first pass, so reassigning a
+#     variable used in a bound cannot extend the loop ---
+K = 3
+loop N from 0 to K
+    output N
+    K = 99
+end
+
+# --- the spec's factors idiom, which relies on `until` and `mod` ---
+NUM = 20
+D = 1
+loop until D * D > NUM
+    if NUM mod D == 0 then
+        output D
+    end
+    D = D + 1
+end

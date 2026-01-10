@@ -13,6 +13,7 @@ pub enum ErrorKind {
     ExpectedLoop,
     ExpectedLoopLowerBound,
     ExpectedLoopUpperBound,
+    LoopBoundMustBeInt(TypeKind),
 
     // Binding Errors
     FailedParsing,
@@ -69,6 +70,9 @@ impl ErrorKind {
             Self::ExpectedLoop => "Expected loop".to_string(),
             Self::ExpectedLoopLowerBound => "Expected loop lower bound".to_string(),
             Self::ExpectedLoopUpperBound => "Expected loop upper bound".to_string(),
+            Self::LoopBoundMustBeInt(bound_type) => {
+                format!("Loop bound must be an Int, found {}", bound_type.to_string())
+            }
 
             Self::FailedParsing => "Failed parsing".to_string(),
             Self::NumberParsing => "Cannot parse number".to_string(),

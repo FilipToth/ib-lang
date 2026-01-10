@@ -704,8 +704,12 @@ impl<'a> Parser<'a> {
         let loop_token = self.tokens.next().unwrap();
         match self.tokens.peek() {
             Some(p) => match p.kind {
+                // the spec writes `loop COUNT from 0 to 5`; `for` is accepted
+                // but optional, so either token starts a counted loop
                 LexerTokenKind::IdentifierToken(_) => self.parse_for_loop(errors),
+                LexerTokenKind::ForKeyword => self.parse_for_loop(errors),
                 LexerTokenKind::WhileKeyword => self.parse_while_loop(errors),
+                LexerTokenKind::UntilKeyword => self.parse_until_loop(errors),
                 _ => {
                     let kind = ErrorKind::ExpectedLoop;
                     errors.add(kind, loop_token.span);
@@ -721,12 +725,26 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_for_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
-        let for_keyword = self.tokens.next().unwrap();
+        // `for` is optional: the spec writes `loop COUNT from 0 to 5`, while
+        // this language has always accepted `loop for COUNT from 0 to 5`
+        let start_span = match self.tokens.peek() {
+            Some(p) => p.span.clone(),
+            None => {
+                let kind = ErrorKind::ExpectedToken("identifier".to_string());
+                errors.add(kind, Span::new(0, 0, 0, 0, 0, 0));
+                return None;
+            }
+        };
+
+        if self.expect_next_token_peek(LexerTokenKind::ForKeyword) {
+            self.tokens.next();
+        }
+
         let (identifier, identifier_span) = match self.parse_identifier() {
             Some(i) => i,
             None => {
                 let kind = ErrorKind::ExpectedToken("identifier".to_string());
-                errors.add(kind, for_keyword.span);
+                errors.add(kind, start_span);
                 return None;
             }
         };
@@ -737,15 +755,11 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let (lower_bound, lower_bound_span) = match self.tokens.next() {
-            Some(t) => match t.kind {
-                LexerTokenKind::IntegerLiteralToken(val) => (val, t.span),
-                _ => {
-                    let kind = ErrorKind::ExpectedLoopLowerBound;
-                    errors.add(kind, identifier_span);
-                    return None;
-                }
-            },
+        // bounds are full expressions, so the spec's `from 0 to COUNT-1` works.
+        // `to` is a keyword rather than an operator, so it terminates the
+        // lower bound's expression on its own.
+        let lower_bound = match self.parse_expression(errors) {
+            Some(e) => e,
             None => {
                 let kind = ErrorKind::ExpectedLoopLowerBound;
                 errors.add(kind, identifier_span);
@@ -753,30 +767,24 @@ impl<'a> Parser<'a> {
             }
         };
 
+        let lower_bound_span = lower_bound.span;
+
         if !self.expect_next_token(LexerTokenKind::ToKeyword) {
             let kind = ErrorKind::ExpectedToken("to keyword".to_string());
             errors.add(kind, lower_bound_span);
             return None;
         }
 
-        let (upper_bound, upper_bound_span) = match self.tokens.next() {
-            Some(t) => {
-                let span = t.span.clone();
-                match t.kind {
-                    LexerTokenKind::IntegerLiteralToken(val) => (val, span),
-                    _ => {
-                        let kind = ErrorKind::ExpectedLoopUpperBound;
-                        errors.add(kind, identifier_span);
-                        return None;
-                    }
-                }
-            }
+        let upper_bound = match self.parse_expression(errors) {
+            Some(e) => e,
             None => {
                 let kind = ErrorKind::ExpectedLoopUpperBound;
                 errors.add(kind, identifier_span);
                 return None;
             }
         };
+
+        let upper_bound_span = upper_bound.span;
 
         let body = match self.parse_scope(errors) {
             Some(b) => b,
@@ -796,12 +804,12 @@ impl<'a> Parser<'a> {
         let end_loc = body.span.end.clone();
         let kind = SyntaxKind::ForLoop {
             identifier: identifier,
-            lower_bound: lower_bound as usize,
-            upper_bound: upper_bound as usize,
+            lower_bound: Box::new(lower_bound),
+            upper_bound: Box::new(upper_bound),
             body: Box::new(body),
         };
 
-        let span = Span::from_loc(for_keyword.span.start, end_loc);
+        let span = Span::from_loc(start_span.start, end_loc);
         let token = SyntaxToken::new(kind, span);
         Some(token)
     }
@@ -833,6 +841,37 @@ impl<'a> Parser<'a> {
         };
 
         let span = Span::from_loc(while_keyword.span.start, end_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
+    }
+
+    fn parse_until_loop(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let until_keyword = self.tokens.next().unwrap();
+
+        let expr = self.parse_expression(errors)?;
+
+        let body = match self.parse_scope(errors) {
+            Some(b) => b,
+            None => {
+                let error_kind = ErrorKind::ExpectedScope;
+                errors.add(error_kind, expr.span);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
+            errors.add(error_kind, body.span);
+            return None;
+        }
+
+        let end_loc = body.span.end.clone();
+        let kind = SyntaxKind::UntilLoop {
+            expr: Box::new(expr),
+            body: Box::new(body),
+        };
+
+        let span = Span::from_loc(until_keyword.span.start, end_loc);
         let token = SyntaxToken::new(kind, span);
         Some(token)
     }
