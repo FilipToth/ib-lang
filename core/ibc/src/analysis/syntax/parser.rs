@@ -413,8 +413,16 @@ impl<'a> Parser<'a> {
             LexerTokenKind::SlashToken => Some(Operator::Division),
             LexerTokenKind::EqualsEqualsToken => Some(Operator::Equality),
             LexerTokenKind::BangToken => Some(Operator::Not),
+            LexerTokenKind::NotKeyword => Some(Operator::Not),
+            LexerTokenKind::BangEqualsToken => Some(Operator::Inequality),
+            LexerTokenKind::ModKeyword => Some(Operator::Modulo),
+            LexerTokenKind::DivKeyword => Some(Operator::IntDivision),
+            LexerTokenKind::AndKeyword => Some(Operator::And),
+            LexerTokenKind::OrKeyword => Some(Operator::Or),
             LexerTokenKind::LesserThanToken => Some(Operator::LesserThan),
             LexerTokenKind::GreaterThanToken => Some(Operator::GreaterThan),
+            LexerTokenKind::GreaterThanEqualsToken => Some(Operator::GreaterThanEquals),
+            LexerTokenKind::LesserThanEqualsToken => Some(Operator::LesserThanEquals),
             _ => None,
         }
     }

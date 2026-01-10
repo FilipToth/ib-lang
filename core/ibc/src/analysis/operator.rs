@@ -9,10 +9,17 @@ pub enum Operator {
     Subtraction,
     Division,
     Multiplication,
+    Modulo,
+    IntDivision,
     Not,
     Equality,
+    Inequality,
     LesserThan,
+    LesserThanEquals,
     GreaterThan,
+    GreaterThanEquals,
+    And,
+    Or,
 }
 
 impl Operator {
@@ -64,7 +71,11 @@ impl Operator {
 
         let span = rhs.span.clone();
         match self {
-            Operator::Subtraction | Operator::Multiplication | Operator::Division => {
+            Operator::Subtraction
+            | Operator::Multiplication
+            | Operator::Division
+            | Operator::Modulo
+            | Operator::IntDivision => {
                 let ret = Some(TypeKind::Int);
                 if disabled {
                     return ret;
@@ -103,7 +114,7 @@ impl Operator {
                 errors.add(err, span);
                 None
             }
-            Operator::Equality => {
+            Operator::Equality | Operator::Inequality => {
                 let ret = Some(TypeKind::Boolean);
                 if disabled {
                     return ret;
@@ -121,13 +132,35 @@ impl Operator {
 
                 ret
             }
-            Operator::LesserThan | Operator::GreaterThan => {
+            Operator::LesserThan
+            | Operator::LesserThanEquals
+            | Operator::GreaterThan
+            | Operator::GreaterThanEquals => {
                 let ret = Some(TypeKind::Boolean);
                 if disabled {
                     return ret;
                 }
 
                 if rhs_type != TypeKind::Int || lhs_type != TypeKind::Int {
+                    let err = ErrorKind::BinaryOPeratorNotDefinedOnType {
+                        op: self.clone(),
+                        lhs: lhs_type,
+                        rhs: rhs_type,
+                    };
+
+                    errors.add(err, span);
+                    return None;
+                }
+
+                ret
+            }
+            Operator::And | Operator::Or => {
+                let ret = Some(TypeKind::Boolean);
+                if disabled {
+                    return ret;
+                }
+
+                if rhs_type != TypeKind::Boolean || lhs_type != TypeKind::Boolean {
                     let err = ErrorKind::BinaryOPeratorNotDefinedOnType {
                         op: self.clone(),
                         lhs: lhs_type,
@@ -150,10 +183,17 @@ impl Operator {
             Operator::Subtraction => "-",
             Operator::Division => "/",
             Operator::Multiplication => "*",
-            Operator::Not => "!",
+            Operator::Modulo => "mod",
+            Operator::IntDivision => "div",
+            Operator::Not => "NOT",
             Operator::Equality => "==",
+            Operator::Inequality => "!=",
             Operator::LesserThan => "<",
+            Operator::LesserThanEquals => "<=",
             Operator::GreaterThan => ">",
+            Operator::GreaterThanEquals => ">=",
+            Operator::And => "AND",
+            Operator::Or => "OR",
         };
 
         op.to_string()

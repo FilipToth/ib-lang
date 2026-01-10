@@ -1,0 +1,89 @@
+# Every operator, in one program.
+# Sections are ordered so the expected output reads top to bottom.
+
+# --- relational, including the two-character forms ---
+output 5 > 4
+output 4 > 5
+output 3 < 4
+output 4 < 3
+output 5 >= 5
+output 5 >= 6
+output 3 <= 3
+output 4 <= 3
+
+# --- equality and its negation, across every comparable type ---
+output 4 == 4
+output 4 != 4
+output 4 != 5
+output "a" == "a"
+output "a" != "b"
+output true == true
+output true != false
+
+# --- AND / OR are binary, NOT is unary ---
+output true AND true
+output true AND false
+output false OR true
+output false OR false
+output NOT true
+output NOT false
+
+# --- mod and div, per the spec: 15 mod 7 = 1, 15 div 7 = 2 ---
+output 15 mod 7
+output 15 div 7
+output 30 mod 7
+output 30 div 7
+output 8 mod 4
+output 8 div 4
+
+# --- precedence ---
+# mod and div bind like * and /, tighter than + and -
+output 1 + 15 mod 7
+output 1 + 15 div 7
+# comparison binds tighter than AND, which binds tighter than OR
+output 1 < 2 AND 3 < 4
+output 1 < 2 OR 3 > 4
+output false AND false OR true
+output true OR false AND false
+# NOT binds tighter than AND but looser than comparison
+output NOT false AND true
+
+# --- casing: the spec writes AND/OR/NOT in capitals and mod/div lower case,
+#     and the lexer lowercases identifiers, so every casing resolves ---
+output true AND true
+output true and true
+output true OR false
+output true or false
+output NOT false
+output not false
+output 15 MOD 7
+output 15 mod 7
+output 15 DIV 7
+output 15 div 7
+
+# --- expressions lifted from the spec's symbol table ---
+X = 7
+Y = 3
+if X < 7 AND Y > 2 then
+    output "and-branch"
+else
+    output "and-else"
+end
+if X < 7 OR Y > 2 then
+    output "or-branch"
+end
+if NOT X == 7 then
+    output "not-branch"
+else
+    output "not-else"
+end
+if 15 mod 7 == 1 then
+    output "mod-ok"
+end
+if 15 div 7 == 2 then
+    output "div-ok"
+end
+
+# --- a zero divisor raises a runtime error rather than panicking.
+#     evaluation continues, and the error value renders as "?" at output. ---
+output 1 div 0

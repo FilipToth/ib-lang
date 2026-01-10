@@ -152,12 +152,31 @@ async fn eval_int_only_binexpr(
         None => return EvalValue::Error,
     };
 
+    // division and both integer-remainder forms trap on a zero divisor
+    // rather than panicking the whole evaluator
+    if rhs == 0 {
+        let divides = matches!(
+            op,
+            Operator::Division | Operator::Modulo | Operator::IntDivision
+        );
+
+        if divides {
+            let msg = "Division by zero".to_string();
+            io.runtime_error(msg).await;
+            return EvalValue::Error;
+        }
+    }
+
     match op {
         Operator::Subtraction => EvalValue::int(lhs - rhs),
         Operator::Multiplication => EvalValue::int(lhs * rhs),
         Operator::Division => EvalValue::int(lhs / rhs),
+        Operator::Modulo => EvalValue::int(lhs % rhs),
+        Operator::IntDivision => EvalValue::int(lhs / rhs),
         Operator::LesserThan => EvalValue::bool(lhs < rhs),
+        Operator::LesserThanEquals => EvalValue::bool(lhs <= rhs),
         Operator::GreaterThan => EvalValue::bool(lhs > rhs),
+        Operator::GreaterThanEquals => EvalValue::bool(lhs >= rhs),
         _ => unreachable!(),
     }
 }
@@ -200,15 +219,22 @@ async fn eval_binary_expr(
         Operator::Subtraction
         | Operator::Multiplication
         | Operator::Division
+        | Operator::Modulo
+        | Operator::IntDivision
         | Operator::LesserThan
-        | Operator::GreaterThan => eval_int_only_binexpr(lhs, op, rhs, io).await,
-        Operator::Equality => {
+        | Operator::LesserThanEquals
+        | Operator::GreaterThan
+        | Operator::GreaterThanEquals => eval_int_only_binexpr(lhs, op, rhs, io).await,
+        Operator::Equality | Operator::Inequality => {
             // check if same variant
             if mem::discriminant(&lhs) != mem::discriminant(&rhs) {
                 unreachable!();
             }
 
-            match lhs {
+            // != is == negated, so compute equality and flip at the end
+            let negate = matches!(op, Operator::Inequality);
+
+            let equal = match lhs {
                 EvalValue::Void => unreachable!(),
                 EvalValue::Int(lhs) => {
                     let rhs = match rhs.get_int(io).await {
@@ -216,7 +242,7 @@ async fn eval_binary_expr(
                         None => return EvalValue::Error,
                     };
 
-                    EvalValue::Bool(rhs == lhs)
+                    rhs == lhs
                 }
                 EvalValue::Bool(lhs) => {
                     let rhs = match rhs.get_bool(io).await {
@@ -224,7 +250,7 @@ async fn eval_binary_expr(
                         None => return EvalValue::Error,
                     };
 
-                    EvalValue::Bool(rhs == lhs)
+                    rhs == lhs
                 }
                 EvalValue::String(lhs) => {
                     let rhs = match rhs.get_string(io).await {
@@ -232,11 +258,33 @@ async fn eval_binary_expr(
                         None => return EvalValue::Error,
                     };
 
-                    EvalValue::Bool(rhs == lhs)
+                    rhs == lhs
                 }
                 EvalValue::Object(_) => unreachable!(),
                 EvalValue::Return(_) => unreachable!(),
                 EvalValue::Error => return EvalValue::Error,
+            };
+
+            if negate {
+                EvalValue::Bool(!equal)
+            } else {
+                EvalValue::Bool(equal)
+            }
+        }
+        Operator::And | Operator::Or => {
+            let lhs = match lhs.get_bool(io).await {
+                Some(l) => l,
+                None => return EvalValue::Error,
+            };
+
+            let rhs = match rhs.get_bool(io).await {
+                Some(r) => r,
+                None => return EvalValue::Error,
+            };
+
+            match op {
+                Operator::And => EvalValue::bool(lhs && rhs),
+                _ => EvalValue::bool(lhs || rhs),
             }
         }
         _ => {

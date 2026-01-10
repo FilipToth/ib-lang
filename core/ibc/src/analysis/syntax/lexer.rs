@@ -24,10 +24,13 @@ pub enum LexerTokenKind {
     StarToken,
     SlashToken,
     BangToken,
+    BangEqualsToken,
     EqualsToken,
     ArrowToken,
     GreaterThanToken,
+    GreaterThanEqualsToken,
     LesserThanToken,
+    LesserThanEqualsToken,
     EqualsEqualsToken,
     OpenParenthesisToken,
     CloseParenthesisToken,
@@ -52,30 +55,46 @@ pub enum LexerTokenKind {
     FromKeyword,
     ToKeyword,
     WhileKeyword,
+    AndKeyword,
+    OrKeyword,
+    NotKeyword,
+    ModKeyword,
+    DivKeyword,
 }
 
 impl LexerTokenKind {
     pub fn unary_operator_precedence(&self) -> usize {
         match self {
-            LexerTokenKind::PlusToken => 4,
-            LexerTokenKind::MinusToken => 4,
-            LexerTokenKind::BangToken => 4,
+            LexerTokenKind::PlusToken => 8,
+            LexerTokenKind::MinusToken => 8,
+            LexerTokenKind::BangToken => 8,
+            // looser than comparison: `NOT X == 7` is `NOT (X == 7)`
+            LexerTokenKind::NotKeyword => 3,
             _ => 0,
         }
     }
 
     pub fn binary_operator_precedence(&self) -> usize {
         match self {
-            LexerTokenKind::StarToken => 4,
-            LexerTokenKind::SlashToken => 4,
+            LexerTokenKind::StarToken => 7,
+            LexerTokenKind::SlashToken => 7,
+            LexerTokenKind::ModKeyword => 7,
+            LexerTokenKind::DivKeyword => 7,
 
-            LexerTokenKind::PlusToken => 3,
-            LexerTokenKind::MinusToken => 3,
+            LexerTokenKind::PlusToken => 6,
+            LexerTokenKind::MinusToken => 6,
 
-            LexerTokenKind::GreaterThanToken => 2,
-            LexerTokenKind::LesserThanToken => 2,
+            LexerTokenKind::GreaterThanToken => 5,
+            LexerTokenKind::GreaterThanEqualsToken => 5,
+            LexerTokenKind::LesserThanToken => 5,
+            LexerTokenKind::LesserThanEqualsToken => 5,
 
-            LexerTokenKind::EqualsEqualsToken => 1,
+            LexerTokenKind::EqualsEqualsToken => 4,
+            LexerTokenKind::BangEqualsToken => 4,
+
+            LexerTokenKind::AndKeyword => 2,
+
+            LexerTokenKind::OrKeyword => 1,
 
             _ => 0,
         }
@@ -104,6 +123,11 @@ fn lex_identifier_or_keyword(value: String) -> LexerTokenKind {
         "from" => LexerTokenKind::FromKeyword,
         "to" => LexerTokenKind::ToKeyword,
         "while" => LexerTokenKind::WhileKeyword,
+        "and" => LexerTokenKind::AndKeyword,
+        "or" => LexerTokenKind::OrKeyword,
+        "not" => LexerTokenKind::NotKeyword,
+        "mod" => LexerTokenKind::ModKeyword,
+        "div" => LexerTokenKind::DivKeyword,
         _ => LexerTokenKind::IdentifierToken(value),
     }
 }
@@ -229,7 +253,16 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             }
             '*' => LexerTokenKind::StarToken,
             '/' => LexerTokenKind::SlashToken,
-            '!' => LexerTokenKind::BangToken,
+            '!' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some('=') => {
+                        chars.next();
+                        LexerTokenKind::BangEqualsToken
+                    }
+                    _ => LexerTokenKind::BangToken,
+                }
+            }
             '=' => {
                 let next_peek = chars.peek();
                 match next_peek {
@@ -243,8 +276,26 @@ pub fn lex(content: String) -> Vec<LexerToken> {
                     None => LexerTokenKind::EqualsToken,
                 }
             }
-            '>' => LexerTokenKind::GreaterThanToken,
-            '<' => LexerTokenKind::LesserThanToken,
+            '>' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some('=') => {
+                        chars.next();
+                        LexerTokenKind::GreaterThanEqualsToken
+                    }
+                    _ => LexerTokenKind::GreaterThanToken,
+                }
+            }
+            '<' => {
+                let next_peek = chars.peek();
+                match next_peek {
+                    Some('=') => {
+                        chars.next();
+                        LexerTokenKind::LesserThanEqualsToken
+                    }
+                    _ => LexerTokenKind::LesserThanToken,
+                }
+            }
             '(' => LexerTokenKind::OpenParenthesisToken,
             ')' => LexerTokenKind::CloseParenthesisToken,
             ',' => LexerTokenKind::CommaToken,
