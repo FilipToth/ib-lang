@@ -1,0 +1,73 @@
+# Every collection type and its methods, in one program.
+
+# --- Array: indexed storage. isEmpty mirrors the other collections. ---
+A = new Array<Int>()
+output A.isEmpty()
+A.push(10)
+A.push(20)
+output A.isEmpty()
+output A.len()
+output A.get(0)
+output A.get(1)
+
+# --- Stack: last in, first out ---
+S = new Stack<Int>()
+output S.isEmpty()
+S.push(1)
+S.push(2)
+output S.pop()
+output S.pop()
+output S.isEmpty()
+
+# --- Queue: first in, first out. The generic differs from the Stack above on
+#     purpose: both methods name their parameter `item`, and the two must not
+#     collide in the caller's scope. ---
+Q = new Queue<String>()
+output Q.isEmpty()
+Q.enqueue("first")
+Q.enqueue("second")
+output Q.dequeue()
+output Q.dequeue()
+output Q.isEmpty()
+
+# --- Collection: the spec names the iteration accessor getNext ---
+C = new Collection<Int>()
+output C.isEmpty()
+C.addItem(30)
+C.addItem(40)
+output C.isEmpty()
+C.resetNext()
+output C.getNext()
+output C.getNext()
+
+# --- the spec's guaranteed-iteration idiom ---
+NUMS = new Collection<Int>()
+NUMS.addItem(1)
+NUMS.addItem(2)
+NUMS.addItem(3)
+NUMS.resetNext()
+loop while NUMS.hasNext()
+    output NUMS.getNext()
+end
+
+# --- resetNext restarts the walk ---
+NUMS.resetNext()
+output NUMS.getNext()
+
+# --- the same method on the same type with different generics ---
+NUMS2 = new Stack<Int>()
+WORDS = new Stack<String>()
+NUMS2.push(11)
+WORDS.push("eleven")
+output NUMS2.pop()
+output WORDS.pop()
+
+# --- a user variable may share a name with a method parameter. `item` and
+#     `index` are ordinary identifiers, not reserved words. ---
+item = "untouched"
+index = "also untouched"
+MIXED = new Array<Int>()
+MIXED.push(99)
+output MIXED.get(0)
+output item
+output index

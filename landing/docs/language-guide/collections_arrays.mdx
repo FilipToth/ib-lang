@@ -40,33 +40,33 @@ output col.isEmpty() # will print `false`
 
 A collection also implements a head pointer, which holds a reference to an item within the collection.
 At first, the pointer will point to the first element in the collection, and you can get its value using the
-`getItem` method.
+`getNext` method.
 
 ```python
 col = new Collection()
 col.addItem("Hello")
 
-output col.getItem() # Outputs "Hello", as the first col item
+output col.getNext() # Outputs "Hello", as the first col item
 ```
 
 :::danger Empty Collections
-If a collection is empty, calling the `getItem` method will result in a **runtime error**. This will
+If a collection is empty, calling the `getNext` method will result in a **runtime error**. This will
 be patched in a later update.
 :::
 
-Calling the `getItem` method also increments the index of the head pointer, thus it moves onto the second value.
+Calling the `getNext` method also increments the index of the head pointer, thus it moves onto the second value.
 ```python
 col = new Collection()
 col.addItem("Hello 1")
 col.addItem("Hello 2")
 
-output col.getItem() # "Hello 1"
-output col.getItem() # "Hello 2"
+output col.getNext() # "Hello 1"
+output col.getNext() # "Hello 2"
 ```
 
 One can also reset the head pointer, doing so will move the pointer to point to the first item in the collection.
 One can also check whether the collection has a next element (element after the head pointer) with the `hasNext` method,
-which returns a `Bool`. It's advised to check `hasNext` before calling `getItem` in order to avoid
+which returns a `Bool`. It's advised to check `hasNext` before calling `getNext` in order to avoid
 runtime errors.
 
 ## Arrays
@@ -113,7 +113,7 @@ return `3`.
 ## Generic Parameters
 
 You can also enable type checking for collections and arrays using generic parameters. Previously,
-the `get` and `getItem` methods returned an object of type `Any` and the `push` and `addItem` methods accept
+the `get` and `getNext` methods returned an object of type `Any` and the `push` and `addItem` methods accept
 an argument of `Any`. Stating a generic parameter when declaring an array or a collection will enable type checking
 and make sure that these methods accept an argument of a type that matches that of the generic parameter.
 
@@ -125,7 +125,7 @@ col = new Array<String>()
 
 # create a string collection
 # addItem will take an argument of `String` and
-# getItem will return an object of type `String`
+# getNext will return an object of type `String`
 col = new Collection<String>()
 ```
 

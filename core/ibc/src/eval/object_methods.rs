@@ -50,6 +50,10 @@ async fn execute_array_method(
             let length = state.internal.len() as i64;
             EvalValue::Int(length)
         }
+        "isEmpty" => {
+            let res = state.internal.len() == 0;
+            EvalValue::Bool(res)
+        }
         _ => unimplemented!(),
     }
 }
@@ -66,7 +70,7 @@ async fn execute_collection_method(
             let res = state.internal.get(index).is_some();
             EvalValue::Bool(res)
         }
-        "getItem" => {
+        "getNext" => {
             let index = state.head.clone();
             match state.internal.get(index) {
                 Some(v) => {

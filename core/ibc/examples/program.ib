@@ -1,0 +1,3 @@
+item = "f"
+S = new Stack<Int>()
+output S.isEmpty()

@@ -66,41 +66,24 @@ describe("autocomplete symbol resolution", () => {
 });
 
 describe("autocomplete member access", () => {
-    it("offers stack methods after a dot", () => {
-        const doc = "S = new Stack<Int>()\nS.p";
-        const labels = completionsAt(doc);
+    // one case per collection type: the declaration, a partial member name to
+    // complete from, and the methods the binder exposes on that type
+    const cases: Array<[string, string, string[]]> = [
+        ["Stack<Int>", "p", ["push", "pop", "isEmpty"]],
+        ["Queue<Int>", "e", ["enqueue", "dequeue", "isEmpty"]],
+        [
+            "Collection<Int>",
+            "a",
+            ["addItem", "getNext", "hasNext", "resetNext", "isEmpty"],
+        ],
+        ["Array<Int>", "g", ["push", "get", "len", "isEmpty"]],
+    ];
 
-        expect(labels).toContain("push");
-        expect(labels).toContain("pop");
-        expect(labels).toContain("isEmpty");
-    });
+    it.each(cases)("offers %s methods after a dot", (type, prefix, methods) => {
+        const labels = completionsAt(`V = new ${type}()\nV.${prefix}`);
 
-    it("offers queue methods after a dot", () => {
-        const doc = "Q = new Queue<Int>()\nQ.e";
-        const labels = completionsAt(doc);
-
-        expect(labels).toContain("enqueue");
-        expect(labels).toContain("dequeue");
-        expect(labels).toContain("isEmpty");
-    });
-
-    it("offers collection methods after a dot", () => {
-        const doc = "C = new Collection<Int>()\nC.a";
-        const labels = completionsAt(doc);
-
-        expect(labels).toContain("addItem");
-        expect(labels).toContain("getItem");
-        expect(labels).toContain("hasNext");
-        expect(labels).toContain("resetNext");
-        expect(labels).toContain("isEmpty");
-    });
-
-    it("offers array methods after a dot", () => {
-        const doc = "A = new Array<Int>()\nA.g";
-        const labels = completionsAt(doc);
-
-        expect(labels).toContain("push");
-        expect(labels).toContain("get");
-        expect(labels).toContain("len");
+        for (const method of methods) {
+            expect(labels).toContain(method);
+        }
     });
 });

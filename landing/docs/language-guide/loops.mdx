@@ -11,13 +11,15 @@ This document elucidates the use of loops in IB Pseudocode, a fundamental constr
 The `for` loop in IB Pseudocode enables deterministic iteration over a specified range of values. The syntax is as follows:
 
 ```
-loop for index from 0 to 10
+loop index from 0 to 10
     my_variable = index * 2
     output my_variable
 end
 ```
 
-This construct executes the code block enclosed between `loop` and `end` exactly 10 times. On each iteration, the variable `index` assumes the current value within the specified range. It is noteworthy that the range is non-inclusive of the upper bound; hence, the loop iterates for index values `0, 1, 2, ..., 9` but excludes `10`.
+This construct executes the code block enclosed between `loop` and `end` once for each value in the specified range. On each iteration, the variable `index` assumes the current value within that range. The range is inclusive of both bounds; hence, the loop iterates for index values `0, 1, 2, ..., 10`, running 11 times in total.
+
+The `for` keyword is optional. `loop for index from 0 to 10` is accepted and behaves identically, but the plain form matches the approved IB notation.
 
 ## While Loops
 
@@ -32,6 +34,20 @@ end
 ```
 
 In this example, the loop evaluates the condition `x < 10` prior to executing the code block. If the condition evaluates to `true`, the block is executed; otherwise, the loop terminates. This mechanism ensures that the loop executes only as long as the condition remains satisfied.
+
+## Until Loops
+
+The `until` loop is the inverse of the `while` loop: it continues for as long as its condition is **false**, and terminates once the condition becomes true.
+
+```
+f = 1
+loop until f > 3
+    output f
+    f = f + 1
+end
+```
+
+The condition is evaluated before each iteration, exactly as in a `while` loop. Consequently, a condition that is already true when the loop is reached causes the body to be skipped entirely.
 
 ## Break
 

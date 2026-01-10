@@ -39,17 +39,17 @@ function assertParses(code) {
 
 describe("loops", () => {
     it("parses a counted loop with and without the optional for", () => {
-        assertParses("loop N from 0 to 5\n  output N\nend");
-        assertParses("loop for N from 0 to 5\n  output N\nend");
-    });
+        const withFor = "loop for N from 0 to 5\n  output N\nend";
+        const withoutFor = "loop N from 0 to 5\n  output N\nend";
 
-    it("tags the optional for as ForKeyword when present", () => {
-        const withFor = nodeNames("loop for N from 0 to 5\n  output N\nend");
-        assert.ok(withFor.includes("ForKeyword"));
+        assertParses(withFor);
+        assertParses(withoutFor);
 
-        const withoutFor = nodeNames("loop N from 0 to 5\n  output N\nend");
-        assert.ok(!withoutFor.includes("ForKeyword"));
-        assert.ok(withoutFor.includes("ForStatement"));
+        assert.ok(nodeNames(withFor).includes("ForKeyword"));
+
+        const plain = nodeNames(withoutFor);
+        assert.ok(!plain.includes("ForKeyword"));
+        assert.ok(plain.includes("ForStatement"));
     });
 
     it("parses an until loop in either case", () => {
@@ -83,15 +83,12 @@ describe("loops", () => {
 });
 
 describe("operators", () => {
-    it("parses the symbol operators", () => {
+    it("parses the symbol operators and tags them as MiscOperator", () => {
         for (const op of ["+", "-", "*", "/", "==", "!=", ">=", "<="]) {
-            assertParses(`A ${op} B`);
-        }
-    });
+            const source = `A ${op} B`;
+            assertParses(source);
 
-    it("tags the new symbol operators as MiscOperator", () => {
-        for (const op of ["!=", ">=", "<="]) {
-            const names = nodeNames(`A ${op} B`);
+            const names = nodeNames(source);
             assert.ok(
                 names.includes("MiscOperator"),
                 `${op} should be a MiscOperator, got ${names.join(",")}`
@@ -99,13 +96,7 @@ describe("operators", () => {
         }
     });
 
-    it("parses the word operators in either case", () => {
-        for (const op of ["and", "AND", "or", "OR", "mod", "MOD", "div", "DIV"]) {
-            assertParses(`A ${op} B`);
-        }
-    });
-
-    it("tags the word operators as their own keyword nodes", () => {
+    it("parses the word operators in either case, each as its own node", () => {
         const cases = [
             ["and", "AndKeyword"],
             ["AND", "AndKeyword"],
@@ -118,7 +109,10 @@ describe("operators", () => {
         ];
 
         for (const [op, expected] of cases) {
-            const names = nodeNames(`A ${op} B`);
+            const source = `A ${op} B`;
+            assertParses(source);
+
+            const names = nodeNames(source);
             assert.ok(
                 names.includes(expected),
                 `${op} should produce ${expected}, got ${names.join(",")}`

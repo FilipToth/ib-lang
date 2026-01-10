@@ -14,6 +14,7 @@ pub enum ErrorKind {
     ExpectedLoopLowerBound,
     ExpectedLoopUpperBound,
     LoopBoundMustBeInt(TypeKind),
+    InvalidCharacter(char),
 
     // Binding Errors
     FailedParsing,
@@ -23,6 +24,7 @@ pub enum ErrorKind {
     CannotFindValue(String),
     CannotFindFunction(String),
     CannotDeclareFunction(String),
+    ConflictingDeclaration(String),
     MismatchedNumberOfArgs {
         id: String,
         expected: usize,
@@ -72,6 +74,12 @@ impl ErrorKind {
             Self::ExpectedLoopUpperBound => "Expected loop upper bound".to_string(),
             Self::LoopBoundMustBeInt(bound_type) => {
                 format!("Loop bound must be an Int, found {}", bound_type.to_string())
+            }
+            Self::InvalidCharacter(character) => {
+                format!("'{}' cannot be used here", character)
+            }
+            Self::ConflictingDeclaration(identifier) => {
+                format!("'{}' is already declared with a different type", identifier)
             }
 
             Self::FailedParsing => "Failed parsing".to_string(),

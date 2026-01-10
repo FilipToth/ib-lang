@@ -15,8 +15,8 @@ interface Symbol {
 /// core/ibc/src/analysis/binding/types.rs -- the two must stay in step, or the
 /// editor will suggest methods the binder rejects.
 const TYPE_METHODS: { [type: string]: string[] } = {
-    Array: ["push", "get", "len"],
-    Collection: ["addItem", "getItem", "hasNext", "resetNext", "isEmpty"],
+    Array: ["push", "get", "len", "isEmpty"],
+    Collection: ["addItem", "getNext", "hasNext", "resetNext", "isEmpty"],
     Stack: ["push", "pop", "isEmpty"],
     Queue: ["enqueue", "dequeue", "isEmpty"],
 };

@@ -30,7 +30,6 @@ fn bind_block(
     let mut bound = Vec::<BoundNode>::new();
     for child in children {
         let bound_child = bind(child, scope_ref.clone(), errors)?;
-
         bound.push(bound_child);
     }
 
@@ -489,6 +488,25 @@ fn bind_reference_expression(
     Some(node)
 }
 
+/// Builds the internal name a type method's parameter is declared under.
+///
+/// Parameters are declared in the caller's scope so the evaluator can read
+/// their values back out of the heap, which is the same convention user
+/// functions use. Two things keep that from colliding with anything:
+///
+/// - the name begins with `$`, which cannot start an identifier, so user code
+///   can neither declare nor reference one;
+/// - it encodes the receiver type and method, so two methods that happen to
+///   share a parameter name -- `Stack<Int>.push(item)` and
+///   `Queue<String>.enqueue(item)` -- get distinct names rather than colliding
+///   on `item` with incompatible types.
+///
+/// `$` separates the parts as well as leading them, so `VariableSymbol::name()`
+/// can recover the user's name as the segment after the last `$`.
+fn type_method_param_name(base_type: &TypeKind, method: &str, param: &str) -> String {
+    format!("$param${}${}${}", base_type.to_string(), method, param)
+}
+
 fn bind_object_member_expression(
     base: &SyntaxToken,
     next: &SyntaxToken,
@@ -506,20 +524,35 @@ fn bind_object_member_expression(
     for method in type_methods {
         let mut params = Vec::<BoundParameter>::new();
         let mut scope_mut = scope.borrow_mut();
+        let method_identifier = method.identifier.clone();
 
         for param in method.params {
-            let param = scope_mut.assign_variable(param.identifier, param.param_type)?;
+            let identifier =
+                type_method_param_name(&base_node.node_type, &method_identifier, &param.identifier);
 
-            let param_type = param.var_type.clone();
+            let param_symbol = match scope_mut.assign_variable(identifier, param.param_type) {
+                Some(symbol) => symbol,
+                None => {
+                    // unreachable while the mangled name encodes the receiver
+                    // type: the same name always carries the same type. report
+                    // rather than bail silently if that ever stops holding,
+                    // using the name the user would know.
+                    let kind = ErrorKind::ConflictingDeclaration(param.identifier);
+                    errors.add(kind, span);
+                    return None;
+                }
+            };
+
+            let param_type = param_symbol.var_type.clone();
             let bound_parameter = BoundParameter {
-                symbol: param,
+                symbol: param_symbol,
                 param_type: param_type,
             };
 
             params.push(bound_parameter);
         }
 
-        object_scope.declare_function(method.identifier, params, method.ret_type);
+        object_scope.declare_function(method_identifier, params, method.ret_type);
     }
 
     let next = bind(next, Rc::new(RefCell::new(object_scope)), errors)?;
@@ -658,9 +691,6 @@ pub fn bind(
             span,
         ),
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
-        _ => {
-            println!("unknown: {:?}", token.kind);
-            unreachable!()
-        }
+        _ => unreachable!("unhandled syntax kind: {:?}", token.kind),
     }
 }

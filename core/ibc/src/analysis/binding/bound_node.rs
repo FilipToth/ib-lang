@@ -49,7 +49,7 @@ impl BoundNode {
             } => {
                 format!(
                     "loop {} from {} to {} {} end",
-                    iterator.identifier,
+                    iterator.name(),
                     lower_bound.to_string(),
                     upper_bound.to_string(),
                     block.to_string()
@@ -75,7 +75,7 @@ impl BoundNode {
                 format!("{}{}", op.to_string(), rhs.to_string())
             }
             BoundNodeKind::AssignmentExpression { symbol, value } => {
-                format!("{} = {}", symbol.identifier, value.to_string())
+                format!("{} = {}", symbol.name(), value.to_string())
             }
             BoundNodeKind::BoundCallExpression { symbol, args: _ } => {
                 format!("{}(...)", symbol.identifier)
@@ -84,7 +84,7 @@ impl BoundNode {
             BoundNodeKind::ObjectMemberExpression { base, next } => {
                 format!("{}.{}", base.to_string(), next.to_string())
             }
-            BoundNodeKind::ReferenceExpression(sym) => sym.identifier.clone(),
+            BoundNodeKind::ReferenceExpression(sym) => sym.name().to_string(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
             BoundNodeKind::StringLiteral(val) => {

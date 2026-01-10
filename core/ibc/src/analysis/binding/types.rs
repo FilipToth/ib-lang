@@ -99,9 +99,16 @@ impl TypeKind {
                     params: Vec::new(),
                 };
 
+                let is_empty = TypeMethodRepresentation {
+                    identifier: "isEmpty".to_string(),
+                    ret_type: TypeKind::Boolean,
+                    params: Vec::new(),
+                };
+
                 methods.push(add);
                 methods.push(get);
                 methods.push(len);
+                methods.push(is_empty);
             }
             TypeKind::Collection(generic) => {
                 let generic = *generic.clone();
@@ -112,7 +119,7 @@ impl TypeKind {
                 };
 
                 let get_item = TypeMethodRepresentation {
-                    identifier: "getItem".to_string(),
+                    identifier: "getNext".to_string(),
                     ret_type: generic.clone(),
                     params: Vec::new(),
                 };
