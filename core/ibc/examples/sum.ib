@@ -4,12 +4,12 @@
 # product of the two
 
 function SUMDOUBLE(A: Int, B: Int) -> Int
-    if A = B then
+    if A == B then
         return A * B
     else
         return A + B
-    end if
-end function
+    end
+end
 
 A = 10
 output SUMDOUBLE(A, A)

@@ -59,6 +59,7 @@ pub enum SyntaxKind {
     IfStatement {
         condition: Box<SyntaxToken>,
         body: Box<SyntaxToken>,
+        else_body: Option<Box<SyntaxToken>>,
     },
     Parameter {
         identifier: String,

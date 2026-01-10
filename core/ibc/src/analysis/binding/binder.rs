@@ -520,9 +520,18 @@ pub fn bind(
         SyntaxKind::Scope { subtokens } => bind_block(&subtokens, scope, true, errors, span),
         SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, span),
         SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, span),
-        SyntaxKind::IfStatement { condition, body } => {
-            bind_if_statement(&condition, &body, None, scope, errors, span)
-        }
+        SyntaxKind::IfStatement {
+            condition,
+            body,
+            else_body,
+        } => bind_if_statement(
+            &condition,
+            &body,
+            else_body.as_deref(),
+            scope,
+            errors,
+            span,
+        ),
         SyntaxKind::FunctionDeclaration {
             identifier,
             parameters,
