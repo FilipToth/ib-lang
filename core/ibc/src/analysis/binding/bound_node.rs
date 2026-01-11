@@ -84,6 +84,9 @@ impl BoundNode {
             BoundNodeKind::ObjectMemberExpression { base, next } => {
                 format!("{}.{}", base.to_string(), next.to_string())
             }
+            BoundNodeKind::IndexExpression { base, index } => {
+                format!("{}[{}]", base.to_string(), index.to_string())
+            }
             BoundNodeKind::ReferenceExpression(sym) => sym.name().to_string(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
@@ -152,6 +155,10 @@ pub enum BoundNodeKind {
     ObjectMemberExpression {
         base: Box<BoundNode>,
         next: Box<BoundNode>,
+    },
+    IndexExpression {
+        base: Box<BoundNode>,
+        index: Box<BoundNode>,
     },
     ReferenceExpression(VariableSymbol),
     NumberLiteral(i64),

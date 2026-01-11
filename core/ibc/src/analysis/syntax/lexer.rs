@@ -34,6 +34,8 @@ pub enum LexerTokenKind {
     EqualsEqualsToken,
     OpenParenthesisToken,
     CloseParenthesisToken,
+    OpenSquareBracketToken,
+    CloseSquareBracketToken,
     CommaToken,
     ColonToken,
     DotToken,
@@ -305,6 +307,8 @@ pub fn lex(content: String) -> Vec<LexerToken> {
             }
             '(' => LexerTokenKind::OpenParenthesisToken,
             ')' => LexerTokenKind::CloseParenthesisToken,
+            '[' => LexerTokenKind::OpenSquareBracketToken,
+            ']' => LexerTokenKind::CloseSquareBracketToken,
             ',' => LexerTokenKind::CommaToken,
             ':' => LexerTokenKind::ColonToken,
             '.' => LexerTokenKind::DotToken,

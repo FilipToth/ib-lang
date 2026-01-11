@@ -10,6 +10,29 @@ output A.len()
 output A.get(0)
 output A.get(1)
 
+# --- Array indexing: the index is any Int expression, and the result takes
+#     the array's element type ---
+SQUARES = new Array<Int>()
+SQUARES.push(0)
+SQUARES.push(1)
+SQUARES.push(4)
+output SQUARES[2]
+output SQUARES[1 + 1]
+output SQUARES[1] + SQUARES[2]
+
+NAMES = new Array<String>()
+NAMES.push("Ada")
+output NAMES[0]
+
+# the spec's walk over every element
+loop POS from 0 to SQUARES.len() - 1
+    output SQUARES[POS]
+end
+
+# out of range in either direction is a runtime error, not a panic
+output SQUARES[3]
+output SQUARES[-1]
+
 # --- Stack: last in, first out ---
 S = new Stack<Int>()
 output S.isEmpty()

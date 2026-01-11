@@ -507,6 +507,45 @@ fn type_method_param_name(base_type: &TypeKind, method: &str, param: &str) -> St
     format!("$param${}${}${}", base_type.to_string(), method, param)
 }
 
+/// Binds `base[index]`. The spec only gives arrays index notation, so stacks,
+/// queues and collections are rejected, and the result takes the array's
+/// element type.
+fn bind_index_expression(
+    base: &SyntaxToken,
+    index: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let base = bind(base, scope.clone(), errors)?;
+    let index = bind(index, scope, errors)?;
+
+    let element_type = match &base.node_type {
+        TypeKind::Array(generic) => *generic.clone(),
+        TypeKind::Any => TypeKind::Any,
+        base_type => {
+            let kind = ErrorKind::CannotIndexType(base_type.clone());
+            errors.add(kind, base.span);
+            return None;
+        }
+    };
+
+    let index_type = index.node_type.clone();
+    if index_type != TypeKind::Int && index_type != TypeKind::Any {
+        let kind = ErrorKind::IndexMustBeInt(index_type);
+        errors.add(kind, index.span);
+        return None;
+    }
+
+    let kind = BoundNodeKind::IndexExpression {
+        base: Box::new(base),
+        index: Box::new(index),
+    };
+
+    let node = BoundNode::new(kind, element_type, span);
+    Some(node)
+}
+
 fn bind_object_member_expression(
     base: &SyntaxToken,
     next: &SyntaxToken,
@@ -674,6 +713,9 @@ pub fn bind(
         }
         SyntaxKind::ReferenceExpression(identifier) => {
             bind_reference_expression(identifier.clone(), scope, errors, span)
+        }
+        SyntaxKind::IndexExpression { base, index } => {
+            bind_index_expression(&base, &index, scope, errors, span)
         }
         SyntaxKind::ObjectMemberExpression { base, next } => {
             bind_object_member_expression(&base, &next, scope, errors, span)

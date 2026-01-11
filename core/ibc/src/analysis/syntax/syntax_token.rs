@@ -25,6 +25,10 @@ pub enum SyntaxKind {
         base: Box<SyntaxToken>,
         next: Box<SyntaxToken>,
     },
+    IndexExpression {
+        base: Box<SyntaxToken>,
+        index: Box<SyntaxToken>,
+    },
     IntegerLiteralExpression(i64),
     BooleanLiteralExpression(bool),
     StringLiteralExpression(String),

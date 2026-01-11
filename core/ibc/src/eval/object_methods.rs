@@ -10,6 +10,27 @@ use super::{
     EvalIO,
 };
 
+/// Reads `index` out of an array, reporting a runtime error instead of
+/// panicking when it falls outside. Shared by `A[I]` and `A.get(I)`.
+pub async fn get_element(state: &ArrayState, index: i64, io: &mut impl EvalIO) -> EvalValue {
+    let element = usize::try_from(index)
+        .ok()
+        .and_then(|i| state.internal.get(i));
+
+    match element {
+        Some(v) => v.clone(),
+        None => {
+            let msg = format!(
+                "Index {} is out of bounds for an array of length {}",
+                index,
+                state.internal.len()
+            );
+            io.runtime_error(msg).await;
+            EvalValue::Error
+        }
+    }
+}
+
 async fn execute_array_method(
     state: &mut ArrayState,
     symbol: &FunctionSymbol,
@@ -29,7 +50,7 @@ async fn execute_array_method(
             let index_value = info.lock().unwrap().heap.get_var(index);
 
             let index_value = match index_value {
-                EvalValue::Int(i) => i as usize,
+                EvalValue::Int(i) => i,
                 _ => {
                     let msg = "Attempting to call Array.get with a non-integer index".to_string();
                     io.runtime_error(msg).await;
@@ -37,14 +58,7 @@ async fn execute_array_method(
                 }
             };
 
-            match state.internal.get(index_value) {
-                Some(v) => v.clone(),
-                None => {
-                    let msg = "Getting element from an empty array".to_string();
-                    io.runtime_error(msg).await;
-                    return EvalValue::Error;
-                }
-            }
+            get_element(state, index_value, io).await
         }
         "len" => {
             let length = state.internal.len() as i64;

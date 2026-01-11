@@ -15,7 +15,11 @@ use crate::analysis::{
     operator::Operator,
 };
 
-use super::{eval_builtin, object_methods::eval_type_method, EvalIO};
+use super::{
+    eval_builtin,
+    object_methods::{eval_type_method, get_element},
+    EvalIO,
+};
 
 pub struct EvalInfo {
     pub heap: EvalHeap,
@@ -417,6 +421,30 @@ async fn eval_while_loop(
     EvalValue::void()
 }
 
+async fn eval_index_expr(base: EvalValue, index: EvalValue, io: &mut impl EvalIO) -> EvalValue {
+    let index = match index.get_int(io).await {
+        Some(i) => i,
+        None => return EvalValue::Error,
+    };
+
+    // the binder only lets arrays through, or `Any`, which is checked here
+    let EvalValue::Object(state) = base else {
+        let msg = "Only arrays can be indexed".to_string();
+        io.runtime_error(msg).await;
+        return EvalValue::Error;
+    };
+
+    let state = state.lock().await;
+    match &*state {
+        ObjectState::Array(array) => get_element(array, index, io).await,
+        _ => {
+            let msg = "Only arrays can be indexed".to_string();
+            io.runtime_error(msg).await;
+            EvalValue::Error
+        }
+    }
+}
+
 #[async_recursion]
 async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl EvalIO) -> EvalValue {
     let val = match &node.kind {
@@ -532,6 +560,11 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             let object = get_object_state(node_type);
 
             EvalValue::Object(Arc::new(tokio::sync::Mutex::new(object)))
+        }
+        BoundNodeKind::IndexExpression { base, index } => {
+            let base_value = eval_rec(&base, info.clone(), io).await;
+            let index_value = eval_rec(&index, info, io).await;
+            eval_index_expr(base_value, index_value, io).await
         }
         BoundNodeKind::ObjectMemberExpression { base, next } => {
             let base_value = eval_rec(&base, info.clone(), io).await;

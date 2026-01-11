@@ -41,6 +41,8 @@ pub enum ErrorKind {
         expected: TypeKind,
     },
     ConditionMustBeBoolean(TypeKind),
+    CannotIndexType(TypeKind),
+    IndexMustBeInt(TypeKind),
     UndefinedType(String),
     UnaryOperatorNotDefinedOnType {
         op: Operator,
@@ -95,6 +97,12 @@ impl ErrorKind {
             Self::ReturnTypeMismatch { found, expected } => format!("Return type doesn't match function return type, found {:?}, expected {:?}", found, expected),
             Self::ConditionMustBeBoolean(cond_type) => {
                 format!("Condition type must be boolean, found {:?}", cond_type)
+            }
+            Self::CannotIndexType(base_type) => {
+                format!("Cannot index into {}, only arrays can be indexed", base_type.to_string())
+            }
+            Self::IndexMustBeInt(index_type) => {
+                format!("Index must be an Int, found {}", index_type.to_string())
             }
             Self::UndefinedType(type_ref) => {
                 format!("Undefined type '{}' in the current scope", type_ref)

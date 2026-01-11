@@ -3,6 +3,17 @@ false
 2
 10
 20
+4
+4
+5
+Ada
+0
+1
+4
+RUNTIME ERROR: Index 3 is out of bounds for an array of length 3
+?
+RUNTIME ERROR: Index -1 is out of bounds for an array of length 3
+?
 true
 2
 1

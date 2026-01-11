@@ -263,6 +263,37 @@ impl<'a> Parser<'a> {
                 let token = SyntaxToken::new(kind, span);
                 Some(token)
             }
+            LexerTokenKind::OpenSquareBracketToken => {
+                // index expression
+                let open_bracket = self.tokens.next().unwrap();
+                let index = match self.parse_expression(errors) {
+                    Some(i) => i,
+                    None => {
+                        let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                        errors.add(error_kind, open_bracket.span);
+                        return None;
+                    }
+                };
+
+                let close_bracket = match self.tokens.next() {
+                    Some(t) if t.kind == LexerTokenKind::CloseSquareBracketToken => t,
+                    _ => {
+                        let error_kind =
+                            ErrorKind::ExpectedToken("close square bracket ']'".to_string());
+                        errors.add(error_kind, index.span);
+                        return None;
+                    }
+                };
+
+                let span = Span::from_loc(identifier_span.start, close_bracket.span.end);
+                let kind = SyntaxKind::IndexExpression {
+                    base: Box::new(reference),
+                    index: Box::new(index),
+                };
+
+                let token = SyntaxToken::new(kind, span);
+                Some(token)
+            }
             _ => Some(reference),
         }
     }
