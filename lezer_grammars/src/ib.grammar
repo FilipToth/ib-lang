@@ -14,12 +14,12 @@ Atom {
   | ExpressionStatement
 }
 
-IfStatement { IfKeyword Expression* ThenKeyword Block (ElseKeyword Block)? EndKeyword }
+IfStatement { IfKeyword Expression ThenKeyword Block (ElseKeyword Block)? EndKeyword }
 FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword }
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }
-ForStatement { LoopKeyword ForKeyword? Identifier FromKeyword Expression* ToKeyword Expression Block EndKeyword }
+ForStatement { LoopKeyword ForKeyword? Identifier FromKeyword Expression ToKeyword Expression Block EndKeyword }
 WhileStatement { LoopKeyword WhileKeyword Expression Block EndKeyword }
 UntilStatement { LoopKeyword UntilKeyword Expression Block EndKeyword }
 
@@ -30,27 +30,31 @@ Block { Atom* }
 Parameter { Identifier ":" TypeAnnotation }
 ParameterList { "(" (Parameter ("," Parameter)*)? ")" }
 
+@precedence { member @left, binary @left, unary @right }
+
 Expression {
-  ReferenceEpxression
+  BinaryExpression
+  | UnaryExpression
+  | MemberAccessExpression
+  | ReferenceEpxression
   | CallExpression
   | ObjectInstantiationExpression
-  | MemberAccessExpression
   | Boolean
   | String
   | Number
-  | MiscOperator
   | TypeAnnotation
-  | NotKeyword
-  | AndKeyword
-  | OrKeyword
-  | ModKeyword
-  | DivKeyword
 }
+
+// A multi-token expression has to reduce to a single Expression, otherwise a
+// loop bound or condition runs on into the Block that follows it -- there is
+// no delimiter keyword between them to stop it.
+BinaryExpression { Expression !binary (MiscOperator | AndKeyword | OrKeyword | ModKeyword | DivKeyword) Expression }
+UnaryExpression { !unary (NotKeyword | MiscOperator) Expression }
 
 ReferenceEpxression { Identifier }
 CallExpression { Identifier "(" (Atom*)? ")" }
 ObjectInstantiationExpression { NewKeyword TypeAnnotation ("<" TypeAnnotation ">") "(" ")" }
-MemberAccessExpression { Expression "." (CallExpression | Identifier) }
+MemberAccessExpression { Expression !member "." (CallExpression | Identifier) }
 
 Boolean { @specialize<Identifier, "true" | "false"> }
 

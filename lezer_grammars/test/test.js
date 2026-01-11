@@ -37,6 +37,34 @@ function assertParses(code) {
     assert.deepEqual(errors, [], `${JSON.stringify(code)} should parse cleanly`);
 }
 
+/// Finds the text every Expression node covers, so a test can assert a
+/// multi-token expression was kept whole instead of spilling into the Block
+/// that follows it.
+function expressionTexts(code) {
+    const tree = parser.parse(code);
+    const cursor = tree.cursor();
+    const texts = [];
+
+    do {
+        if (cursor.type.name === "Expression") {
+            texts.push(code.slice(cursor.from, cursor.to));
+        }
+    } while (cursor.next());
+
+    return texts;
+}
+
+/// Asserts `code` parses cleanly and that `expr` came out as one Expression.
+function assertWholeExpression(code, expr) {
+    assertParses(code);
+
+    const texts = expressionTexts(code);
+    assert.ok(
+        texts.includes(expr),
+        `${JSON.stringify(expr)} should be one Expression, got ${JSON.stringify(texts)}`
+    );
+}
+
 describe("loops", () => {
     it("parses a counted loop with and without the optional for", () => {
         const withFor = "loop for N from 0 to 5\n  output N\nend";
@@ -152,5 +180,34 @@ describe("operators", () => {
         assertParses("if A >= 1 AND B <= 2 OR NOT C == 3 then\n  output A\nend");
         assertParses("output 15 mod 7");
         assertParses("output 15 div 7");
+    });
+});
+
+describe("multi-token expressions", () => {
+    /// A loop bound and a loop condition are both followed directly by the
+    /// Block, with no delimiter keyword to close the expression. Without
+    /// binary-expression structure the trailing tokens end up as statements
+    /// inside the Block instead.
+    it("keeps a loop bound whole when it spans several tokens", () => {
+        assertWholeExpression("loop N from 0 to COUNT - 1\n  output N\nend", "COUNT - 1");
+        assertWholeExpression("loop N from A + 1 to B * 2\n  output N\nend", "B * 2");
+    });
+
+    it("keeps a loop condition whole", () => {
+        assertWholeExpression("loop while I < 10\n  output I\nend", "I < 10");
+        assertWholeExpression("loop until F * F > NUM\n  output F\nend", "F * F > NUM");
+    });
+
+    it("keeps an if condition whole", () => {
+        assertWholeExpression("if X >= 4 then\n  output X\nend", "X >= 4");
+        assertWholeExpression("if A AND B OR C then\n  output A\nend", "A AND B OR C");
+    });
+
+    /// A '-' that opens an expression is still unary; only one that follows an
+    /// operand binds as a binary operator.
+    it("still reads a leading minus as unary", () => {
+        assertWholeExpression("X = -1", "-1");
+        assertWholeExpression("output -X", "-X");
+        assertWholeExpression("output NOT true", "NOT true");
     });
 });
