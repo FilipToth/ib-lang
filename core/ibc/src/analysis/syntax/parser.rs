@@ -8,7 +8,7 @@ use crate::analysis::{
 
 use super::{
     lexer::{LexerToken, LexerTokenKind},
-    syntax_token::{SyntaxKind, SyntaxToken},
+    syntax_token::{SyntaxKind, SyntaxToken, TypeAnnotation},
 };
 
 type LexerTokens<'a> = Peekable<Iter<'a, LexerToken>>;
@@ -193,32 +193,18 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let reference_kind = SyntaxKind::ReferenceExpression(identifier.clone());
-        let reference = SyntaxToken::new(reference_kind, identifier_span);
-
         let peek = match self.tokens.peek() {
             Some(p) => p,
-            None => return Some(reference),
+            None => {
+                let kind = SyntaxKind::ReferenceExpression(identifier);
+                let token = SyntaxToken::new(kind, identifier_span);
+                return Some(token);
+            }
         };
 
-        match peek.kind {
+        let base = match peek.kind {
             LexerTokenKind::OpenParenthesisToken => {
-                // call expression
-                let arguments = self.parse_argument_list(errors)?;
-
-                let last_loc = match arguments.last() {
-                    Some(t) => t.span.end,
-                    None => identifier_span.end,
-                };
-
-                let kind = SyntaxKind::CallExpression {
-                    identifier: identifier,
-                    args: arguments,
-                };
-
-                let span = Span::from_loc(identifier_span.start, last_loc);
-                let token = SyntaxToken::new(kind, span);
-                Some(token)
+                self.parse_call_expression(identifier, identifier_span, errors)?
             }
             LexerTokenKind::EqualsToken => {
                 // assignment expression
@@ -240,128 +226,243 @@ impl<'a> Parser<'a> {
 
                 let span = Span::from_loc(identifier_span.start, end_loc);
                 let token = SyntaxToken::new(kind, span);
-                Some(token)
+                return Some(token);
             }
-            LexerTokenKind::DotToken => {
-                // object call expression
-                let dot = self.tokens.next().unwrap();
-                let next_expr = match self.parse_reference_based_token(errors) {
-                    Some(n) => n,
-                    None => {
-                        let error_kind = ErrorKind::ExpectedToken("object member".to_string());
-                        errors.add(error_kind, dot.span);
-                        return None;
-                    }
-                };
-
-                let span = Span::from_loc(reference.span.start, next_expr.span.end);
-                let kind = SyntaxKind::ObjectMemberExpression {
-                    base: Box::new(reference),
-                    next: Box::new(next_expr),
-                };
-
-                let token = SyntaxToken::new(kind, span);
-                Some(token)
+            _ => {
+                let kind = SyntaxKind::ReferenceExpression(identifier);
+                SyntaxToken::new(kind, identifier_span)
             }
-            LexerTokenKind::OpenSquareBracketToken => {
-                // index expression
-                let open_bracket = self.tokens.next().unwrap();
-                let index = match self.parse_expression(errors) {
-                    Some(i) => i,
-                    None => {
-                        let error_kind = ErrorKind::ExpectedToken("expression".to_string());
-                        errors.add(error_kind, open_bracket.span);
-                        return None;
+        };
+
+        self.parse_access_chain(base, errors)
+    }
+
+    fn parse_call_expression(
+        &mut self,
+        identifier: String,
+        identifier_span: Span,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let arguments = self.parse_argument_list(errors)?;
+
+        let last_loc = match arguments.last() {
+            Some(t) => t.span.end,
+            None => identifier_span.end,
+        };
+
+        let kind = SyntaxKind::CallExpression {
+            identifier: identifier,
+            args: arguments,
+        };
+
+        let span = Span::from_loc(identifier_span.start, last_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
+    }
+
+    /// Applies member accesses and indexes left to right, so `A[0].pop()`
+    /// indexes `A` and then calls `pop` on the element.
+    fn parse_access_chain(
+        &mut self,
+        base: SyntaxToken,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let mut expr = base;
+
+        loop {
+            let peek = match self.tokens.peek() {
+                Some(p) => p,
+                None => return Some(expr),
+            };
+
+            expr = match peek.kind {
+                LexerTokenKind::DotToken => self.parse_member_access(expr, errors)?,
+                LexerTokenKind::OpenSquareBracketToken => {
+                    let indexed = self.parse_index_expression(expr, errors)?;
+
+                    // an assignment is a whole expression, nothing chains off it
+                    if let SyntaxKind::IndexAssignmentExpression { .. } = indexed.kind {
+                        return Some(indexed);
                     }
-                };
 
-                let close_bracket = match self.tokens.next() {
-                    Some(t) if t.kind == LexerTokenKind::CloseSquareBracketToken => t,
-                    _ => {
-                        let error_kind =
-                            ErrorKind::ExpectedToken("close square bracket ']'".to_string());
-                        errors.add(error_kind, index.span);
-                        return None;
-                    }
-                };
-
-                let span = Span::from_loc(identifier_span.start, close_bracket.span.end);
-                let kind = SyntaxKind::IndexExpression {
-                    base: Box::new(reference),
-                    index: Box::new(index),
-                };
-
-                let token = SyntaxToken::new(kind, span);
-                Some(token)
-            }
-            _ => Some(reference),
+                    indexed
+                }
+                _ => return Some(expr),
+            };
         }
+    }
+
+    fn parse_member_access(
+        &mut self,
+        base: SyntaxToken,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let dot = self.tokens.next().unwrap();
+        let (member, member_span) = match self.parse_identifier() {
+            Some(m) => m,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("object member".to_string());
+                errors.add(error_kind, dot.span);
+                return None;
+            }
+        };
+
+        let next = if self.expect_next_token_peek(LexerTokenKind::OpenParenthesisToken) {
+            self.parse_call_expression(member, member_span, errors)?
+        } else {
+            let kind = SyntaxKind::ReferenceExpression(member);
+            SyntaxToken::new(kind, member_span)
+        };
+
+        let span = Span::from_loc(base.span.start, next.span.end);
+        let kind = SyntaxKind::ObjectMemberExpression {
+            base: Box::new(base),
+            next: Box::new(next),
+        };
+
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
+    }
+
+    /// Parses `[index]` after `base`, along with the `= value` that makes it an
+    /// index assignment when one follows.
+    fn parse_index_expression(
+        &mut self,
+        base: SyntaxToken,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let open_bracket = self.tokens.next().unwrap();
+        let index = match self.parse_expression(errors) {
+            Some(i) => i,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                errors.add(error_kind, open_bracket.span);
+                return None;
+            }
+        };
+
+        let close_bracket = match self.tokens.next() {
+            Some(t) if t.kind == LexerTokenKind::CloseSquareBracketToken => t,
+            _ => {
+                let error_kind = ErrorKind::ExpectedToken("close square bracket ']'".to_string());
+                errors.add(error_kind, index.span);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token_peek(LexerTokenKind::EqualsToken) {
+            let span = Span::from_loc(base.span.start, close_bracket.span.end);
+            let kind = SyntaxKind::IndexExpression {
+                base: Box::new(base),
+                index: Box::new(index),
+            };
+
+            let token = SyntaxToken::new(kind, span);
+            return Some(token);
+        }
+
+        // index assignment expression
+        let equals = self.tokens.next().unwrap();
+        let value = match self.parse_expression(errors) {
+            Some(v) => v,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                errors.add(error_kind, equals.span);
+                return None;
+            }
+        };
+
+        let span = Span::from_loc(base.span.start, value.span.end);
+        let kind = SyntaxKind::IndexAssignmentExpression {
+            base: Box::new(base),
+            index: Box::new(index),
+            value: Box::new(value),
+        };
+
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
     }
 
     fn parse_instantiation_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let new_keyword = self.tokens.next().unwrap();
+        let type_annotation = self.parse_type_annotation(new_keyword.span, errors)?;
 
-        let (identifier, identifier_span) = match self.parse_identifier() {
-            Some((i, s)) => (i, s),
-            None => {
-                let error_kind = ErrorKind::ExpectedToken("Identifier".to_string());
-                errors.add(error_kind, new_keyword.span);
-                return None;
-            }
-        };
-
-        let peek = match self.tokens.peek() {
-            Some(i) => i,
-            None => {
-                let error_kind = ErrorKind::ExpectedToken("Argument List".to_string());
-                errors.add(error_kind, identifier_span);
-                return None;
-            }
-        };
-
-        let type_param = match peek.kind {
-            LexerTokenKind::LesserThanToken => {
-                let le_token = self.tokens.next().unwrap();
-                let (identifier, _) = match self.parse_identifier() {
-                    Some(i) => i,
-                    None => {
-                        let error_kind = ErrorKind::ExpectedToken("Type Identifier".to_string());
-                        errors.add(error_kind, le_token.span);
-                        return None;
-                    }
-                };
-
-                // consume ge token
-                self.expect_next_token(LexerTokenKind::GreaterThanToken);
-
-                Some(identifier)
-            }
-            _ => None,
-        };
+        if !self.expect_next_token_peek(LexerTokenKind::OpenParenthesisToken) {
+            let error_kind = ErrorKind::ExpectedToken("Argument List".to_string());
+            errors.add(error_kind, type_annotation.span);
+            return None;
+        }
 
         let arg_list = match self.parse_argument_list(errors) {
             Some(a) => a,
             None => {
                 let error_kind = ErrorKind::ExpectedToken("Argument List".to_string());
-                errors.add(error_kind, identifier_span);
+                errors.add(error_kind, type_annotation.span);
                 return None;
             }
         };
 
         let end_loc = match arg_list.last() {
             Some(l) => l.span.end,
-            None => identifier_span.end,
-        };
-
-        let kind = SyntaxKind::InstantiationExpression {
-            type_name: identifier,
-            type_param: type_param,
-            args: arg_list,
+            None => type_annotation.span.end,
         };
 
         let span = Span::from_loc(new_keyword.span.start, end_loc);
+        let kind = SyntaxKind::InstantiationExpression {
+            type_annotation: type_annotation,
+            args: arg_list,
+        };
+
         let token = SyntaxToken::new(kind, span);
         Some(token)
+    }
+
+    /// Parses a type: a name, optionally followed by a generic parameter in
+    /// angle brackets. The parameter is itself a type, so `Array<Stack<Int>>`
+    /// nests. `preceding` is where to report a missing name.
+    fn parse_type_annotation(
+        &mut self,
+        preceding: Span,
+        errors: &mut ErrorBag,
+    ) -> Option<TypeAnnotation> {
+        let (name, name_span) = match self.parse_identifier() {
+            Some(i) => i,
+            None => {
+                let error_kind = ErrorKind::ExpectedToken("type".to_string());
+                errors.add(error_kind, preceding);
+                return None;
+            }
+        };
+
+        if !self.expect_next_token_peek(LexerTokenKind::LesserThanToken) {
+            let annotation = TypeAnnotation {
+                name: name,
+                generic: None,
+                span: name_span,
+            };
+
+            return Some(annotation);
+        }
+
+        let open_angle = self.tokens.next().unwrap();
+        let generic = self.parse_type_annotation(open_angle.span, errors)?;
+
+        let close_angle = match self.tokens.next() {
+            Some(t) if t.kind == LexerTokenKind::GreaterThanToken => t,
+            _ => {
+                let error_kind = ErrorKind::ExpectedToken("close angle bracket '>'".to_string());
+                errors.add(error_kind, generic.span);
+                return None;
+            }
+        };
+
+        let annotation = TypeAnnotation {
+            name: name,
+            generic: Some(Box::new(generic)),
+            span: Span::from_loc(name_span.start, close_angle.span.end),
+        };
+
+        Some(annotation)
     }
 
     fn parse_argument_list(&mut self, errors: &mut ErrorBag) -> Option<Vec<SyntaxToken>> {
@@ -598,16 +699,10 @@ impl<'a> Parser<'a> {
         // parameter list
         let parameters = self.parse_parameter_list(errors)?;
 
-        let mut return_type: Option<String> = None;
+        let mut return_type: Option<TypeAnnotation> = None;
         if self.expect_next_token_peek(LexerTokenKind::ArrowToken) {
             let arrow = self.tokens.next().unwrap();
-            match self.parse_identifier() {
-                Some((i, _)) => return_type = Some(i.clone()),
-                None => {
-                    let error_kind = ErrorKind::ExpectedToken("identifier".to_string());
-                    errors.add(error_kind, arrow.span);
-                }
-            };
+            return_type = self.parse_type_annotation(arrow.span, errors);
         }
 
         // body
@@ -690,21 +785,11 @@ impl<'a> Parser<'a> {
 
             let (identifier, loc) = self.parse_identifier()?;
 
-            let type_annotation = {
-                if self.expect_next_token_peek(LexerTokenKind::ColonToken) {
-                    let _ = self.expect_next_token(LexerTokenKind::ColonToken);
-                    match self.parse_identifier() {
-                        Some((i, _)) => Some(i),
-                        None => {
-                            let error_kind =
-                                ErrorKind::ExpectedToken("type annotation".to_string());
-                            errors.add(error_kind, peek.span);
-                            return None;
-                        }
-                    }
-                } else {
-                    None
-                }
+            let type_annotation = if self.expect_next_token_peek(LexerTokenKind::ColonToken) {
+                let colon = self.tokens.next().unwrap();
+                Some(self.parse_type_annotation(colon.span, errors)?)
+            } else {
+                None
             };
 
             prev_comma = false;
@@ -931,10 +1016,32 @@ impl<'a> Parser<'a> {
     fn parse_scope(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let mut parsed: Vec<SyntaxToken> = Vec::new();
         loop {
-            let statement = self.parse_statement(errors);
-            match statement {
+            // a scope ends at the end of the file or at a keyword that closes
+            // it; the enclosing construct checks it got the one it expected
+            let closes_scope = match self.tokens.peek() {
+                Some(t) => matches!(t.kind, LexerTokenKind::EndKeyword | LexerTokenKind::ElseKeyword),
+                None => true,
+            };
+
+            if closes_scope {
+                break;
+            }
+
+            let error_count = errors.errors.len();
+            match self.parse_statement(errors) {
                 Some(s) => parsed.push(s),
-                None => break,
+                None => {
+                    // a statement that failed without reporting anything could
+                    // not start at all. say so, rather than silently dropping
+                    // everything after it.
+                    if errors.errors.len() == error_count {
+                        if let Some(t) = self.tokens.peek() {
+                            errors.add(ErrorKind::UnexpectedToken, t.span);
+                        }
+                    }
+
+                    break;
+                }
             };
         }
 
@@ -994,5 +1101,16 @@ pub fn parse(tokens: Vec<LexerToken>, errors: &mut ErrorBag) -> Option<SyntaxTok
     let iter = tokens.iter().peekable();
     let mut parser = Parser::new(iter);
 
-    parser.parse_scope(errors)
+    let error_count = errors.errors.len();
+    let root = parser.parse_scope(errors)?;
+
+    // a nested scope leaves `end` and `else` for its construct to consume. at
+    // the top level there is no construct, so one left over is stray.
+    if errors.errors.len() == error_count {
+        if let Some(t) = parser.tokens.peek() {
+            errors.add(ErrorKind::UnexpectedToken, t.span);
+        }
+    }
+
+    Some(root)
 }

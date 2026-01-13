@@ -133,3 +133,51 @@ fn missing_end_after_else_is_reported() {
         "an unterminated else must still raise a diagnostic"
     );
 }
+
+/// True if parsing `src` reported an error with exactly this message.
+fn reports(src: &str, message: &str) -> bool {
+    let (_, errors) = parse_source(src);
+
+    errors
+        .errors
+        .iter()
+        .any(|error| error.kind.format() == message)
+}
+
+#[test]
+fn a_statement_that_cannot_start_is_reported() {
+    // each of these used to end the program early without a word
+    let cases = [
+        // only the first value of a multi-value output parses
+        "output 1 , 2\noutput 3",
+        // a call is not something that can be assigned to
+        "A = new Array<Int>()\nA.len() = 7",
+        // at the top level there is no construct for an `end` to close
+        "output 1\nend\noutput 2",
+    ];
+
+    for src in cases {
+        assert!(reports(src, "Unexpected token"), "{:?}", src);
+    }
+}
+
+#[test]
+fn nested_type_annotations_parse() {
+    let src = "function f(GRID: Array<Stack<Int>>) -> Array<Int>\n\
+                   return new Array<Int>()\n\
+               end\n\
+               G = new Array<Array<Int>>()";
+
+    let (root, errors) = parse_source(src);
+
+    assert!(root.is_some());
+    assert_eq!(errors.errors.len(), 0);
+}
+
+#[test]
+fn an_unclosed_generic_is_reported() {
+    assert!(reports(
+        "A = new Array<Int()",
+        "Expected token: close angle bracket '>'"
+    ));
+}

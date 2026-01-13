@@ -4,7 +4,7 @@ use crate::analysis::{
     error_bag::{ErrorBag, ErrorKind},
     operator::Operator,
     span::Span,
-    syntax::syntax_token::{SyntaxKind, SyntaxToken},
+    syntax::syntax_token::{SyntaxKind, SyntaxToken, TypeAnnotation},
 };
 
 use super::{
@@ -117,7 +117,7 @@ fn bind_if_statement(
 fn bind_function_declaration(
     identifier: String,
     params: &Vec<SyntaxToken>,
-    ret_type: &Option<String>,
+    ret_type: &Option<TypeAnnotation>,
     block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
@@ -129,12 +129,9 @@ fn bind_function_declaration(
     let params = bind_params(params, func_scope_ref.clone(), errors)?;
 
     let ret_type = match ret_type {
-        Some(t) => t,
-        None => "Void",
-    }
-    .to_string();
-
-    let ret_type = get_type(ret_type, None, &span, errors)?;
+        Some(t) => get_type(t, errors)?,
+        None => TypeKind::Void,
+    };
 
     let block_span = block.span.clone();
     let SyntaxKind::Scope { subtokens } = &block.kind else {
@@ -286,7 +283,7 @@ fn bind_params(
         };
 
         let param_type = match type_annotation {
-            Some(t) => get_type(t.clone(), None, &span, errors)?,
+            Some(t) => get_type(t, errors)?,
             None => TypeKind::Any,
         };
 
@@ -403,10 +400,15 @@ fn bind_assignment_expression(
     Some(node)
 }
 
+/// `scope` resolves the function and `arg_scope` binds its arguments. For an
+/// ordinary call they are the same scope. A method call looks the method up on
+/// the object, but its arguments are still expressions from where the call was
+/// written.
 fn bind_call_expression(
     identifier: String,
     args: &Vec<SyntaxToken>,
     scope: Rc<RefCell<BoundScope>>,
+    arg_scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
@@ -439,7 +441,7 @@ fn bind_call_expression(
         let param = &params[index];
         let arg = &args[index];
 
-        let bound_arg = bind(arg, scope.clone(), errors)?;
+        let bound_arg = bind(arg, arg_scope.clone(), errors)?;
 
         if param.param_type != bound_arg.node_type
             && param.param_type != TypeKind::Any
@@ -507,16 +509,15 @@ fn type_method_param_name(base_type: &TypeKind, method: &str, param: &str) -> St
     format!("$param${}${}${}", base_type.to_string(), method, param)
 }
 
-/// Binds `base[index]`. The spec only gives arrays index notation, so stacks,
-/// queues and collections are rejected, and the result takes the array's
-/// element type.
-fn bind_index_expression(
+/// Binds the `base[index]` shared by reads and writes, returning both along
+/// with the array's element type. The spec only gives arrays index notation,
+/// so stacks, queues and collections are rejected.
+fn bind_index_target(
     base: &SyntaxToken,
     index: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
-    span: Span,
-) -> Option<BoundNode> {
+) -> Option<(BoundNode, BoundNode, TypeKind)> {
     let base = bind(base, scope.clone(), errors)?;
     let index = bind(index, scope, errors)?;
 
@@ -537,12 +538,57 @@ fn bind_index_expression(
         return None;
     }
 
+    Some((base, index, element_type))
+}
+
+fn bind_index_expression(
+    base: &SyntaxToken,
+    index: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let (base, index, element_type) = bind_index_target(base, index, scope, errors)?;
+
     let kind = BoundNodeKind::IndexExpression {
         base: Box::new(base),
         index: Box::new(index),
     };
 
     let node = BoundNode::new(kind, element_type, span);
+    Some(node)
+}
+
+/// Binds `base[index] = value`. The value has to match the array's element
+/// type, the same rule reassigning a variable follows.
+fn bind_index_assignment_expression(
+    base: &SyntaxToken,
+    index: &SyntaxToken,
+    value: &SyntaxToken,
+    scope: Rc<RefCell<BoundScope>>,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let (base, index, element_type) = bind_index_target(base, index, scope.clone(), errors)?;
+    let value = bind(value, scope, errors)?;
+
+    let value_type = value.node_type.clone();
+    let matches = element_type == value_type
+        || element_type == TypeKind::Any
+        || value_type == TypeKind::Any;
+
+    if !matches {
+        errors.add(ErrorKind::AssignMismatchedTypes, span);
+        return None;
+    }
+
+    let kind = BoundNodeKind::IndexAssignmentExpression {
+        base: Box::new(base),
+        index: Box::new(index),
+        value: Box::new(value),
+    };
+
+    let node = BoundNode::new(kind, value_type, span);
     Some(node)
 }
 
@@ -594,7 +640,18 @@ fn bind_object_member_expression(
         object_scope.declare_function(method_identifier, params, method.ret_type);
     }
 
-    let next = bind(next, Rc::new(RefCell::new(object_scope)), errors)?;
+    let object_scope = Rc::new(RefCell::new(object_scope));
+    let next = match &next.kind {
+        SyntaxKind::CallExpression { identifier, args } => bind_call_expression(
+            identifier.clone(),
+            args,
+            object_scope,
+            scope,
+            errors,
+            next.span,
+        )?,
+        _ => bind(next, object_scope, errors)?,
+    };
 
     let node_type = next.node_type.clone();
     let kind = BoundNodeKind::ObjectMemberExpression {
@@ -607,18 +664,17 @@ fn bind_object_member_expression(
 }
 
 fn bind_instantiation_expression(
-    type_name: String,
-    type_param: Option<String>,
+    type_annotation: &TypeAnnotation,
     args: &Vec<SyntaxToken>,
     _scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let instantiation_type = get_type(type_name.clone(), type_param, &span, errors)?;
+    let instantiation_type = get_type(type_annotation, errors)?;
 
     if args.len() != 0 {
         // we don't support constructors with arguments yet
-        let ctor = format!("{}.constructor()", type_name);
+        let ctor = format!("{}.constructor()", type_annotation.name);
         let kind = ErrorKind::MismatchedNumberOfArgs {
             id: ctor,
             expected: 0,
@@ -709,7 +765,7 @@ pub fn bind(
             bind_assignment_expression(identifier.clone(), value, scope, errors, span)
         }
         SyntaxKind::CallExpression { identifier, args } => {
-            bind_call_expression(identifier.clone(), &args, scope, errors, span)
+            bind_call_expression(identifier.clone(), &args, scope.clone(), scope, errors, span)
         }
         SyntaxKind::ReferenceExpression(identifier) => {
             bind_reference_expression(identifier.clone(), scope, errors, span)
@@ -717,21 +773,16 @@ pub fn bind(
         SyntaxKind::IndexExpression { base, index } => {
             bind_index_expression(&base, &index, scope, errors, span)
         }
+        SyntaxKind::IndexAssignmentExpression { base, index, value } => {
+            bind_index_assignment_expression(&base, &index, &value, scope, errors, span)
+        }
         SyntaxKind::ObjectMemberExpression { base, next } => {
             bind_object_member_expression(&base, &next, scope, errors, span)
         }
         SyntaxKind::InstantiationExpression {
-            type_name,
-            type_param,
+            type_annotation,
             args,
-        } => bind_instantiation_expression(
-            type_name.clone(),
-            type_param.clone(),
-            &args,
-            scope,
-            errors,
-            span,
-        ),
+        } => bind_instantiation_expression(&type_annotation, &args, scope, errors, span),
         SyntaxKind::ParenthesizedExpression { inner } => bind(&inner, scope, errors),
         _ => unreachable!("unhandled syntax kind: {:?}", token.kind),
     }

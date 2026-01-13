@@ -111,15 +111,27 @@ describe("loops", () => {
 });
 
 describe("operators", () => {
-    it("parses the symbol operators and tags them as MiscOperator", () => {
-        for (const op of ["+", "-", "*", "/", "==", "!=", ">=", "<="]) {
+    it("parses the symbol operators and tags each with its node", () => {
+        // `+` and `-` are also unary, so they get a node of their own
+        const cases = [
+            ["+", "AdditiveOperator"],
+            ["-", "AdditiveOperator"],
+            ["*", "MiscOperator"],
+            ["/", "MiscOperator"],
+            ["==", "MiscOperator"],
+            ["!=", "MiscOperator"],
+            [">=", "MiscOperator"],
+            ["<=", "MiscOperator"],
+        ];
+
+        for (const [op, node] of cases) {
             const source = `A ${op} B`;
             assertParses(source);
 
             const names = nodeNames(source);
             assert.ok(
-                names.includes("MiscOperator"),
-                `${op} should be a MiscOperator, got ${names.join(",")}`
+                names.includes(node),
+                `${op} should be a ${node}, got ${names.join(",")}`
             );
         }
     });
@@ -209,5 +221,59 @@ describe("multi-token expressions", () => {
         assertWholeExpression("X = -1", "-1");
         assertWholeExpression("output -X", "-X");
         assertWholeExpression("output NOT true", "NOT true");
+    });
+});
+
+describe("indexing", () => {
+    it("parses an index read wherever an expression can go", () => {
+        assertWholeExpression("X = A[0]", "A[0]");
+        assertWholeExpression("output A[I + 1] * 2", "A[I + 1] * 2");
+        assertWholeExpression("if STOCK[N] > 0 then\n  output N\nend", "STOCK[N] > 0");
+    });
+
+    /// The spec fills arrays by assigning through an index, so a write has to
+    /// come out as its own statement rather than a stray expression.
+    it("parses an index write as an assignment", () => {
+        for (const code of ["VALUE[0] = 7", "LIST[COUNT] = DATA", "MYARRAY[POS] = MYSTACK.pop()"]) {
+            assertParses(code);
+
+            const names = nodeNames(code);
+            assert.ok(
+                names.includes("IndexAssignment"),
+                `${JSON.stringify(code)} should be an IndexAssignment, got ${names.join(",")}`
+            );
+        }
+    });
+});
+
+describe("types and chaining", () => {
+    it("parses nested generics wherever a type is written", () => {
+        for (const code of [
+            "G = new Array<Array<Int>>()",
+            "function f(S: Stack<Int>)\n  output 1\nend",
+            "function f() -> Array<Stack<Int>>\n  return new Array<Stack<Int>>()\nend",
+        ]) {
+            assertParses(code);
+        }
+    });
+
+    /// The return type used to be read as two unary operators at the top of
+    /// the function body.
+    it("keeps a return type out of the function body", () => {
+        const code = "function f(A: Int) -> Int\n  return -A\nend";
+        assertParses(code);
+
+        const names = nodeNames(code);
+        assert.ok(names.includes("ReturnType"), `got ${names.join(",")}`);
+        assert.ok(!expressionTexts(code).includes("-> Int"));
+    });
+
+    it("chains indexes and member accesses", () => {
+        assertWholeExpression("output GRID[0].len()", "GRID[0].len()");
+        assertWholeExpression("output GRID[0][1]", "GRID[0][1]");
+        assertWholeExpression("output make().pop()", "make().pop()");
+
+        assertParses("GRID[0][1] = 9");
+        assert.ok(nodeNames("GRID[0][1] = 9").includes("IndexAssignment"));
     });
 });

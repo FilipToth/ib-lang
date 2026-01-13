@@ -1,7 +1,7 @@
 use crate::{
     analysis::{
         error_bag::{ErrorBag, ErrorKind},
-        span::Span,
+        syntax::syntax_token::TypeAnnotation,
     },
     eval::evaluator::EvalValue,
 };
@@ -230,74 +230,38 @@ impl TypeKind {
     }
 }
 
-pub fn get_type(
-    identifier: String,
-    generic: Option<String>,
-    span: &Span,
-    errors: &mut ErrorBag,
-) -> Option<TypeKind> {
-    let type_kind = match identifier.as_str() {
+pub fn get_type(annotation: &TypeAnnotation, errors: &mut ErrorBag) -> Option<TypeKind> {
+    let type_kind = match annotation.name.as_str() {
         "Any" => TypeKind::Any,
         "Void" => TypeKind::Void,
         "Int" => TypeKind::Int,
         "String" => TypeKind::String,
         "Boolean" => TypeKind::Boolean,
-        "Array" => {
-            let generic = match generic {
-                Some(id) => get_type(id, None, span, errors)?,
-                None => {
-                    let kind = ErrorKind::ExpectsGenericTypeParam("Array".to_string());
-                    errors.add(kind, span.clone());
-                    return None;
-                }
-            };
-
-            TypeKind::Array(Box::new(generic))
-        }
-        "Collection" => {
-            let generic = match generic {
-                Some(id) => get_type(id, None, span, errors)?,
-                None => {
-                    let kind = ErrorKind::ExpectsGenericTypeParam("Collection".to_string());
-                    errors.add(kind, span.clone());
-                    return None;
-                }
-            };
-
-            TypeKind::Collection(Box::new(generic))
-        }
-        "Stack" => {
-            let generic = match generic {
-                Some(id) => get_type(id, None, span, errors)?,
-                None => {
-                    let kind = ErrorKind::ExpectsGenericTypeParam("Stack".to_string());
-                    errors.add(kind, span.clone());
-                    return None;
-                }
-            };
-
-            TypeKind::Stack(Box::new(generic))
-        }
-        "Queue" => {
-            let generic = match generic {
-                Some(id) => get_type(id, None, span, errors)?,
-                None => {
-                    let kind = ErrorKind::ExpectsGenericTypeParam("Queue".to_string());
-                    errors.add(kind, span.clone());
-                    return None;
-                }
-            };
-
-            TypeKind::Queue(Box::new(generic))
-        }
+        "Array" => TypeKind::Array(Box::new(get_generic(annotation, errors)?)),
+        "Collection" => TypeKind::Collection(Box::new(get_generic(annotation, errors)?)),
+        "Stack" => TypeKind::Stack(Box::new(get_generic(annotation, errors)?)),
+        "Queue" => TypeKind::Queue(Box::new(get_generic(annotation, errors)?)),
         _ => {
-            let kind = ErrorKind::UndefinedType(identifier);
-            errors.add(kind, span.clone());
+            let kind = ErrorKind::UndefinedType(annotation.name.clone());
+            errors.add(kind, annotation.span);
             return None;
         }
     };
 
     Some(type_kind)
+}
+
+/// Resolves the element type a collection requires. It is a full type, so
+/// collections of collections resolve recursively.
+fn get_generic(annotation: &TypeAnnotation, errors: &mut ErrorBag) -> Option<TypeKind> {
+    match &annotation.generic {
+        Some(generic) => get_type(generic, errors),
+        None => {
+            let kind = ErrorKind::ExpectsGenericTypeParam(annotation.name.clone());
+            errors.add(kind, annotation.span);
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

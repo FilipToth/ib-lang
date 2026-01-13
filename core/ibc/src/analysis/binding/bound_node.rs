@@ -87,6 +87,14 @@ impl BoundNode {
             BoundNodeKind::IndexExpression { base, index } => {
                 format!("{}[{}]", base.to_string(), index.to_string())
             }
+            BoundNodeKind::IndexAssignmentExpression { base, index, value } => {
+                format!(
+                    "{}[{}] = {}",
+                    base.to_string(),
+                    index.to_string(),
+                    value.to_string()
+                )
+            }
             BoundNodeKind::ReferenceExpression(sym) => sym.name().to_string(),
             BoundNodeKind::NumberLiteral(num) => num.to_string(),
             BoundNodeKind::BooleanLiteral(bool) => bool.to_string(),
@@ -159,6 +167,11 @@ pub enum BoundNodeKind {
     IndexExpression {
         base: Box<BoundNode>,
         index: Box<BoundNode>,
+    },
+    IndexAssignmentExpression {
+        base: Box<BoundNode>,
+        index: Box<BoundNode>,
+        value: Box<BoundNode>,
     },
     ReferenceExpression(VariableSymbol),
     NumberLiteral(i64),

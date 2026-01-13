@@ -10,6 +10,16 @@ use super::{
     EvalIO,
 };
 
+async fn out_of_bounds(index: i64, len: usize, io: &mut impl EvalIO) -> EvalValue {
+    let msg = format!(
+        "Index {} is out of bounds for an array of length {}",
+        index, len
+    );
+
+    io.runtime_error(msg).await;
+    EvalValue::Error
+}
+
 /// Reads `index` out of an array, reporting a runtime error instead of
 /// panicking when it falls outside. Shared by `A[I]` and `A.get(I)`.
 pub async fn get_element(state: &ArrayState, index: i64, io: &mut impl EvalIO) -> EvalValue {
@@ -19,16 +29,28 @@ pub async fn get_element(state: &ArrayState, index: i64, io: &mut impl EvalIO) -
 
     match element {
         Some(v) => v.clone(),
-        None => {
-            let msg = format!(
-                "Index {} is out of bounds for an array of length {}",
-                index,
-                state.internal.len()
-            );
-            io.runtime_error(msg).await;
-            EvalValue::Error
-        }
+        None => out_of_bounds(index, state.internal.len(), io).await,
     }
+}
+
+/// Writes `value` at `index`. Arrays have no declared size and start out
+/// empty, so writing one past the end appends -- that is what lets the spec's
+/// `LIST[COUNT] = DATA` fill an array. Anything further out is an error.
+pub async fn set_element(
+    state: &mut ArrayState,
+    index: i64,
+    value: EvalValue,
+    io: &mut impl EvalIO,
+) -> EvalValue {
+    let len = state.internal.len();
+
+    match usize::try_from(index) {
+        Ok(i) if i < len => state.internal[i] = value.clone(),
+        Ok(i) if i == len => state.internal.push(value.clone()),
+        _ => return out_of_bounds(index, len, io).await,
+    }
+
+    value
 }
 
 async fn execute_array_method(
@@ -202,6 +224,9 @@ pub async fn eval_type_method(
         EvalValue::Object(state) => {
             execute_object_method(state.clone(), symbol, info.clone(), io).await
         }
+        // already reported where it came from, e.g. an index out of bounds
+        // in `A[9].pop()`
+        EvalValue::Error => EvalValue::Error,
         _ => unimplemented!(),
     }
 }

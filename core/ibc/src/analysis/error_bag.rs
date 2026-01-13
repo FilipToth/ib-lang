@@ -15,6 +15,7 @@ pub enum ErrorKind {
     ExpectedLoopUpperBound,
     LoopBoundMustBeInt(TypeKind),
     InvalidCharacter(char),
+    UnexpectedToken,
 
     // Binding Errors
     FailedParsing,
@@ -80,6 +81,7 @@ impl ErrorKind {
             Self::InvalidCharacter(character) => {
                 format!("'{}' cannot be used here", character)
             }
+            Self::UnexpectedToken => "Unexpected token".to_string(),
             Self::ConflictingDeclaration(identifier) => {
                 format!("'{}' is already declared with a different type", identifier)
             }

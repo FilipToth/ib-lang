@@ -10,7 +10,7 @@
         "@lezer/lr": "^1.0.0"
     },
     "scripts": {
-        "prepare": "lezer-generator src/ib.grammar -o src/parser.js",
+        "prepare": "lezer-generator src/ib.grammar -o src/parser.js && cp src/parser.js ../ide-web/src/pages/editor/parser.js",
         "test": "mocha test/test.js"
     }
 }

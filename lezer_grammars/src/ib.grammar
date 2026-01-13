@@ -11,11 +11,12 @@ Atom {
   | WhileStatement
   | UntilStatement
   | VariableAssignment
+  | IndexAssignment
   | ExpressionStatement
 }
 
 IfStatement { IfKeyword Expression ThenKeyword Block (ElseKeyword Block)? EndKeyword }
-FunctionDeclaration { FunctionKeyword Identifier ParameterList Block EndKeyword }
+FunctionDeclaration { FunctionKeyword Identifier ParameterList ReturnType? Block EndKeyword }
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression }
 ReturnStatement { ReturnKeyword Expression }
@@ -24,10 +25,16 @@ WhileStatement { LoopKeyword WhileKeyword Expression Block EndKeyword }
 UntilStatement { LoopKeyword UntilKeyword Expression Block EndKeyword }
 
 VariableAssignment { Identifier AssignmentOperator Expression }
+IndexAssignment { IndexExpression AssignmentOperator Expression }
 
 Block { Atom* }
 
-Parameter { Identifier ":" TypeAnnotation }
+Parameter { Identifier ":" Type }
+ReturnType { "->" Type }
+
+// A type name, optionally with a generic parameter that is itself a type, so
+// `Array<Stack<Int>>` nests.
+Type { TypeAnnotation ("<" Type ">")? }
 ParameterList { "(" (Parameter ("," Parameter)*)? ")" }
 
 @precedence { member @left, binary @left, unary @right }
@@ -36,6 +43,7 @@ Expression {
   BinaryExpression
   | UnaryExpression
   | MemberAccessExpression
+  | IndexExpression
   | ReferenceEpxression
   | CallExpression
   | ObjectInstantiationExpression
@@ -48,12 +56,17 @@ Expression {
 // A multi-token expression has to reduce to a single Expression, otherwise a
 // loop bound or condition runs on into the Block that follows it -- there is
 // no delimiter keyword between them to stop it.
-BinaryExpression { Expression !binary (MiscOperator | AndKeyword | OrKeyword | ModKeyword | DivKeyword) Expression }
-UnaryExpression { !unary (NotKeyword | MiscOperator) Expression }
+BinaryExpression { Expression !binary (AdditiveOperator | MiscOperator | AndKeyword | OrKeyword | ModKeyword | DivKeyword) Expression }
+
+// only `+`, `-` and NOT can prefix an expression. were every operator allowed,
+// a function body could start with `<`, which right after `-> Stack` cannot be
+// told apart from the start of a generic parameter.
+UnaryExpression { !unary (NotKeyword | AdditiveOperator) Expression }
 
 ReferenceEpxression { Identifier }
 CallExpression { Identifier "(" (Atom*)? ")" }
-ObjectInstantiationExpression { NewKeyword TypeAnnotation ("<" TypeAnnotation ">") "(" ")" }
+IndexExpression { Expression !member "[" Expression "]" }
+ObjectInstantiationExpression { NewKeyword Type "(" ")" }
 MemberAccessExpression { Expression !member "." (CallExpression | Identifier) }
 
 Boolean { @specialize<Identifier, "true" | "false"> }
@@ -98,13 +111,17 @@ TypeAnnotation { @specialize<Identifier,
 
   LineComment { "#" ![\n]* }
 
-  MiscOperator { "==" | "!=" | ">=" | "<=" | ">" | "<" | "+" | "-" | "*" | "/" }
+  AdditiveOperator { "+" | "-" }
+
+  MiscOperator { "==" | "!=" | ">=" | "<=" | ">" | "<" | "*" | "/" }
 
   AssignmentOperator { "=" }
 
   space { $[ \t\n\r]+ }
 
-  "(" ")"
+  "(" ")" "[" "]" "->"
+
+  @precedence { "->", AdditiveOperator }
 }
 
 @detectDelim

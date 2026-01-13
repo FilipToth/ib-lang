@@ -57,6 +57,13 @@ describe("autocomplete symbol resolution", () => {
         expect(() => completionsAt("")).not.toThrow();
     });
 
+    it("suggests parameters inside a function with a return type", () => {
+        // the return type sits between the parameter list and the body
+        const doc = "function total(COUNT: Int) -> Int\n  return COUNT\nend\n";
+        const labels = completionsAt(doc, doc.indexOf("COUNT\nend"));
+        expect(labels).toContain("COUNT");
+    });
+
     it("does not leak collection methods into top-level completions", () => {
         // push/pop belong to a Stack instance, not to the enclosing scope
         const labels = completionsAt("S = new Stack<Int>()\n");
@@ -85,5 +92,17 @@ describe("autocomplete member access", () => {
         for (const method of methods) {
             expect(labels).toContain(method);
         }
+    });
+
+    it("uses the outer type of a nested generic", () => {
+        const labels = completionsAt("V = new Array<Stack<Int>>()\nV.l");
+        expect(labels).toContain("len");
+        expect(labels).not.toContain("pop");
+    });
+
+    it("offers methods on a collection parameter", () => {
+        const doc = "function f(S: Stack<Int>)\n  S.p\nend\n";
+        const labels = completionsAt(doc, doc.indexOf("\nend"));
+        expect(labels).toContain("pop");
     });
 });

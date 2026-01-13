@@ -33,6 +33,27 @@ end
 output SQUARES[3]
 output SQUARES[-1]
 
+# --- Array index writes: overwriting in range, and appending by writing one
+#     past the end, which is how the spec fills an array that starts empty ---
+SQUARES[0] = 100
+SQUARES[1 + 1] = SQUARES[0] + 1
+output SQUARES[0]
+output SQUARES[2]
+
+REVERSED = new Array<String>()
+LETTERS = new Stack<String>()
+LETTERS.push("a")
+LETTERS.push("b")
+loop POS from 0 to 1
+    REVERSED[POS] = LETTERS.pop()
+end
+output REVERSED[0]
+output REVERSED[1]
+
+# writing further out than one past the end is an error, and changes nothing
+REVERSED[5] = "gap"
+output REVERSED.len()
+
 # --- Stack: last in, first out ---
 S = new Stack<Int>()
 output S.isEmpty()
@@ -94,3 +115,66 @@ MIXED.push(99)
 output MIXED.get(0)
 output item
 output index
+
+# --- method arguments are the caller's expressions, so they can use its
+#     variables ---
+VALUES = new Array<Int>()
+FIVE = 5
+VALUES.push(FIVE)
+VALUES.push(FIVE * 2)
+output VALUES[1]
+
+# --- collections of collections, reached by chaining indexes and calls ---
+GRID = new Array<Array<Int>>()
+ROW = new Array<Int>()
+ROW.push(1)
+ROW.push(2)
+GRID.push(ROW)
+output GRID[0].len()
+output GRID[0][1]
+
+# elements are shared, not copied: writing through GRID changes ROW
+GRID[0][1] = 9
+output ROW[1]
+
+PILES = new Array<Stack<String>>()
+PILES.push(new Stack<String>())
+PILES[0].push("top")
+output PILES[0].pop()
+output PILES[0].isEmpty()
+
+# --- collections as parameters and return values ---
+function total(NUMBERS: Array<Int>) -> Int
+    SUM = 0
+    loop I from 0 to NUMBERS.len() - 1
+        SUM = SUM + NUMBERS[I]
+    end
+    return SUM
+end
+
+function single(ITEM: Int) -> Stack<Int>
+    RESULT = new Stack<Int>()
+    RESULT.push(ITEM)
+    return RESULT
+end
+
+output total(VALUES)
+output single(3).pop()
+
+# --- the spec's copy-in-reverse: a method call as another method's argument ---
+SURVEY = new Collection<String>()
+SURVEY.addItem("first")
+SURVEY.addItem("second")
+MYSTACK = new Stack<String>()
+MYARRAY = new Array<String>()
+COUNT = 0
+SURVEY.resetNext()
+loop while SURVEY.hasNext()
+    MYSTACK.push(SURVEY.getNext())
+    COUNT = COUNT + 1
+end
+loop POS from 0 to COUNT - 1
+    MYARRAY[POS] = MYSTACK.pop()
+end
+output MYARRAY[0]
+output MYARRAY[1]

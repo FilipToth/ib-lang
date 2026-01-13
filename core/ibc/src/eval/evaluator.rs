@@ -17,7 +17,7 @@ use crate::analysis::{
 
 use super::{
     eval_builtin,
-    object_methods::{eval_type_method, get_element},
+    object_methods::{eval_type_method, get_element, set_element},
     EvalIO,
 };
 
@@ -421,27 +421,55 @@ async fn eval_while_loop(
     EvalValue::void()
 }
 
-async fn eval_index_expr(base: EvalValue, index: EvalValue, io: &mut impl EvalIO) -> EvalValue {
-    let index = match index.get_int(io).await {
-        Some(i) => i,
-        None => return EvalValue::Error,
+async fn not_indexable(io: &mut impl EvalIO) -> EvalValue {
+    let msg = "Only arrays can be indexed".to_string();
+    io.runtime_error(msg).await;
+    EvalValue::Error
+}
+
+/// Resolves the `base[index]` operands shared by reads and writes. The binder
+/// only lets arrays through, or `Any`, which has to be checked here instead.
+async fn eval_index_operands(
+    base: EvalValue,
+    index: EvalValue,
+    io: &mut impl EvalIO,
+) -> Option<(Arc<tokio::sync::Mutex<ObjectState>>, i64)> {
+    let index = index.get_int(io).await?;
+
+    let EvalValue::Object(state) = base else {
+        not_indexable(io).await;
+        return None;
     };
 
-    // the binder only lets arrays through, or `Any`, which is checked here
-    let EvalValue::Object(state) = base else {
-        let msg = "Only arrays can be indexed".to_string();
-        io.runtime_error(msg).await;
+    Some((state, index))
+}
+
+async fn eval_index_expr(base: EvalValue, index: EvalValue, io: &mut impl EvalIO) -> EvalValue {
+    let Some((state, index)) = eval_index_operands(base, index, io).await else {
         return EvalValue::Error;
     };
 
     let state = state.lock().await;
     match &*state {
         ObjectState::Array(array) => get_element(array, index, io).await,
-        _ => {
-            let msg = "Only arrays can be indexed".to_string();
-            io.runtime_error(msg).await;
-            EvalValue::Error
-        }
+        _ => not_indexable(io).await,
+    }
+}
+
+async fn eval_index_assignment_expr(
+    base: EvalValue,
+    index: EvalValue,
+    value: EvalValue,
+    io: &mut impl EvalIO,
+) -> EvalValue {
+    let Some((state, index)) = eval_index_operands(base, index, io).await else {
+        return EvalValue::Error;
+    };
+
+    let mut state = state.lock().await;
+    match &mut *state {
+        ObjectState::Array(array) => set_element(array, index, value, io).await,
+        _ => not_indexable(io).await,
     }
 }
 
@@ -565,6 +593,12 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             let base_value = eval_rec(&base, info.clone(), io).await;
             let index_value = eval_rec(&index, info, io).await;
             eval_index_expr(base_value, index_value, io).await
+        }
+        BoundNodeKind::IndexAssignmentExpression { base, index, value } => {
+            let base_value = eval_rec(&base, info.clone(), io).await;
+            let index_value = eval_rec(&index, info.clone(), io).await;
+            let value = eval_rec(&value, info, io).await;
+            eval_index_assignment_expr(base_value, index_value, value, io).await
         }
         BoundNodeKind::ObjectMemberExpression { base, next } => {
             let base_value = eval_rec(&base, info.clone(), io).await;

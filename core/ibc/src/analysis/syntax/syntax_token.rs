@@ -1,5 +1,14 @@
 use crate::analysis::{operator::Operator, span::Span};
 
+/// A type as written in source, before the binder resolves it: `Int`,
+/// `Stack<Int>`, or nested, `Array<Stack<Int>>`.
+#[derive(Debug, Clone)]
+pub struct TypeAnnotation {
+    pub name: String,
+    pub generic: Option<Box<TypeAnnotation>>,
+    pub span: Span,
+}
+
 #[derive(Debug)]
 pub struct SyntaxToken {
     pub kind: SyntaxKind,
@@ -29,6 +38,11 @@ pub enum SyntaxKind {
         base: Box<SyntaxToken>,
         index: Box<SyntaxToken>,
     },
+    IndexAssignmentExpression {
+        base: Box<SyntaxToken>,
+        index: Box<SyntaxToken>,
+        value: Box<SyntaxToken>,
+    },
     IntegerLiteralExpression(i64),
     BooleanLiteralExpression(bool),
     StringLiteralExpression(String),
@@ -53,8 +67,7 @@ pub enum SyntaxKind {
         inner: Box<SyntaxToken>,
     },
     InstantiationExpression {
-        type_name: String,
-        type_param: Option<String>,
+        type_annotation: TypeAnnotation,
         args: Vec<SyntaxToken>,
     },
     OutputStatement {
@@ -67,12 +80,12 @@ pub enum SyntaxKind {
     },
     Parameter {
         identifier: String,
-        type_annotation: Option<String>,
+        type_annotation: Option<TypeAnnotation>,
     },
     FunctionDeclaration {
         identifier: String,
         parameters: Vec<SyntaxToken>,
-        return_type: Option<String>,
+        return_type: Option<TypeAnnotation>,
         body: Box<SyntaxToken>,
     },
     ReturnStatement {

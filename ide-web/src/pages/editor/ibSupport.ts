@@ -25,9 +25,11 @@ const LANG_DEF = LRLanguage.define({
                 String: t.string,
                 Number: t.number,
                 MiscOperator: t.operator,
+                AdditiveOperator: t.operator,
                 AssignmentOperator: t.operator,
                 LineComment: t.lineComment,
                 "( )": t.paren,
+                "[ ]": t.squareBracket,
 
                 IfKeyword: t.keyword,
                 ThenKeyword: t.keyword,

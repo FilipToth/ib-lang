@@ -156,6 +156,15 @@ const resolveSymbolsInScope = (
     resolveSymbolsInScope(scopeChild.nextSibling, context, symbols);
 };
 
+/// The outermost name of a `Type` node, which is what TYPE_METHODS is keyed
+/// by: `Array` for `Array<Stack<Int>>`.
+const getTypeName = (document: Text, typeNode: SyntaxNode | null) => {
+    const nameNode = typeNode?.getChild("TypeAnnotation");
+    if (nameNode == null) return null;
+
+    return document.sliceString(nameNode.from, nameNode.to);
+};
+
 const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
     const expr = varNode.getChild("Expression");
     if (expr == null) return null;
@@ -163,12 +172,7 @@ const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
     const objInstantiation = expr.getChild("ObjectInstantiationExpression");
     if (objInstantiation == null) return null;
 
-    const typeNodes = objInstantiation.getChildren("TypeAnnotation");
-    if (typeNodes.length == 0) return null;
-
-    const typeNode = typeNodes[0];
-    const typeName = document.sliceString(typeNode.from, typeNode.to);
-    return typeName;
+    return getTypeName(document, objInstantiation.getChild("Type"));
 };
 
 const checkForParameters = (
@@ -176,14 +180,16 @@ const checkForParameters = (
     context: CompletionContext,
     symbols: Symbol[]
 ) => {
-    // the parameter list will always be the
-    // prev sibling to the block in a function
-    // declaration
+    // parameters are in scope in the function's own block. look the list up on
+    // the declaration rather than as the block's previous sibling, since a
+    // return type can sit between the two
+    const declaration = block.parent;
+    if (declaration == null || declaration.name != "FunctionDeclaration") return;
 
-    const prev = block.prevSibling;
-    if (prev == null || prev.name != "ParameterList") return;
+    const parameters = declaration.getChild("ParameterList");
+    if (parameters == null) return;
 
-    checkForParametersRecursive(prev.firstChild!, context, symbols);
+    checkForParametersRecursive(parameters.firstChild!, context, symbols);
 };
 
 const checkForParametersRecursive = (
@@ -201,7 +207,7 @@ const checkForParametersRecursive = (
         const symbol: Symbol = {
             name: identifier,
             kind: "variable",
-            type: null,
+            type: getTypeName(context.state.doc, param.getChild("Type")),
         };
         symbols.push(symbol);
     }
