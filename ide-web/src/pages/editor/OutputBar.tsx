@@ -10,12 +10,16 @@ import {
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
+import { RuntimeErrorRange } from "./runtimeError";
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
 interface OutputProps {
     code: string;
     fileId: string | undefined;
+    /// Reports where a runtime error happened so the editor can highlight it,
+    /// and null once a new run starts.
+    onRuntimeError: (error: RuntimeErrorRange | null) => void;
 }
 
 enum WebSocketMessageKind {
@@ -23,15 +27,22 @@ enum WebSocketMessageKind {
     Output,
     Input,
     RuntimeError,
+    AnalysisError,
 }
 
 interface WebSocketMessage {
     kind: WebSocketMessageKind;
     payload: string;
     file_id?: string;
+    offset_start?: number;
+    offset_end?: number;
 }
 
-const OutputBar: FunctionComponent<OutputProps> = ({ code, fileId }) => {
+const OutputBar: FunctionComponent<OutputProps> = ({
+    code,
+    fileId,
+    onRuntimeError,
+}) => {
     const [output, setOutput] = useState("");
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
@@ -48,6 +59,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code, fileId }) => {
 
     const onClick = async () => {
         setOutput("");
+        onRuntimeError(null);
         if (WS_URL == undefined) {
             console.error("Wrong env config, websockets url is undefined");
             return;
@@ -93,6 +105,23 @@ const OutputBar: FunctionComponent<OutputProps> = ({ code, fileId }) => {
                     setError(null);
                 }, 4000);
 
+                // the snackbar goes away on its own, the highlight stays until
+                // the next run or the next edit
+                if (
+                    msg.offset_start != undefined &&
+                    msg.offset_end != undefined
+                ) {
+                    onRuntimeError({
+                        start: msg.offset_start,
+                        end: msg.offset_end,
+                    });
+                }
+
+                break;
+            case WebSocketMessageKind.AnalysisError:
+                // the program was not run at all, and the linter already
+                // underlines why
+                showError("Cannot run: " + msg.payload);
                 break;
         }
     }, [lastMessage]);

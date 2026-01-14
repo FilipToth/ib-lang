@@ -208,7 +208,7 @@ async fn run(source: String) {
     let result = analysis::analyze(source);
     result.errors.report();
 
-    let Some(root) = &result.root else {
+    let Some(root) = result.runnable() else {
         return;
     };
 

@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::auth::verify_jwt;
 use crate::db::get_filename_uid;
 use crate::throttle::{ConnectionGuard, Throttle};
-use crate::Diagnostic;
 
 #[derive(Debug, Clone, Copy)]
 enum WebsocketMessageKind {
@@ -27,6 +26,8 @@ enum WebsocketMessageKind {
     Output = 1,
     Input = 2,
     RuntimeError = 3,
+    /// The program did not pass analysis, so it was not run at all.
+    AnalysisError = 4,
 }
 
 impl<'de> Deserialize<'de> for WebsocketMessageKind {
@@ -39,6 +40,7 @@ impl<'de> Deserialize<'de> for WebsocketMessageKind {
             1 => Ok(WebsocketMessageKind::Output),
             2 => Ok(WebsocketMessageKind::Input),
             3 => Ok(WebsocketMessageKind::RuntimeError),
+            4 => Ok(WebsocketMessageKind::AnalysisError),
             _ => Err(serde::de::Error::custom(format!(
                 "{} is an invalid value for WebSocketMessageKind",
                 value
@@ -65,6 +67,12 @@ struct WebsocketMessage {
     /// file. Absent on the messages the server sends back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     file_id: Option<String>,
+    /// Where a runtime error happened, as character offsets into the source,
+    /// so the editor can highlight it. Only set on RuntimeError messages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    offset_start: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    offset_end: Option<usize>,
 }
 
 struct WebSocketEvaluator {
@@ -78,6 +86,8 @@ impl EvalIO for WebSocketEvaluator {
             kind: WebsocketMessageKind::Output,
             payload: output_msg,
             file_id: None,
+            offset_start: None,
+            offset_end: None,
         };
 
         let msg_raw = serde_json::to_string(&msg).unwrap();
@@ -92,6 +102,8 @@ impl EvalIO for WebSocketEvaluator {
             kind: WebsocketMessageKind::Input,
             payload: "".to_string(),
             file_id: None,
+            offset_start: None,
+            offset_end: None,
         };
 
         let mut socket = self.socket.lock().await;
@@ -117,6 +129,8 @@ impl EvalIO for WebSocketEvaluator {
             kind: WebsocketMessageKind::RuntimeError,
             payload: error.to_string(),
             file_id: None,
+            offset_start: Some(error.span.start.char_offset),
+            offset_end: Some(error.span.end.char_offset),
         };
 
         let msg_raw = serde_json::to_string(&msg).unwrap();
@@ -151,6 +165,8 @@ async fn refuse(socket: &Arc<Mutex<WebSocket>>, reason: &str) {
         kind: WebsocketMessageKind::RuntimeError,
         payload: reason.to_string(),
         file_id: None,
+        offset_start: None,
+        offset_end: None,
     };
 
     if let Ok(raw) = serde_json::to_string(&msg) {
@@ -162,26 +178,33 @@ async fn refuse(socket: &Arc<Mutex<WebSocket>>, reason: &str) {
 async fn execute(body: String, socket: Arc<Mutex<WebSocket>>) {
     let result = ibc::analysis::analyze(body);
 
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    let errors = result.errors.errors;
-
-    for error in errors {
-        let diagnostic = Diagnostic {
-            message: error.kind.format(),
-            offset_start: error.span.start.char_offset,
-            offset_end: error.span.end.char_offset,
+    // a program with errors is not run. the editor already underlines them
+    // through the diagnostics route, so this only has to say why nothing ran
+    let Some(root) = result.runnable() else {
+        let message = match result.errors.errors.first() {
+            Some(error) => error.kind.format(),
+            None => "the program could not be analyzed".to_string(),
         };
 
-        diagnostics.push(diagnostic)
-    }
+        let msg = WebsocketMessage {
+            kind: WebsocketMessageKind::AnalysisError,
+            payload: message,
+            file_id: None,
+            offset_start: None,
+            offset_end: None,
+        };
 
-    let Some(root) = result.root else {
-        // TODO: Report Error
-        unreachable!()
+        if let Ok(raw) = serde_json::to_string(&msg) {
+            let mut socket = socket.lock().await;
+            let _ = socket.send(Message::Text(raw)).await;
+        }
+
+        let _ = socket.lock().await.send(Message::Close(None)).await;
+        return;
     };
 
     let mut io = WebSocketEvaluator { socket: socket.clone() };
-    evaluator::eval(&root, &mut io).await;
+    evaluator::eval(root, &mut io).await;
 
     let _ = socket.lock().await.send(Message::Close(None)).await;
 }
@@ -228,7 +251,7 @@ async fn handle_message(
         // server only accepts execute requests
         WebsocketMessageKind::Input => {}
         WebsocketMessageKind::Output => {}
-        WebsocketMessageKind::RuntimeError => {}
+        WebsocketMessageKind::AnalysisError | WebsocketMessageKind::RuntimeError => {}
     };
 }
 

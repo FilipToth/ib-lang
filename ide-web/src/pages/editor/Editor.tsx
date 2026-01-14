@@ -24,6 +24,7 @@ import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
 import IbIcon from "./IbIcon";
+import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
 import DeleteFileDialog from "pages/DeleteDialog";
 import { v4 as uuidv4 } from "uuid";
 
@@ -116,6 +117,9 @@ const EditorTabs = ({
 
 const Editor = () => {
     const [code, setCode] = useState("");
+    const [runtimeError, setRuntimeError] = useState<RuntimeErrorRange | null>(
+        null
+    );
     const [tabState, setTabState] = useState(0);
     const [tabs, setTabs] = useState<IBFile[]>([]);
     const [files, setFiles] = useState<IBFile[]>([]);
@@ -286,6 +290,10 @@ const Editor = () => {
                                         ibSupport,
                                         keyExtension,
                                         indentUnit.of("    "),
+                                        runtimeErrorHighlight(
+                                            runtimeError,
+                                            code.length
+                                        ),
                                     ]}
                                     value={code}
                                     onChange={(
@@ -295,6 +303,10 @@ const Editor = () => {
                                         setCode(value);
                                         if (currentFile != null)
                                             currentFile.contents = value;
+
+                                        // the highlight belongs to the source
+                                        // that was run, so an edit retires it
+                                        setRuntimeError(null);
                                     }}
                                     style={{
                                         flexGrow: 1,
@@ -307,6 +319,7 @@ const Editor = () => {
                             <OutputBar
                                 code={code}
                                 fileId={tabs[tabState]?.id}
+                                onRuntimeError={setRuntimeError}
                             />
                         )}
                     </Stack>

@@ -29,6 +29,21 @@ impl AnalysisResult {
     }
 }
 
+impl AnalysisResult {
+    /// The tree to run, or `None` when the program did not pass analysis.
+    ///
+    /// A program with errors is never run. Analysis stops at the first error it
+    /// cannot recover from, so what is left would be only the part before it --
+    /// running that does less than the program says, without saying so.
+    pub fn runnable(&self) -> Option<&BoundNode> {
+        if !self.errors.errors.is_empty() {
+            return None;
+        }
+
+        self.root.as_ref()
+    }
+}
+
 pub fn analyze(contents: String) -> AnalysisResult {
     // parsing
     let mut bag = ErrorBag::new();

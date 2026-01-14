@@ -227,3 +227,28 @@ fn runtime_errors_stop_the_program() {
         assert_eq!(actual, expected, "{:?}", source);
     }
 }
+
+/// A program that did not pass analysis is never run. Analysis stops at the
+/// first error it cannot recover from, so running what is left would do less
+/// than the program says without saying so.
+#[test]
+fn a_program_with_errors_is_not_runnable() {
+    let broken = [
+        // a statement that cannot start ends the scope early
+        "output 1 ,\noutput 2",
+        "output \"hello\"\noutput MISSING",
+        "X = \"s\"\nX = 1",
+    ];
+
+    for source in broken {
+        let result = analysis::analyze(source.to_string());
+
+        assert!(!result.errors.errors.is_empty(), "{:?}", source);
+        assert!(result.runnable().is_none(), "{:?}", source);
+    }
+
+    let result = analysis::analyze("output \"fine\"".to_string());
+
+    assert!(result.errors.errors.is_empty());
+    assert!(result.runnable().is_some());
+}
