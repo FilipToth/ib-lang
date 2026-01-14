@@ -27,7 +27,10 @@ impl BoundNode {
         match &self.kind {
             BoundNodeKind::Module { .. } => "Module".to_string(),
             BoundNodeKind::Block { .. } => "Block".to_string(),
-            BoundNodeKind::OutputStatement { expr } => format!("output {}", &expr.to_string()),
+            BoundNodeKind::OutputStatement { exprs } => {
+                let parts: Vec<String> = exprs.iter().map(|expr| expr.to_string()).collect();
+                format!("output {}", parts.join(" , "))
+            }
             BoundNodeKind::ReturnStatement { expr } => {
                 let expr_fmt = match expr {
                     Some(expr) => format!(" {}", expr.to_string()),
@@ -114,7 +117,7 @@ pub enum BoundNodeKind {
         children: Box<Vec<BoundNode>>,
     },
     OutputStatement {
-        expr: Box<BoundNode>,
+        exprs: Vec<BoundNode>,
     },
     ReturnStatement {
         expr: Option<Box<BoundNode>>,

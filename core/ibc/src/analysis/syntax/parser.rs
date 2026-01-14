@@ -568,28 +568,45 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// The spec writes `output NUM , " = " , F`, so an output statement takes a
+    /// comma-separated list of expressions, printed on one line.
     fn parse_output_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let keyword = self.tokens.next().unwrap();
         let start_loc = keyword.span.start.clone();
 
-        let expr = self.parse_expression(errors);
-        match expr {
-            Some(expr) => {
-                let end_loc = expr.span.end.clone();
-                let kind = SyntaxKind::OutputStatement {
-                    expr: Box::new(expr),
-                };
-
-                let span = Span::from_loc(start_loc, end_loc);
-                let token = SyntaxToken::new(kind, span);
-                Some(token)
-            }
+        let first = match self.parse_expression(errors) {
+            Some(e) => e,
             None => {
                 let error_kind = ErrorKind::ExpectedToken("expression".to_string());
                 errors.add(error_kind, keyword.span);
                 return None;
             }
+        };
+
+        let mut end_loc = first.span.end.clone();
+        let mut exprs: Vec<SyntaxToken> = vec![first];
+
+        while self.expect_next_token_peek(LexerTokenKind::CommaToken) {
+            let comma = self.tokens.next().unwrap();
+
+            let expr = match self.parse_expression(errors) {
+                Some(e) => e,
+                None => {
+                    let error_kind = ErrorKind::ExpectedToken("expression".to_string());
+                    errors.add(error_kind, comma.span);
+                    return None;
+                }
+            };
+
+            end_loc = expr.span.end.clone();
+            exprs.push(expr);
         }
+
+        let kind = SyntaxKind::OutputStatement { exprs: exprs };
+
+        let span = Span::from_loc(start_loc, end_loc);
+        let token = SyntaxToken::new(kind, span);
+        Some(token)
     }
 
     fn parse_if_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {

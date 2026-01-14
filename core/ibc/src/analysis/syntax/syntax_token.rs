@@ -71,7 +71,7 @@ pub enum SyntaxKind {
         args: Vec<SyntaxToken>,
     },
     OutputStatement {
-        expr: Box<SyntaxToken>,
+        exprs: Vec<SyntaxToken>,
     },
     IfStatement {
         condition: Box<SyntaxToken>,

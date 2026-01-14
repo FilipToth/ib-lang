@@ -1,0 +1,29 @@
+# Output statements, including the spec's comma-separated form.
+
+# --- the spec joins its values with nothing between them: every space in its
+#     examples is written inside a string literal ---
+NUM = 140
+F = 1
+D = 140
+FACTORS = 10
+output NUM , " = " , F , "*" , D
+output NUM , " has " , FACTORS , " factors "
+output "Average = " , 7
+
+# --- one value still works, and each statement is its own line ---
+output "only"
+output 42
+
+# --- values of any type, and expressions ---
+X = 5
+output "x is " , X , " and double is " , X * 2
+output 1 + 2 , "/" , true , "/" , "s"
+
+# --- collections print as their elements, here in the middle of a line ---
+ITEMS = new Array<Int>()
+ITEMS.push(1)
+ITEMS.push(2)
+output "list: " , ITEMS , " done"
+
+# --- an empty string contributes nothing ---
+output "a" , "" , "b"

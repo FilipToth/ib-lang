@@ -45,3 +45,12 @@ true
 3
 second
 first
+[]
+[1, 2]
+items: [1, 2]
+[[1, 2], []]
+[a, b]
+[first, second]
+first
+[second]
+[7]

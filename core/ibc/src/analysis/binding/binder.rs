@@ -42,15 +42,18 @@ fn bind_block(
 }
 
 fn bind_output_statement(
-    expr: &SyntaxToken,
+    exprs: &Vec<SyntaxToken>,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
 ) -> Option<BoundNode> {
-    let expr = bind(expr, scope, errors)?;
+    let mut bound_exprs: Vec<BoundNode> = Vec::new();
+    for expr in exprs {
+        bound_exprs.push(bind(expr, scope.clone(), errors)?);
+    }
 
     let kind = BoundNodeKind::OutputStatement {
-        expr: Box::new(expr),
+        exprs: bound_exprs,
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, span);
@@ -698,7 +701,7 @@ pub fn bind(
     let span = token.span.clone();
     match &token.kind {
         SyntaxKind::Scope { subtokens } => bind_block(&subtokens, scope, true, errors, span),
-        SyntaxKind::OutputStatement { expr } => bind_output_statement(&expr, scope, errors, span),
+        SyntaxKind::OutputStatement { exprs } => bind_output_statement(&exprs, scope, errors, span),
         SyntaxKind::ReturnStatement { expr } => bind_return_statement(&expr, scope, errors, span),
         SyntaxKind::IfStatement {
             condition,

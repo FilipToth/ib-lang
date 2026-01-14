@@ -135,8 +135,40 @@ impl EvalValue {
             EvalValue::Int(val) => val.to_string(),
             EvalValue::Bool(val) => val.to_string(),
             EvalValue::String(val) => val.clone(),
-            EvalValue::Object(_) => unreachable!(),
+            // collections print through `display`, which has to lock them
+            EvalValue::Object(_) => "object".to_string(),
         }
+    }
+
+    /// How a value is shown to the user. Primitives print as themselves, and a
+    /// collection prints its elements in the order they went in, `[1, 2, 3]`.
+    /// Elements print the same way, so nested collections nest.
+    #[async_recursion]
+    pub async fn display(&self) -> String {
+        let EvalValue::Object(state) = self else {
+            return self.to_string();
+        };
+
+        // the elements are copied out so the collection is not held locked
+        // while they are printed, which matters once they are collections too
+        let elements = {
+            let state = state.lock().await;
+            match &*state {
+                ObjectState::Array(state) => state.internal.clone(),
+                ObjectState::Collection(state) => state.internal.clone(),
+                ObjectState::Stack(state) => state.internal.clone(),
+                // a queue keeps its front at the end of the vector, so reading
+                // it backwards gives the order items were enqueued in
+                ObjectState::Queue(state) => state.internal.iter().rev().cloned().collect(),
+            }
+        };
+
+        let mut parts: Vec<String> = Vec::new();
+        for element in elements {
+            parts.push(element.display().await);
+        }
+
+        format!("[{}]", parts.join(", "))
     }
 
     fn get_int(&self, span: Span) -> EvalResult<i64> {
@@ -200,15 +232,20 @@ fn eval_int_only_binexpr(lhs: EvalValue, op: &Operator, rhs: EvalValue, span: Sp
     Ok(value)
 }
 
-fn eval_binary_expr(lhs: EvalValue, op: &Operator, rhs: EvalValue, span: Span) -> EvalResult {
+async fn eval_binary_expr(
+    lhs: EvalValue,
+    op: &Operator,
+    rhs: EvalValue,
+    span: Span,
+) -> EvalResult {
     let value = match op {
         Operator::Addition => {
             if let EvalValue::String(lhs_val) = &lhs {
-                let rhs_val = rhs.to_string();
+                let rhs_val = rhs.display().await;
                 let val = format!("{}{}", lhs_val, rhs_val);
                 EvalValue::String(val)
             } else if let EvalValue::String(rhs_val) = &rhs {
-                let lhs_val = lhs.to_string();
+                let lhs_val = lhs.display().await;
                 let val = format!("{}{}", lhs_val, rhs_val);
                 EvalValue::String(val)
             } else {
@@ -444,7 +481,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         BoundNodeKind::BinaryExpression { lhs, op, rhs } => {
             let lhs_val = eval_rec(&lhs, info.clone(), io).await?;
             let rhs_val = eval_rec(&rhs, info, io).await?;
-            eval_binary_expr(lhs_val, op, rhs_val, node.span)?
+            eval_binary_expr(lhs_val, op, rhs_val, node.span).await?
         }
         BoundNodeKind::UnaryExpression { op, rhs } => {
             let rhs_val = eval_rec(&rhs, info, io).await?;
@@ -453,11 +490,17 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         BoundNodeKind::NumberLiteral(num) => EvalValue::int(*num),
         BoundNodeKind::BooleanLiteral(val) => EvalValue::bool(*val),
         BoundNodeKind::StringLiteral(val) => EvalValue::string(val.clone()),
-        BoundNodeKind::OutputStatement { expr } => {
-            let value = eval_rec(&expr, info, io).await?;
+        BoundNodeKind::OutputStatement { exprs } => {
+            // the spec's commas join their values with nothing between them:
+            // every space in its examples is written inside a string literal
+            let mut line = String::new();
+            for expr in exprs.iter() {
+                let value = eval_rec(expr, info.clone(), io).await?;
+                line.push_str(&value.display().await);
+            }
 
-            let value = format!("{}\n", value.to_string());
-            io.output(value).await;
+            line.push('\n');
+            io.output(line).await;
 
             EvalValue::void()
         }

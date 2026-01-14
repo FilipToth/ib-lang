@@ -170,3 +170,34 @@ loop POS from 0 to COUNT - 1
 end
 output MYARRAY[0]
 output MYARRAY[1]
+
+# --- a collection prints as its elements, in the order they went in, and each
+#     element prints the same way, so nested collections nest ---
+SHOWN = new Array<Int>()
+output SHOWN
+SHOWN.push(1)
+SHOWN.push(2)
+output SHOWN
+output "items: " + SHOWN
+
+NESTED = new Array<Array<Int>>()
+NESTED.push(SHOWN)
+NESTED.push(new Array<Int>())
+output NESTED
+
+PLATES = new Stack<String>()
+PLATES.push("a")
+PLATES.push("b")
+output PLATES
+
+# a queue prints front first, the order it dequeues in
+LINE = new Queue<String>()
+LINE.enqueue("first")
+LINE.enqueue("second")
+output LINE
+output LINE.dequeue()
+output LINE
+
+PICKS = new Collection<Int>()
+PICKS.addItem(7)
+output PICKS

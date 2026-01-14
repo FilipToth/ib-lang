@@ -18,7 +18,7 @@ Atom {
 IfStatement { IfKeyword Expression ThenKeyword Block (ElseKeyword Block)? EndKeyword }
 FunctionDeclaration { FunctionKeyword Identifier ParameterList ReturnType? Block EndKeyword }
 ExpressionStatement { Expression }
-OutputStatement { OutputKeyword Expression }
+OutputStatement { OutputKeyword Expression ("," Expression)* }
 ReturnStatement { ReturnKeyword Expression }
 ForStatement { LoopKeyword ForKeyword? Identifier FromKeyword Expression ToKeyword Expression Block EndKeyword }
 WhileStatement { LoopKeyword WhileKeyword Expression Block EndKeyword }

@@ -277,3 +277,20 @@ describe("types and chaining", () => {
         assert.ok(nodeNames("GRID[0][1] = 9").includes("IndexAssignment"));
     });
 });
+
+describe("output", () => {
+    /// The spec writes `output NUM , " = " , F`, so a comma-separated list is
+    /// one statement rather than the start of a new one.
+    it("parses a comma-separated output", () => {
+        for (const code of [
+            'output NUM , " = " , F , "*" , D',
+            'output "only"',
+            "output A , B\noutput C",
+        ]) {
+            assertParses(code);
+        }
+
+        const names = nodeNames('output A , B');
+        assert.ok(names.includes("OutputStatement"), `got ${names.join(",")}`);
+    });
+});

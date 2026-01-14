@@ -148,8 +148,8 @@ fn reports(src: &str, message: &str) -> bool {
 fn a_statement_that_cannot_start_is_reported() {
     // each of these used to end the program early without a word
     let cases = [
-        // only the first value of a multi-value output parses
-        "output 1 , 2\noutput 3",
+        // a line cannot start with an operator
+        "X = 1\n= 2",
         // a call is not something that can be assigned to
         "A = new Array<Int>()\nA.len() = 7",
         // at the top level there is no construct for an `end` to close
