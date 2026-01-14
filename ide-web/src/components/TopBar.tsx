@@ -26,7 +26,6 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
     };
 
     const signOut = () => {
-        console.log(auth.currentUser);
         auth.signOut();
         navigate("/login");
     };

@@ -11,17 +11,18 @@ import {
     Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { auth } from "services/firebase";
+import useAuthUser from "services/useAuthUser";
+import AuthLoading from "components/AuthLoading";
 
 const SignupPage = () => {
     const navigate = useNavigate();
+    const { user, loading } = useAuthUser();
 
     useEffect(() => {
-        console.log(auth.currentUser);
-        if (auth.currentUser != null) {
-            navigate("/");
+        if (user != null) {
+            navigate("/", { replace: true });
         }
-    });
+    }, [user, navigate]);
 
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
@@ -62,6 +63,10 @@ const SignupPage = () => {
             navigate("/");
         });
     };
+
+    if (loading || user != null) {
+        return <AuthLoading />;
+    }
 
     return (
         <>

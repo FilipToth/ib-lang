@@ -15,17 +15,19 @@ import {
     Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { auth } from "services/firebase";
+import useAuthUser from "services/useAuthUser";
+import AuthLoading from "components/AuthLoading";
 
 const LoginPage = () => {
     const navigate = useNavigate();
+    const { user, loading } = useAuthUser();
 
+    // someone who is already signed in has no business on this page
     useEffect(() => {
-        console.log(auth.currentUser);
-        if (auth.currentUser != null) {
-            navigate("/");
+        if (user != null) {
+            navigate("/", { replace: true });
         }
-    });
+    }, [user, navigate]);
 
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
@@ -69,6 +71,12 @@ const LoginPage = () => {
             navigate("/");
         });
     };
+
+    // holding the form back until the session is known keeps it from flashing
+    // in front of someone who is about to be redirected
+    if (loading || user != null) {
+        return <AuthLoading />;
+    }
 
     return (
         <>

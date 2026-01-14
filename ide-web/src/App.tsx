@@ -9,17 +9,20 @@ import "./App.css";
 import Editor from "./pages/editor/Editor";
 import React, { ReactNode } from "react";
 import LoginPage from "pages/Login";
-import { auth } from "services/firebase";
 import SignupPage from "pages/SignUp";
+import useAuthUser from "services/useAuthUser";
+import AuthLoading from "components/AuthLoading";
 
 const PrivateRouteHandler = () => {
-    // check if authed
-    console.log(auth.currentUser);
-    return (
-        <>
-            {auth.currentUser == null ? <Navigate to={"/login"} /> : <Outlet />}
-        </>
-    );
+    const { user, loading } = useAuthUser();
+
+    // a stored session is restored asynchronously, so redirecting before that
+    // finishes is what signed people out whenever they reloaded
+    if (loading) {
+        return <AuthLoading />;
+    }
+
+    return user == null ? <Navigate to={"/login"} replace /> : <Outlet />;
 };
 
 const App = () => {
