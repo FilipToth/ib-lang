@@ -29,10 +29,6 @@ loop POS from 0 to SQUARES.len() - 1
     output SQUARES[POS]
 end
 
-# out of range in either direction is a runtime error, not a panic
-output SQUARES[3]
-output SQUARES[-1]
-
 # --- Array index writes: overwriting in range, and appending by writing one
 #     past the end, which is how the spec fills an array that starts empty ---
 SQUARES[0] = 100
@@ -49,10 +45,6 @@ loop POS from 0 to 1
 end
 output REVERSED[0]
 output REVERSED[1]
-
-# writing further out than one past the end is an error, and changes nothing
-REVERSED[5] = "gap"
-output REVERSED.len()
 
 # --- Stack: last in, first out ---
 S = new Stack<Int>()

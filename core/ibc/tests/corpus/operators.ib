@@ -83,7 +83,3 @@ end
 if 15 div 7 == 2 then
     output "div-ok"
 end
-
-# --- a zero divisor raises a runtime error rather than panicking.
-#     evaluation continues, and the error value renders as "?" at output. ---
-output 1 div 0

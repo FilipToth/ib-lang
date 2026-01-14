@@ -85,3 +85,34 @@ loop until D * D > NUM
     end
     D = D + 1
 end
+
+# --- a return inside a loop leaves the whole function, not just the loop ---
+function firstOver(LIMIT: Int) -> Int
+    loop N from 0 to 10
+        if N > LIMIT then
+            return N
+        end
+    end
+    return -1
+end
+output firstOver(3)
+
+function countTo(TARGET: Int) -> Int
+    COUNT = 0
+    loop while true
+        COUNT = COUNT + 1
+        if COUNT == TARGET then
+            return COUNT
+        end
+    end
+    return -1
+end
+output countTo(5)
+
+function firstWord() -> String
+    loop until false
+        return "stopped"
+    end
+    return "never"
+end
+output firstWord()

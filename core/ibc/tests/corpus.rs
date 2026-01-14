@@ -4,7 +4,10 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use ibc::analysis;
-use ibc::eval::{evaluator, EvalIO};
+use ibc::eval::{
+    evaluator::{self, RuntimeError},
+    EvalIO,
+};
 
 /// Captures everything a program writes, so a test can assert on it.
 /// `EvalIO` takes `&self`, hence the interior mutability.
@@ -35,8 +38,8 @@ impl EvalIO for CapturingIO {
         String::new()
     }
 
-    async fn runtime_error(&self, msg: String) {
-        let line = format!("RUNTIME ERROR: {}\n", msg);
+    async fn runtime_error(&self, error: RuntimeError) {
+        let line = format!("RUNTIME ERROR: {}\n", error);
         self.output.lock().unwrap().push_str(&line);
     }
 }
@@ -121,4 +124,106 @@ fn corpus_matches_expected_output() {
     }
 
     assert!(failures.is_empty(), "corpus mismatches:\n{}", failures.join("\n"));
+}
+
+/// A runtime error stops the program where it happens -- including from inside
+/// a function, a loop, a condition or a method argument -- and is reported once,
+/// with its line. Each program can only reach one error, so these are separate
+/// programs rather than a corpus file.
+#[test]
+fn runtime_errors_stop_the_program() {
+    let cases = [
+        (
+            "output \"before\"\n\
+             output 1 / 0\n\
+             output \"after\"",
+            "before\n\
+             RUNTIME ERROR: Division by zero on line 2\n",
+        ),
+        (
+            // integer division traps a zero divisor the same way
+            "output 1 div 0",
+            "RUNTIME ERROR: Division by zero on line 1\n",
+        ),
+        (
+            // the caller stops too, not just the function
+            "function f() -> Int\n\
+                 X = 1 / 0\n\
+                 output \"rest of f\"\n\
+                 return 1\n\
+             end\n\
+             output f()\n\
+             output \"after\"",
+            "RUNTIME ERROR: Division by zero on line 2\n",
+        ),
+        (
+            "loop I from 0 to 3\n\
+                 output I\n\
+                 output 1 / (I - 1)\n\
+             end\n\
+             output \"after\"",
+            "0\n\
+             -1\n\
+             1\n\
+             RUNTIME ERROR: Division by zero on line 3\n",
+        ),
+        (
+            // the failed value is never used, so there is no second error
+            "X = 1 / 0\n\
+             Y = X + 1\n\
+             output Y",
+            "RUNTIME ERROR: Division by zero on line 1\n",
+        ),
+        (
+            // a condition that fails used to panic the evaluator
+            "I = 0\n\
+             loop while I / 0 < 3\n\
+                 output I\n\
+             end",
+            "RUNTIME ERROR: Division by zero on line 2\n",
+        ),
+        (
+            "S = new Stack<Int>()\n\
+             S.push(1 / 0)\n\
+             output \"after\"",
+            "RUNTIME ERROR: Division by zero on line 2\n",
+        ),
+        (
+            "A = new Array<Int>()\n\
+             A.push(1)\n\
+             output A[5]",
+            "RUNTIME ERROR: Index 5 is out of bounds for an array of length 1 on line 3\n",
+        ),
+        (
+            "A = new Array<Int>()\n\
+             output A[-1]",
+            "RUNTIME ERROR: Index -1 is out of bounds for an array of length 0 on line 2\n",
+        ),
+        (
+            // one past the end appends, anything further is an error
+            "A = new Array<Int>()\n\
+             A[1] = 5",
+            "RUNTIME ERROR: Index 1 is out of bounds for an array of length 0 on line 2\n",
+        ),
+        (
+            "S = new Stack<Int>()\n\
+             output S.pop()",
+            "RUNTIME ERROR: Popping element from an empty stack on line 2\n",
+        ),
+        (
+            "Q = new Queue<Int>()\n\
+             output Q.dequeue()",
+            "RUNTIME ERROR: Dequeuing from an empty queue on line 2\n",
+        ),
+        (
+            "C = new Collection<Int>()\n\
+             output C.getNext()",
+            "RUNTIME ERROR: Getting item from an empty collection on line 2\n",
+        ),
+    ];
+
+    for (source, expected) in cases {
+        let actual = run("runtime error case", source.to_string());
+        assert_eq!(actual, expected, "{:?}", source);
+    }
 }

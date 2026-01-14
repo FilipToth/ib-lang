@@ -10,7 +10,10 @@ use axum::{
     Extension,
 };
 use futures_util::{lock::Mutex, StreamExt};
-use ibc::eval::{evaluator, EvalIO};
+use ibc::eval::{
+    evaluator::{self, RuntimeError},
+    EvalIO,
+};
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::auth::verify_jwt;
@@ -109,10 +112,10 @@ impl EvalIO for WebSocketEvaluator {
         }
     }
 
-    async fn runtime_error(&self, msg: String) {
+    async fn runtime_error(&self, error: RuntimeError) {
         let msg = WebsocketMessage {
             kind: WebsocketMessageKind::RuntimeError,
-            payload: msg,
+            payload: error.to_string(),
             file_id: None,
         };
 

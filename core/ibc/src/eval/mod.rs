@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 
+use self::evaluator::RuntimeError;
+
 pub mod eval_builtin;
 pub mod evaluator;
 pub mod object_methods;
@@ -8,5 +10,6 @@ pub mod object_methods;
 pub trait EvalIO: Send + Sync {
     async fn output(&self, output_msg: String);
     async fn input(&self) -> String;
-    async fn runtime_error(&self, msg: String);
+    /// Called once, with the error that stopped the program.
+    async fn runtime_error(&self, error: RuntimeError);
 }

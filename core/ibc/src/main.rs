@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use eval::EvalIO;
+use eval::{evaluator::RuntimeError, EvalIO};
 
 use analysis::error_bag::ErrorBag;
 
@@ -33,8 +33,8 @@ impl EvalIO for IBEvaluator {
         }
     }
 
-    async fn runtime_error(&self, msg: String) {
-        println!("Runtime Error: {}", msg);
+    async fn runtime_error(&self, error: RuntimeError) {
+        println!("Runtime Error: {}", error);
     }
 }
 
