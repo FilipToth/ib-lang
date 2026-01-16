@@ -41,6 +41,24 @@ export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
     return data;
 };
 
+export interface IBControlFlowGraph {
+    /// Graphviz DOT, or null when the program does not compile.
+    dot: string | null;
+    /// Why it could not be drawn. Empty when `dot` is set.
+    diagnostics: IBDiagnostic[];
+}
+
+export const getControlFlowGraph = async (
+    code: string
+): Promise<IBControlFlowGraph> => {
+    const headers = await getHeaders();
+    const req = await axios.post(`${API_BASE}control-flow`, code, {
+        headers: headers,
+    });
+
+    return req.data;
+};
+
 export const getFiles = async (): Promise<IBFile[]> => {
     const headers = await getHeaders();
     const req = await axios.get(`${API_BASE}files`, {

@@ -58,6 +58,7 @@ async fn main() {
 
     let protected_router = Router::new()
         .route("/diagnostics", post(diagnostics))
+        .route("/control-flow", post(control_flow))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
@@ -102,6 +103,41 @@ async fn diagnostics(
     }
 
     Json(diagnostics)
+}
+
+#[derive(Serialize)]
+struct ControlFlowGraph {
+    /// The graph in Graphviz DOT, or null when the program does not compile.
+    dot: Option<String>,
+    /// Why it could not be drawn. Empty when `dot` is set.
+    diagnostics: Vec<Diagnostic>,
+}
+
+/// Draws the control flow graph of the posted source. Unlike `/diagnostics`
+/// this does not sync the file: it is a view of code the caller already has.
+async fn control_flow(
+    Extension(_uid): Extension<String>,
+    body: String,
+) -> Json<ControlFlowGraph> {
+    let (errors, dot) = ibc::analysis::control_flow_graph(body);
+
+    let mut diagnostics: Vec<Diagnostic> = vec![];
+    for error in errors.errors {
+        let diagnostic = Diagnostic {
+            message: error.kind.format(),
+            offset_start: error.span.start.char_offset,
+            offset_end: error.span.end.char_offset,
+        };
+
+        diagnostics.push(diagnostic);
+    }
+
+    let graph = ControlFlowGraph {
+        dot: dot,
+        diagnostics: diagnostics,
+    };
+
+    Json(graph)
 }
 
 async fn files(

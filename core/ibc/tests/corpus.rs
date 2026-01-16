@@ -252,3 +252,34 @@ fn a_program_with_errors_is_not_runnable() {
     assert!(result.errors.errors.is_empty());
     assert!(result.runnable().is_some());
 }
+
+/// The graph is drawn on request rather than as a side effect of analysis, and
+/// only for a program that compiles.
+#[test]
+fn a_control_flow_graph_is_drawn_for_a_valid_program() {
+    let source = "function f(N: Int) -> Int\n\
+                      if N > 0 then\n\
+                          return 1\n\
+                      end\n\
+                      return 0\n\
+                  end\n\
+                  output f(1)";
+
+    let (errors, dot) = analysis::control_flow_graph(source.to_string());
+    let dot = dot.expect("a valid program has a graph");
+
+    assert!(errors.errors.is_empty());
+    assert!(dot.starts_with("digraph controlflow {"), "{}", dot);
+    assert!(dot.contains("if N > 0"), "{}", dot);
+    assert!(dot.contains("->"), "{}", dot);
+}
+
+#[test]
+fn a_program_that_does_not_compile_has_no_graph() {
+    for source in ["output MISSING", "output 1 ,"] {
+        let (errors, dot) = analysis::control_flow_graph(source.to_string());
+
+        assert!(dot.is_none(), "{:?}", source);
+        assert!(!errors.errors.is_empty(), "{:?}", source);
+    }
+}

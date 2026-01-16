@@ -44,6 +44,30 @@ impl AnalysisResult {
     }
 }
 
+/// Analyzes `contents` and draws its control flow graph as Graphviz DOT.
+///
+/// The graph is `None` when the program does not compile, in which case the
+/// errors say why -- a half-bound program has no meaningful flow to draw.
+pub fn control_flow_graph(contents: String) -> (ErrorBag, Option<String>) {
+    let mut bag = ErrorBag::new();
+
+    let Some(root) = syntax::parse(contents, &mut bag) else {
+        bag.add(ErrorKind::FailedParsing, span::Span::new(0, 0, 0, 0, 0, 0));
+        return (bag, None);
+    };
+
+    let Some(bound) = binding::bind_root(&root, &mut bag) else {
+        return (bag, None);
+    };
+
+    let graphs = control_flow::analyze(&bound, &mut bag);
+    if !bag.errors.is_empty() {
+        return (bag, None);
+    }
+
+    (bag, Some(control_flow::dot(&graphs)))
+}
+
 pub fn analyze(contents: String) -> AnalysisResult {
     // parsing
     let mut bag = ErrorBag::new();
@@ -65,9 +89,10 @@ pub fn analyze(contents: String) -> AnalysisResult {
 
     // println!("{:#?}", bound);
 
-    // control flow analysis
-    let graphs = control_flow::analyze(&bound, &mut bag);
-    control_flow::digraph(&graphs, "controlflow.dot");
+    // control flow analysis. the graph itself is only built on request, by
+    // `control_flow_graph`, since this runs on every keystroke through the
+    // diagnostics route
+    control_flow::analyze(&bound, &mut bag);
 
     AnalysisResult::new(bag, bound)
 }

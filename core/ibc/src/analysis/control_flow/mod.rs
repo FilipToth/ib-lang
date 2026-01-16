@@ -57,7 +57,8 @@ fn scan_for_functions_recursive(
     }
 }
 
-pub fn digraph(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>, path: &str) {
+/// The graphs as one Graphviz digraph, one subgraph per function.
+pub fn dot(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>) -> String {
     let mut dot_graph = "".to_string();
     dot_graph += "digraph controlflow {";
 
@@ -67,7 +68,11 @@ pub fn digraph(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>, path: &str) {
     }
 
     dot_graph += "}";
-    fs::write(path, dot_graph).expect("Cannot write to file");
+    dot_graph
+}
+
+pub fn digraph(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>, path: &str) {
+    fs::write(path, dot(graphs)).expect("Cannot write to file");
 }
 
 pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<Rc<RefCell<ControlFlowNode>>> {
