@@ -5,7 +5,33 @@ use crate::analysis::binding::{
     types::TypeKind,
 };
 
-use super::FuncControlFlow;
+/// Numbers the nodes of one graph.
+///
+/// The prefix is what keeps the graphs in a file apart: they are drawn into one
+/// digraph, so without it every graph would start again at 1 and graphviz would
+/// read those as the same nodes, merging every function into one tangle.
+pub struct NodeIds {
+    prefix: String,
+    counter: RefCell<u64>,
+}
+
+impl NodeIds {
+    pub fn new(prefix: String) -> Rc<NodeIds> {
+        let ids = NodeIds {
+            prefix: prefix,
+            counter: RefCell::new(0),
+        };
+
+        Rc::new(ids)
+    }
+
+    fn next(&self) -> String {
+        let mut count = self.counter.borrow_mut();
+        *count += 1;
+
+        format!("{}_{}", self.prefix, count)
+    }
+}
 
 pub struct ControlFlowNode {
     pub is_start: bool,
@@ -35,10 +61,7 @@ impl ControlFlowSpan {
 }
 
 impl ControlFlowNode {
-    fn new(counter: Rc<RefCell<u64>>, label: String) -> ControlFlowNode {
-        let mut count = counter.borrow_mut();
-        *count += 1;
-
+    fn new(ids: &Rc<NodeIds>, label: String) -> ControlFlowNode {
         ControlFlowNode {
             is_start: false,
             is_end: false,
@@ -46,7 +69,7 @@ impl ControlFlowNode {
             on_condition: None,
             ret_type: None,
             graph_label: label,
-            graph_id: count.to_string(),
+            graph_id: ids.next(),
         }
     }
 
@@ -124,11 +147,11 @@ fn walk(
     node: &BoundNode,
     prev: Option<Rc<RefCell<ControlFlowNode>>>,
     end_node: Rc<RefCell<ControlFlowNode>>,
-    counter: Rc<RefCell<u64>>,
+    ids: Rc<NodeIds>,
 ) -> ControlFlowSpan {
     let (next, last) = match &node.kind {
         BoundNodeKind::Block { children } => {
-            let block = ControlFlowNode::new(counter.clone(), node.to_string());
+            let block = ControlFlowNode::new(&ids, node.to_string());
             let block_ptr = Rc::new(RefCell::new(block));
 
             let mut new_prev = block_ptr.clone();
@@ -137,7 +160,7 @@ fn walk(
                     child,
                     Some(new_prev.clone()),
                     end_node.clone(),
-                    counter.clone(),
+                    ids.clone(),
                 );
 
                 let last = child_node.last.clone();
@@ -148,7 +171,7 @@ fn walk(
             (block_ptr.clone(), new_prev)
         }
         BoundNodeKind::ReturnStatement { expr: _ } => {
-            let mut new_node = ControlFlowNode::new(counter, node.to_string());
+            let mut new_node = ControlFlowNode::new(&ids, node.to_string());
 
             new_node.next = Some(end_node);
             new_node.ret_type = Some(node.node_type.clone());
@@ -161,11 +184,11 @@ fn walk(
             block,
             else_block,
         } => {
-            let mut if_node = ControlFlowNode::new(counter.clone(), node.to_string());
-            let end_if_node = ControlFlowNode::new(counter.clone(), "end if".to_string());
+            let mut if_node = ControlFlowNode::new(&ids, node.to_string());
+            let end_if_node = ControlFlowNode::new(&ids, "end if".to_string());
             let end_if_ref = Rc::new(RefCell::new(end_if_node));
 
-            let on_condition_span = walk(&block, None, end_node.clone(), counter.clone());
+            let on_condition_span = walk(&block, None, end_node.clone(), ids.clone());
             if_node.on_condition = Some(on_condition_span.first);
 
             let mut on_cond_last = on_condition_span.last.borrow_mut();
@@ -177,7 +200,7 @@ fn walk(
 
             match else_block {
                 Some(e) => {
-                    let span = walk(&e, None, end_node.clone(), counter.clone());
+                    let span = walk(&e, None, end_node.clone(), ids.clone());
                     if_node.next = Some(span.first);
 
                     let mut last = span.last.borrow_mut();
@@ -193,7 +216,7 @@ fn walk(
             (if_ref, end_if_ref)
         }
         _ => {
-            let node = ControlFlowNode::new(counter, node.to_string());
+            let node = ControlFlowNode::new(&ids, node.to_string());
             let node_ref = Rc::new(RefCell::new(node));
             (node_ref.clone(), node_ref)
         }
@@ -206,19 +229,20 @@ fn walk(
     ControlFlowSpan::new(next, last)
 }
 
-pub fn contruct_graph(func: FuncControlFlow) -> Rc<RefCell<ControlFlowNode>> {
-    let counter = Rc::new(RefCell::new(0 as u64));
+/// Builds the graph of one block. `prefix` names its nodes apart from the other
+/// graphs drawn into the same file.
+pub fn contruct_graph(block: &BoundNode, prefix: String) -> Rc<RefCell<ControlFlowNode>> {
+    let ids = NodeIds::new(prefix);
 
-    let mut start_node = ControlFlowNode::new(counter.clone(), "<Start>".to_string());
+    let mut start_node = ControlFlowNode::new(&ids, "<Start>".to_string());
     start_node.is_start = true;
     let start_node_ref = Rc::new(RefCell::new(start_node));
 
-    let mut end_node = ControlFlowNode::new(counter.clone(), "<End>".to_string());
+    let mut end_node = ControlFlowNode::new(&ids, "<End>".to_string());
     end_node.is_end = true;
     let end_node_ref = Rc::new(RefCell::new(end_node));
 
-    let start = func.block;
-    walk(&start, Some(start_node_ref.clone()), end_node_ref, counter);
+    walk(block, Some(start_node_ref.clone()), end_node_ref, ids);
 
     start_node_ref
 }

@@ -18,6 +18,14 @@ pub struct FuncControlFlow {
     block: Arc<BoundNode>,
     ret_type: TypeKind,
     span: Span,
+    label: String,
+}
+
+/// One drawable graph: a function's, or the program's own.
+pub struct ControlFlowGraph {
+    /// What the graph is of, shown on the cluster that holds it.
+    pub label: String,
+    pub root: Rc<RefCell<ControlFlowNode>>,
 }
 
 fn scan_for_functions_recursive(
@@ -49,6 +57,7 @@ fn scan_for_functions_recursive(
                 block: block.clone(),
                 ret_type: symbol.ret_type.clone(),
                 span: node.span.clone(),
+                label: node.to_string(),
             };
 
             functions.push(func);
@@ -57,36 +66,54 @@ fn scan_for_functions_recursive(
     }
 }
 
-/// The graphs as one Graphviz digraph, one subgraph per function.
-pub fn dot(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>) -> String {
-    let mut dot_graph = "".to_string();
-    dot_graph += "digraph controlflow {";
+/// The graphs as one Graphviz digraph, each in a cluster of its own so the
+/// functions are drawn as separate boxes rather than one run-on graph.
+pub fn dot(graphs: &Vec<ControlFlowGraph>) -> String {
+    let mut dot_graph = "digraph controlflow {\n".to_string();
 
-    for graph in graphs {
-        let subgraph = graph.borrow().dot_graph(false);
-        dot_graph += subgraph.as_str();
+    for (index, graph) in graphs.iter().enumerate() {
+        let label = graph.label.replace('"', "\\\"");
+
+        dot_graph += format!("  subgraph cluster_{} {{\n", index).as_str();
+        dot_graph += format!("    label=\"{}\"\n", label).as_str();
+        dot_graph += graph.root.borrow().dot_graph(false).as_str();
+        dot_graph += "  }\n";
     }
 
     dot_graph += "}";
     dot_graph
 }
 
-pub fn digraph(graphs: &Vec<Rc<RefCell<ControlFlowNode>>>, path: &str) {
+pub fn digraph(graphs: &Vec<ControlFlowGraph>, path: &str) {
     fs::write(path, dot(graphs)).expect("Cannot write to file");
 }
 
-pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<Rc<RefCell<ControlFlowNode>>> {
+pub fn analyze(root: &BoundNode, errors: &mut ErrorBag) -> Vec<ControlFlowGraph> {
     let mut function_declarations: Vec<FuncControlFlow> = Vec::new();
     scan_for_functions_recursive(root, errors, &mut function_declarations);
 
-    let mut graphs: Vec<Rc<RefCell<ControlFlowNode>>> = Vec::new();
-    for func in function_declarations {
+    // the statements outside any function are a flow of their own. they are
+    // only drawn, not analyzed: "not all code paths return" is a question about
+    // a function, and the program has no return type to check against
+    let program = ControlFlowGraph {
+        label: "<program>".to_string(),
+        root: control_flow_graph::contruct_graph(root, "p".to_string()),
+    };
+
+    let mut graphs: Vec<ControlFlowGraph> = vec![program];
+
+    for (index, func) in function_declarations.into_iter().enumerate() {
         let span = func.span.clone();
         let ret_type = func.ret_type.clone();
+        let label = func.label.clone();
 
-        let graph = control_flow_graph::contruct_graph(func);
-        control_flow_analyzer::analyze_func(graph.clone(), &span, &ret_type, errors);
-        graphs.push(graph);
+        let root = control_flow_graph::contruct_graph(&func.block, format!("f{}", index));
+        control_flow_analyzer::analyze_func(root.clone(), &span, &ret_type, errors);
+
+        graphs.push(ControlFlowGraph {
+            label: label,
+            root: root,
+        });
     }
 
     graphs
