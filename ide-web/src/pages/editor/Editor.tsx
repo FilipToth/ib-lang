@@ -5,7 +5,13 @@ import { indentLess, indentMore, indentWithTab } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { TopBar } from "components/TopBar";
 import {
     Alert,
@@ -56,6 +62,25 @@ const tabStyle: SxProps = {
     height: tabHeight,
     minHeight: tabHeight,
 };
+
+/// The editor's extensions that never change. They are built once, because
+/// CodeMirror reconfigures itself whenever it is handed new ones.
+const baseExtensions = [
+    ib(),
+    Prec.highest(
+        keymap.of([
+            {
+                key: "Tab",
+                run: (e) => {
+                    if (!completionStatus(e.state)) return indentMore(e);
+
+                    return acceptCompletion(e);
+                },
+            },
+        ])
+    ),
+    indentUnit.of("    "),
+];
 
 /// How long typing has to pause before the open files are saved.
 const saveDelay = 1000;
@@ -428,17 +453,22 @@ const Editor = () => {
         return () => window.removeEventListener("beforeunload", warn);
     }, [unsaved]);
 
-    const ibSupport = ib();
-    const keys = keymap.of([
-        {
-            key: "Tab",
-            run: (e) => {
-                if (!completionStatus(e.state)) return indentMore(e);
+    // a new array would make CodeMirror reconfigure itself, so it is rebuilt
+    // only when the highlight changes, not on every keystroke
+    const extensions = useMemo(
+        () => [...baseExtensions, runtimeErrorHighlight(runtimeError)],
+        [runtimeError]
+    );
 
-                return acceptCompletion(e);
-            },
-        },
-    ]);
+    // CodeMirror reconfigures when this changes too, so it has to be stable
+    const onChange = useCallback((value: string, _viewUpdate: ViewUpdate) => {
+        setCode(value);
+        if (currentFile != null) currentFile.contents = value;
+
+        // the highlight belongs to the source that was run, so an edit
+        // retires it
+        setRuntimeError(null);
+    }, []);
 
     /// The source a graph tab draws. `saveActiveCode` writes the buffer back
     /// whenever a tab changes, so the file's contents are current by the time
@@ -456,7 +486,6 @@ const Editor = () => {
         return files.find((f) => f.id == fileId)?.contents ?? "";
     };
 
-    const keyExtension = Prec.highest(keys);
     const activeTab = tabs[tabState];
 
     return (
@@ -513,28 +542,9 @@ const Editor = () => {
                                     width="70vw"
                                     maxHeight="100%"
                                     theme={coolGlow}
-                                    extensions={[
-                                        ibSupport,
-                                        keyExtension,
-                                        indentUnit.of("    "),
-                                        runtimeErrorHighlight(
-                                            runtimeError,
-                                            code.length
-                                        ),
-                                    ]}
+                                    extensions={extensions}
                                     value={code}
-                                    onChange={(
-                                        value: string,
-                                        _viewUpdate: ViewUpdate
-                                    ) => {
-                                        setCode(value);
-                                        if (currentFile != null)
-                                            currentFile.contents = value;
-
-                                        // the highlight belongs to the source
-                                        // that was run, so an edit retires it
-                                        setRuntimeError(null);
-                                    }}
+                                    onChange={onChange}
                                     style={{
                                         flexGrow: 1,
                                         overflow: "scroll",

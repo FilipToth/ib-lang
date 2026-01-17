@@ -9,7 +9,7 @@ function markedRanges(
 ): Array<[number, number]> {
     const state = EditorState.create({
         doc,
-        extensions: [runtimeErrorHighlight(error, doc.length)],
+        extensions: [runtimeErrorHighlight(error)],
     });
 
     const ranges: Array<[number, number]> = [];

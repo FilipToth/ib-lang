@@ -1,5 +1,9 @@
-import { Extension } from "@codemirror/state";
-import { Decoration, EditorView } from "@uiw/react-codemirror";
+import { Extension, StateField } from "@codemirror/state";
+import {
+    Decoration,
+    DecorationSet,
+    EditorView,
+} from "@uiw/react-codemirror";
 
 /// Where a runtime error happened, as character offsets into the source the
 /// server was given.
@@ -21,23 +25,31 @@ const mark = Decoration.mark({ class: "cm-runtimeError" });
 ///
 /// The decoration is built once from `error` rather than tracked through
 /// document changes, because an edit invalidates the error itself -- the editor
-/// clears it on the next change.
-const runtimeErrorHighlight = (
-    error: RuntimeErrorRange | null,
-    docLength: number
-): Extension => {
+/// clears it on the next change. It is built from the editor's own document, so
+/// the extension depends on `error` alone and stays the same between
+/// keystrokes.
+const runtimeErrorHighlight = (error: RuntimeErrorRange | null): Extension => {
     if (error == null) return [];
 
-    // the error came from a run of source the document may have moved past, so
-    // the range is clamped rather than trusted
-    const start = Math.min(error.start, docLength);
-    const end = Math.min(Math.max(error.end, start + 1), docLength);
+    const field = StateField.define<DecorationSet>({
+        create: (state) => {
+            const docLength = state.doc.length;
 
-    // nothing left to point at
-    if (start >= end) return [];
+            // the error came from a run of source the document may have moved
+            // past, so the range is clamped rather than trusted
+            const start = Math.min(error.start, docLength);
+            const end = Math.min(Math.max(error.end, start + 1), docLength);
 
-    const decorations = Decoration.set([mark.range(start, end)]);
-    return [theme, EditorView.decorations.of(decorations)];
+            // nothing left to point at
+            if (start >= end) return Decoration.none;
+
+            return Decoration.set([mark.range(start, end)]);
+        },
+        update: (decorations, tr) => decorations.map(tr.changes),
+        provide: (f) => EditorView.decorations.from(f),
+    });
+
+    return [theme, field];
 };
 
 export default runtimeErrorHighlight;
