@@ -22,16 +22,42 @@ use super::{
     EvalIO,
 };
 
+/// How deep calls may nest before the program is stopped. Without a limit a
+/// runaway recursion takes the whole process down with the native stack, since
+/// evaluating a call means recursing in rust too.
+///
+/// A call costs native stack in proportion to how involved its body is, so this
+/// only holds together alongside `EVAL_STACK_SIZE`: the hosts run evaluation on
+/// a stack big enough for this many calls of a heavy function.
+pub const MAX_CALL_DEPTH: usize = 500;
+
+/// The native stack evaluation needs to reach `MAX_CALL_DEPTH`. Thread stacks
+/// are reserved address space, not memory in use, so asking for room is cheap.
+pub const EVAL_STACK_SIZE: usize = 256 * 1024 * 1024;
+
 pub struct EvalInfo {
     pub heap: EvalHeap,
+    depth: usize,
 }
+
+/// A declared function: its body, and the variables one run of it owns.
+#[derive(Clone)]
+pub struct FunctionBody {
+    block: Arc<BoundNode>,
+    locals: Arc<Vec<u64>>,
+}
+
+/// The values a call displaced, put back when it returns. `None` is a variable
+/// that had no value yet, so leaving the call removes it again rather than
+/// leaving the callee's behind.
+type SavedLocals = Vec<(u64, Option<EvalValue>)>;
 
 pub struct EvalHeap {
     // just use rust's heap to manage
     // memory, no need for us to make
     // our own heap
     variables: HashMap<u64, EvalValue>,
-    functions: HashMap<u64, Arc<BoundNode>>,
+    functions: HashMap<u64, FunctionBody>,
 }
 
 impl EvalHeap {
@@ -53,15 +79,45 @@ impl EvalHeap {
         value.clone()
     }
 
-    pub fn declare_func(&mut self, symbol: &FunctionSymbol, body: Arc<BoundNode>) {
+    pub fn declare_func(
+        &mut self,
+        symbol: &FunctionSymbol,
+        block: Arc<BoundNode>,
+        locals: Arc<Vec<u64>>,
+    ) {
         let id = symbol.symbol_id;
+        let body = FunctionBody {
+            block: block,
+            locals: locals,
+        };
+
         self.functions.insert(id, body);
     }
 
-    pub fn get_func(&self, symbol: &FunctionSymbol) -> Arc<BoundNode> {
-        let id = &symbol.symbol_id;
-        let body = &self.functions[id];
-        body.clone()
+    /// The body of `symbol`, or `None` for a builtin, which has none.
+    pub fn get_func(&self, symbol: &FunctionSymbol) -> Option<FunctionBody> {
+        self.functions.get(&symbol.symbol_id).cloned()
+    }
+
+    /// Takes the values of a function's own variables out of the way, so the
+    /// run that is starting cannot overwrite the one that is waiting.
+    fn enter_call(&mut self, locals: &Vec<u64>) -> SavedLocals {
+        let mut saved: SavedLocals = Vec::with_capacity(locals.len());
+
+        for id in locals {
+            saved.push((*id, self.variables.remove(id)));
+        }
+
+        saved
+    }
+
+    fn leave_call(&mut self, saved: SavedLocals) {
+        for (id, value) in saved {
+            match value {
+                Some(value) => self.variables.insert(id, value),
+                None => self.variables.remove(&id),
+            };
+        }
     }
 }
 
@@ -327,23 +383,29 @@ fn eval_unary_expr(rhs_val: EvalValue, op: &Operator, span: Span) -> EvalResult 
     Ok(value)
 }
 
+/// Evaluates a call's arguments, which are the caller's expressions and so read
+/// the caller's variables. They are assigned to the parameters only once the
+/// callee's frame is in place, by `assign_args`.
 async fn eval_call_args(
-    symbol: &FunctionSymbol,
     args: &Box<Vec<BoundNode>>,
     info: Arc<Mutex<EvalInfo>>,
     io: &mut impl EvalIO,
-) -> EvalResult<()> {
-    let num_params = symbol.parameters.len();
-    for index in 0..num_params {
-        let param = &symbol.parameters[index];
-        let arg = &args[index];
+) -> EvalResult<Vec<EvalValue>> {
+    let mut values: Vec<EvalValue> = Vec::with_capacity(args.len());
 
-        let symbol = &param.symbol;
-        let value = eval_rec(arg, info.clone(), io).await?;
-        info.lock().unwrap().heap.assign_var(symbol, value);
+    for arg in args.iter() {
+        values.push(eval_rec(arg, info.clone(), io).await?);
     }
 
-    Ok(())
+    Ok(values)
+}
+
+fn assign_args(symbol: &FunctionSymbol, values: Vec<EvalValue>, info: Arc<Mutex<EvalInfo>>) {
+    let mut lock = info.lock().unwrap();
+
+    for (param, value) in symbol.parameters.iter().zip(values) {
+        lock.heap.assign_var(&param.symbol, value);
+    }
 }
 
 async fn eval_for_loop(
@@ -458,11 +520,37 @@ async fn eval_index_assignment_expr(
     }
 }
 
+/// Registers every function a block declares before any of its statements run.
+///
+/// This mirrors the binder, which lets a function be called from above the
+/// line that declares it. Registering at the declaration statement instead
+/// would leave such a call finding no body, and a missing body is otherwise
+/// how a builtin is recognised.
+fn declare_block_functions(children: &Vec<BoundNode>, info: &Arc<Mutex<EvalInfo>>) {
+    let mut lock = info.lock().unwrap();
+
+    for child in children {
+        let BoundNodeKind::FunctionDeclaration {
+            symbol,
+            block,
+            locals,
+        } = &child.kind
+        else {
+            continue;
+        };
+
+        lock.heap
+            .declare_func(symbol, block.clone(), Arc::new(locals.clone()));
+    }
+}
+
 #[async_recursion]
 async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl EvalIO) -> EvalResult {
     let val = match &node.kind {
         BoundNodeKind::Module { block } => eval_rec(&block, info, io).await?,
         BoundNodeKind::Block { children } => {
+            declare_block_functions(children, &info);
+
             for child in children.iter() {
                 eval_rec(child, info.clone(), io).await?;
             }
@@ -530,31 +618,54 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
 
             EvalValue::void()
         }
-        BoundNodeKind::FunctionDeclaration { symbol, block } => {
-            info.lock()
-                .unwrap()
-                .heap
-                .declare_func(symbol, block.clone());
-
-            EvalValue::void()
-        }
+        // already registered by the block holding it, before any of that
+        // block's statements ran
+        BoundNodeKind::FunctionDeclaration { .. } => EvalValue::void(),
         BoundNodeKind::BoundCallExpression { symbol, args } => {
-            eval_call_args(symbol, args, info.clone(), io).await?;
+            let values = eval_call_args(args, info.clone(), io).await?;
+            let body = info.lock().unwrap().heap.get_func(symbol);
 
-            let builtin_eval = eval_builtin::try_eval_builtin(symbol, info.clone(), io).await;
-            match builtin_eval {
-                Some(val) => val,
-                None => {
-                    // no need to clear arguments after executing the block
-                    let body = info.lock().unwrap().heap.get_func(symbol);
+            let Some(body) = body else {
+                // a builtin has no body of its own to run, and nothing to save
+                assign_args(symbol, values, info.clone());
 
-                    // the call is where a return stops. an error keeps going
-                    match eval_rec(&body, info.clone(), io).await {
-                        Ok(_) => EvalValue::void(),
-                        Err(Signal::Return(ret_value)) => ret_value,
-                        Err(error) => return Err(error),
-                    }
+                let builtin = eval_builtin::try_eval_builtin(symbol, info.clone(), io).await;
+                let Some(value) = builtin else {
+                    unreachable!()
+                };
+
+                return Ok(value);
+            };
+
+            // the run that is starting gets its own copy of the function's
+            // variables, so a call to itself cannot overwrite the one waiting
+            let saved = {
+                let mut lock = info.lock().unwrap();
+
+                lock.depth += 1;
+                if lock.depth > MAX_CALL_DEPTH {
+                    lock.depth -= 1;
+                    return runtime_error("Recursion too deep", node.span);
                 }
+
+                lock.heap.enter_call(&body.locals)
+            };
+
+            assign_args(symbol, values, info.clone());
+
+            // the call is where a return stops. an error keeps going
+            let result = eval_rec(&body.block, info.clone(), io).await;
+
+            {
+                let mut lock = info.lock().unwrap();
+                lock.heap.leave_call(saved);
+                lock.depth -= 1;
+            }
+
+            match result {
+                Ok(_) => EvalValue::void(),
+                Err(Signal::Return(ret_value)) => ret_value,
+                Err(error) => return Err(error),
             }
         }
         BoundNodeKind::ObjectExpression => {
@@ -581,7 +692,11 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             // values are also objects, but they don't hold state?
             match &next.kind {
                 BoundNodeKind::BoundCallExpression { symbol, args } => {
-                    eval_call_args(&symbol, &args, info.clone(), io).await?;
+                    // a type method has no frame: its parameters are declared
+                    // where the call is written
+                    let values = eval_call_args(&args, info.clone(), io).await?;
+                    assign_args(symbol, values, info.clone());
+
                     eval_type_method(base_value, symbol, info, node.span).await?
                 }
                 _ => unreachable!(),
@@ -616,7 +731,10 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
 
 pub async fn eval(root: &BoundNode, io: &mut impl EvalIO) {
     let heap = EvalHeap::new();
-    let info = EvalInfo { heap: heap };
+    let info = EvalInfo {
+        heap: heap,
+        depth: 0,
+    };
 
     // an error stops the program and is reported here, once. a return outside
     // any function also stops it, the same as reaching the end.

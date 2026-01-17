@@ -44,8 +44,19 @@ pub struct IbFile {
     pub contents: String,
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    // evaluation recurses, so the threads that run request handlers need more
+    // stack than tokio's default
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(ibc::eval::evaluator::EVAL_STACK_SIZE)
+        .enable_all()
+        .build()
+        .expect("cannot build the tokio runtime");
+
+    runtime.block_on(serve());
+}
+
+async fn serve() {
     dotenv().ok();
     setup_db();
 

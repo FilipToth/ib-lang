@@ -1,0 +1,109 @@
+# Functions, including recursion: every run of a function owns its parameters
+# and the variables declared in its body.
+
+# --- the classic, where the parameter is read before the recursive call ---
+function fact(N: Int) -> Int
+    if N <= 1 then
+        return 1
+    end
+    return N * fact(N - 1)
+end
+output fact(5)
+
+# --- read after the call returns, which only works with a frame per run ---
+function factAfter(N: Int) -> Int
+    if N <= 1 then
+        return 1
+    end
+    X = factAfter(N - 1)
+    return N * X
+end
+output factAfter(5)
+
+# --- two recursive calls in one expression: the second used to read the
+#     parameter the first had already overwritten ---
+function fib(N: Int) -> Int
+    if N <= 1 then
+        return N
+    end
+    return fib(N - 1) + fib(N - 2)
+end
+output fib(10)
+
+# --- variables declared inside nested blocks belong to the run too ---
+function sumTo(N: Int) -> Int
+    if N <= 0 then
+        return 0
+    end
+
+    TOTAL = 0
+    loop I from 1 to N
+        TOTAL = TOTAL + I
+    end
+
+    if TOTAL > 0 then
+        INNER = sumTo(N - 1)
+        return TOTAL - INNER
+    end
+
+    return TOTAL
+end
+output sumTo(4)
+
+# --- a variable declared outside any function is not part of a frame, so a
+#     function still changes the one everybody sees ---
+COUNT = 0
+function bump() -> Int
+    COUNT = COUNT + 1
+    return COUNT
+end
+output bump()
+output bump()
+output COUNT
+
+# --- recursion that builds a collection, to check objects survive frames ---
+function countDown(N: Int, INTO: Array<Int>) -> Array<Int>
+    if N <= 0 then
+        return INTO
+    end
+
+    INTO.push(N)
+    return countDown(N - 1, INTO)
+end
+STEPS = new Array<Int>()
+output countDown(3, STEPS)
+
+# --- a function calling a different one keeps its own parameter ---
+function twice(N: Int) -> Int
+    return N * 2
+end
+function describe(N: Int) -> String
+    DOUBLED = twice(N + 1)
+    return "n=" + N
+end
+output describe(4) , " doubled+1=" , twice(5)
+
+# --- functions are hoisted within their block: every signature is declared
+#     before any body binds, so two functions can call each other ---
+function isEven(N: Int) -> Boolean
+    if N == 0 then
+        return true
+    end
+    return isOdd(N - 1)
+end
+
+function isOdd(N: Int) -> Boolean
+    if N == 0 then
+        return false
+    end
+    return isEven(N - 1)
+end
+
+output isEven(10) , " " , isOdd(7) , " " , isEven(3)
+
+# --- which also means a function can be called above its declaration ---
+output later(2)
+
+function later(N: Int) -> Int
+    return N * 10
+end

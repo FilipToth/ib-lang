@@ -10,6 +10,7 @@ use crate::analysis::{
 use super::{
     bound_node::{BoundNode, BoundNodeKind, BoundParameter},
     bound_scope::BoundScope,
+    symbols::FunctionSymbol,
     types::{get_type, TypeKind},
 };
 
@@ -27,9 +28,40 @@ fn bind_block(
         scope
     };
 
-    let mut bound = Vec::<BoundNode>::new();
+    // every function in the block is declared before any statement binds, so
+    // a function can call one written after it. mutual recursion needs this:
+    // each body refers to the other, so neither order works one at a time.
+    let mut signatures: Vec<Option<FunctionSignature>> = Vec::with_capacity(children.len());
     for child in children {
-        let bound_child = bind(child, scope_ref.clone(), errors)?;
+        let signature = match &child.kind {
+            SyntaxKind::FunctionDeclaration {
+                identifier,
+                parameters,
+                return_type,
+                body: _,
+            } => Some(declare_function_signature(
+                identifier.clone(),
+                parameters,
+                return_type,
+                scope_ref.clone(),
+                errors,
+                child.span,
+            )?),
+            _ => None,
+        };
+
+        signatures.push(signature);
+    }
+
+    let mut bound = Vec::<BoundNode>::new();
+    for (child, signature) in children.iter().zip(signatures) {
+        let bound_child = match (signature, &child.kind) {
+            (Some(signature), SyntaxKind::FunctionDeclaration { body, .. }) => {
+                bind_function_body(signature, body, errors, child.span)?
+            }
+            _ => bind(child, scope_ref.clone(), errors)?,
+        };
+
         bound.push(bound_child);
     }
 
@@ -117,15 +149,25 @@ fn bind_if_statement(
     Some(node)
 }
 
-fn bind_function_declaration(
+/// A function's signature, declared ahead of its body.
+///
+/// The body binds against the very parameter symbols the signature created,
+/// which is why the scope holding them travels with it rather than being built
+/// again when the body's turn comes.
+struct FunctionSignature {
+    symbol: FunctionSymbol,
+    params: Vec<BoundParameter>,
+    scope: Rc<RefCell<BoundScope>>,
+}
+
+fn declare_function_signature(
     identifier: String,
     params: &Vec<SyntaxToken>,
     ret_type: &Option<TypeAnnotation>,
-    block: &SyntaxToken,
     scope: Rc<RefCell<BoundScope>>,
     errors: &mut ErrorBag,
     span: Span,
-) -> Option<BoundNode> {
+) -> Option<FunctionSignature> {
     let func_scope = BoundScope::new(scope.clone());
     let func_scope_ref = Rc::new(RefCell::new(func_scope));
 
@@ -136,28 +178,59 @@ fn bind_function_declaration(
         None => TypeKind::Void,
     };
 
-    let block_span = block.span.clone();
-    let SyntaxKind::Scope { subtokens } = &block.kind else {
-        return None;
-    };
-
-    let block = bind_block(&subtokens, func_scope_ref, false, errors, block_span)?;
-
     let symbol =
         scope
             .borrow_mut()
             .declare_function(identifier.clone(), params.clone(), ret_type.clone());
 
-    let kind = match symbol {
-        Some(s) => BoundNodeKind::FunctionDeclaration {
-            symbol: s,
-            block: Arc::new(block),
-        },
-        None => {
-            let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
-            errors.add(kind, span);
-            return None;
-        }
+    let Some(symbol) = symbol else {
+        let kind = ErrorKind::CannotDeclareFunction(identifier.clone());
+        errors.add(kind, span);
+        return None;
+    };
+
+    let signature = FunctionSignature {
+        symbol: symbol,
+        params: params,
+        scope: func_scope_ref,
+    };
+
+    Some(signature)
+}
+
+fn bind_function_body(
+    signature: FunctionSignature,
+    block: &SyntaxToken,
+    errors: &mut ErrorBag,
+    span: Span,
+) -> Option<BoundNode> {
+    let FunctionSignature {
+        symbol,
+        params,
+        scope,
+    } = signature;
+
+    let block_span = block.span.clone();
+    let SyntaxKind::Scope { subtokens } = &block.kind else {
+        return None;
+    };
+
+    // everything allocated while the body binds belongs to this function, at
+    // any depth, so a call can give it storage of its own
+    scope.borrow().enter_function(symbol.symbol_id);
+    let block = bind_block(&subtokens, scope.clone(), false, errors, block_span);
+    scope.borrow().exit_function();
+
+    let block = block?;
+
+    // the parameters were allocated before the function had an id
+    let mut locals: Vec<u64> = params.iter().map(|p| p.symbol.symbol_id).collect();
+    locals.extend(scope.borrow().locals_of(symbol.symbol_id));
+
+    let kind = BoundNodeKind::FunctionDeclaration {
+        symbol: symbol,
+        block: Arc::new(block),
+        locals: locals,
     };
 
     let node = BoundNode::new(kind, TypeKind::Void, span);
@@ -720,15 +793,21 @@ pub fn bind(
             parameters,
             return_type,
             body,
-        } => bind_function_declaration(
-            identifier.clone(),
-            parameters,
-            return_type,
-            &body,
-            scope,
-            errors,
-            span,
-        ),
+        } => {
+            // unreached in practice: a declaration is always a statement in a
+            // block, and `bind_block` binds those itself, signatures first.
+            // kept whole so binding one on its own still works.
+            let signature = declare_function_signature(
+                identifier.clone(),
+                parameters,
+                return_type,
+                scope,
+                errors,
+                span,
+            )?;
+
+            bind_function_body(signature, &body, errors, span)
+        }
         SyntaxKind::ForLoop {
             identifier,
             lower_bound,

@@ -38,6 +38,20 @@ impl BoundScope {
         }
     }
 
+    /// Records the variables allocated from here on as belonging to this
+    /// function, until `exit_function`.
+    pub fn enter_function(&self, symbol_id: u64) {
+        self.symbol_scope.borrow_mut().enter_function(symbol_id);
+    }
+
+    pub fn exit_function(&self) {
+        self.symbol_scope.borrow_mut().exit_function();
+    }
+
+    pub fn locals_of(&self, symbol_id: u64) -> Vec<u64> {
+        self.symbol_scope.borrow().locals_of(symbol_id)
+    }
+
     pub fn assign_variable(
         &mut self,
         identifier: String,

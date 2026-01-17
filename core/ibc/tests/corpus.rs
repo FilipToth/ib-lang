@@ -67,13 +67,22 @@ fn run(name: &str, source: String) -> String {
         messages
     );
 
-    let mut io = CapturingIO::new();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        evaluator::eval(&root, &mut io).await;
-    });
+    // evaluation recurses, so it gets the same room the real hosts give it
+    let worker = std::thread::Builder::new()
+        .stack_size(evaluator::EVAL_STACK_SIZE)
+        .spawn(move || {
+            let mut io = CapturingIO::new();
+            let runtime = tokio::runtime::Runtime::new().unwrap();
 
-    io.captured()
+            runtime.block_on(async {
+                evaluator::eval(&root, &mut io).await;
+            });
+
+            io.captured()
+        })
+        .unwrap();
+
+    worker.join().unwrap()
 }
 
 /// Every `.ib` file in tests/corpus has a matching `.expected` file holding the
@@ -206,6 +215,15 @@ fn runtime_errors_stop_the_program() {
             "RUNTIME ERROR: Index 1 is out of bounds for an array of length 0 on line 2\n",
         ),
         (
+            // recursion that never ends is stopped rather than taking the
+            // native stack, and the process, down with it
+            "function forever(N: Int) -> Int\n\
+                 return forever(N + 1)\n\
+             end\n\
+             output forever(1)",
+            "RUNTIME ERROR: Recursion too deep on line 2\n",
+        ),
+        (
             "S = new Stack<Int>()\n\
              output S.pop()",
             "RUNTIME ERROR: Popping element from an empty stack on line 2\n",
@@ -238,6 +256,10 @@ fn a_program_with_errors_is_not_runnable() {
         "output 1 ,\noutput 2",
         "output \"hello\"\noutput MISSING",
         "X = \"s\"\nX = 1",
+        // hoisting still refuses two functions of the same name
+        "function f() -> Int\n    return 1\nend\nfunction f() -> Int\n    return 2\nend",
+        // and it is per block: a function declared in one is not visible outside
+        "if true then\n    function inner() -> Int\n        return 1\n    end\nend\noutput inner()",
     ];
 
     for source in broken {

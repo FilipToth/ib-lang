@@ -64,7 +64,11 @@ impl BoundNode {
             BoundNodeKind::UntilLoop { expr, block } => {
                 format!("loop until {} {} end", expr.to_string(), block.to_string())
             }
-            BoundNodeKind::FunctionDeclaration { symbol, block: _ } => {
+            BoundNodeKind::FunctionDeclaration {
+                symbol,
+                block: _,
+                locals: _,
+            } => {
                 format!(
                     "function {}(...) -> {}",
                     symbol.identifier,
@@ -130,6 +134,10 @@ pub enum BoundNodeKind {
     FunctionDeclaration {
         symbol: FunctionSymbol,
         block: Arc<BoundNode>,
+        /// The variables that belong to one run of this function: its
+        /// parameters, and everything declared in its body. Kept here rather
+        /// than on `FunctionSymbol`, which is cloned into every call.
+        locals: Vec<u64>,
     },
     ForLoop {
         iterator: VariableSymbol,

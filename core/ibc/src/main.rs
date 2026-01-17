@@ -1,7 +1,7 @@
 use std::{
     env, fs,
     io::{self, BufRead, BufReader},
-    process,
+    process, thread,
 };
 
 use async_trait::async_trait;
@@ -215,8 +215,19 @@ async fn run(source: String) {
     eval::evaluator::eval(root, &mut IBEvaluator).await;
 }
 
+fn main() {
+    // evaluation recurses, so it runs on a stack sized for it rather than on
+    // whatever the main thread happens to get
+    let worker = thread::Builder::new()
+        .stack_size(eval::evaluator::EVAL_STACK_SIZE)
+        .spawn(run_cli)
+        .expect("cannot start the interpreter thread");
+
+    worker.join().expect("the interpreter thread panicked");
+}
+
 #[tokio::main]
-async fn main() {
+async fn run_cli() {
     let (mode, path) = parse_args();
     let source = read_source(&path);
 

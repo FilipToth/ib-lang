@@ -52,7 +52,11 @@ fn scan_for_functions_recursive(
                 scan_for_functions_recursive(e, errors, functions)
             }
         }
-        BoundNodeKind::FunctionDeclaration { symbol, block } => {
+        BoundNodeKind::FunctionDeclaration {
+            symbol,
+            block,
+            locals: _,
+        } => {
             let func = FuncControlFlow {
                 block: block.clone(),
                 ret_type: symbol.ret_type.clone(),
