@@ -260,6 +260,8 @@ fn a_program_with_errors_is_not_runnable() {
         "function f() -> Int\n    return 1\nend\nfunction f() -> Int\n    return 2\nend",
         // and it is per block: a function declared in one is not visible outside
         "if true then\n    function inner() -> Int\n        return 1\n    end\nend\noutput inner()",
+        // a chain with a branch that falls off the end still fails to return
+        "function g(N: Int) -> Int\n    if N == 1 then\n        return 1\n    else if N == 2 then\n        return 2\n    end\nend",
     ];
 
     for source in broken {

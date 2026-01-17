@@ -294,3 +294,32 @@ describe("output", () => {
         assert.ok(names.includes("OutputStatement"), `got ${names.join(",")}`);
     });
 });
+
+describe("else if", () => {
+    /// The compiler reads `else if` on one line as a chain sharing the one
+    /// `end`, and an `if` on the next line as a nested if with its own. The
+    /// grammar has no lines, so it keeps both readings and the `end`s decide.
+    it("parses a chain closed by a single end", () => {
+        const chain =
+            "if a then\n  output 1\nelse if b then\n  output 2\nelse if c then\n  output 3\nelse\n  output 4\nend";
+
+        assertParses(chain);
+        assert.equal(
+            nodeNames(chain).filter((n) => n == "ElseIf").length,
+            2,
+            "each else if is its own link"
+        );
+    });
+
+    it("still parses the nested form with an end per if", () => {
+        const nested =
+            "if a then\n  output a\nelse\n  if b then\n    output b\n  end\nend";
+
+        assertParses(nested);
+        assert.ok(!nodeNames(nested).includes("ElseIf"));
+    });
+
+    it("keeps parsing after a chain", () => {
+        assertParses("if a then\n  output 1\nelse if b then\n  output 2\nend\noutput 3");
+    });
+});

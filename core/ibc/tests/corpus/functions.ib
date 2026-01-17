@@ -107,3 +107,20 @@ output later(2)
 function later(N: Int) -> Int
     return N * 10
 end
+
+# --- an else if chain closes with one end. every branch returns here, and
+#     the return analysis has to see that through the chain ---
+function grade(N: Int) -> String
+    if N >= 90 then
+        return "A"
+    else if N >= 80 then
+        return "B"
+    else
+        return "C"
+    end
+end
+
+loop S from 79 to 80
+    output grade(S)
+end
+output grade(95)

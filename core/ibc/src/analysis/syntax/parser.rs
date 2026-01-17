@@ -610,6 +610,32 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let statement = self.parse_if_chain(errors)?;
+
+        // however many `else if`s the chain has, it closes with one end
+        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
+            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
+            errors.add(error_kind, statement.span);
+            return None;
+        }
+
+        Some(statement)
+    }
+
+    /// Parses `if <condition> then <body>` and any `else` after it, stopping
+    /// short of the `end`, which the whole chain shares.
+    ///
+    /// `else if` on one line continues the chain, the way the spec writes it:
+    ///
+    /// ```text
+    /// if A then ... else if B then ... else ... end
+    /// ```
+    ///
+    /// An `if` on the line after `else` is an ordinary nested `if` instead, with
+    /// its own `end`. Both give the same tree: the chained `if` becomes the
+    /// only statement of the else branch, so nothing past the parser has to
+    /// know chains exist.
+    fn parse_if_chain(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let keyword = self.tokens.next().unwrap();
         let start_loc = keyword.span.start.clone();
 
@@ -641,15 +667,33 @@ impl<'a> Parser<'a> {
         // optional else clause. parse_scope stops at the else token without
         // consuming it, the same way it stops at end.
         let else_body = if self.expect_next_token_peek(LexerTokenKind::ElseKeyword) {
-            // consume the else keyword
-            self.tokens.next();
+            let else_keyword = self.tokens.next().unwrap();
 
-            let else_scope = match self.parse_scope(errors) {
-                Some(s) => s,
-                None => {
-                    let error_kind = ErrorKind::ExpectedScope;
-                    errors.add(error_kind, body.span);
-                    return None;
+            let chained = match self.tokens.peek() {
+                Some(t) => {
+                    t.kind == LexerTokenKind::IfKeyword
+                        && t.span.start.line == else_keyword.span.start.line
+                }
+                None => false,
+            };
+
+            let else_scope = if chained {
+                let link = self.parse_if_chain(errors)?;
+                let span = link.span;
+
+                let kind = SyntaxKind::Scope {
+                    subtokens: vec![link],
+                };
+
+                SyntaxToken::new(kind, span)
+            } else {
+                match self.parse_scope(errors) {
+                    Some(s) => s,
+                    None => {
+                        let error_kind = ErrorKind::ExpectedScope;
+                        errors.add(error_kind, body.span);
+                        return None;
+                    }
                 }
             };
 
@@ -657,13 +701,6 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-
-        // end keyword
-        if !self.expect_next_token(LexerTokenKind::EndKeyword) {
-            let error_kind = ErrorKind::ExpectedToken("end keyword".to_string());
-            errors.add(error_kind, body.span);
-            return None;
-        }
 
         // the statement runs to the end of whichever clause came last
         let end_loc = match &else_body {

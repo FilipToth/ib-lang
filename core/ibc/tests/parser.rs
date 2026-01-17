@@ -181,3 +181,50 @@ fn an_unclosed_generic_is_reported() {
         "Expected token: close angle bracket '>'"
     ));
 }
+
+#[test]
+fn else_if_on_one_line_continues_the_chain() {
+    let src = "if a then\n\
+                   output a\n\
+               else if b then\n\
+                   output b\n\
+               else\n\
+                   output c\n\
+               end";
+
+    let (root, errors) = parse_source(src);
+    let root = root.expect("should parse");
+
+    assert_eq!(errors.errors.len(), 0, "a chain closes with a single end");
+
+    // the chained if is the only statement of the outer else branch, the same
+    // tree the nested form gives, so nothing past the parser treats it apart
+    let outer = first_if_statement(&root).expect("should contain an if");
+    let SyntaxKind::IfStatement { else_body, .. } = &outer.kind else {
+        panic!("expected an if statement");
+    };
+
+    let else_body = else_body.as_ref().expect("the chain is the else branch");
+    let SyntaxKind::Scope { subtokens } = &else_body.kind else {
+        panic!("expected the else branch to be a scope");
+    };
+
+    assert_eq!(subtokens.len(), 1);
+
+    let SyntaxKind::IfStatement { else_body, .. } = &subtokens[0].kind else {
+        panic!("expected the else branch to hold the chained if");
+    };
+
+    assert!(else_body.is_some(), "the final else belongs to the last link");
+}
+
+#[test]
+fn an_else_if_chain_takes_exactly_one_end() {
+    // a second end has no if left to close, so it is stray at the top level
+    let (_, errors) = parse_source("if a then\n    output a\nelse if b then\n    output b\nend\nend");
+
+    assert!(
+        errors.errors.len() > 0,
+        "a chain closed twice must be reported"
+    );
+}

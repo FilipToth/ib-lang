@@ -194,3 +194,30 @@ fn a_program_that_does_not_compile_has_no_graph() {
         assert!(!errors.errors.is_empty(), "{:?}", source);
     }
 }
+
+/// A chain is parsed into the tree the nested form gives, so everything after
+/// the parser -- the graph included -- cannot tell them apart.
+#[test]
+fn an_else_if_chain_draws_like_the_nested_form() {
+    let chained = "X = 2\n\
+                   if X == 1 then\n\
+                       output 1\n\
+                   else if X == 2 then\n\
+                       output 2\n\
+                   else\n\
+                       output 3\n\
+                   end";
+
+    let nested = "X = 2\n\
+                  if X == 1 then\n\
+                      output 1\n\
+                  else\n\
+                      if X == 2 then\n\
+                          output 2\n\
+                      else\n\
+                          output 3\n\
+                      end\n\
+                  end";
+
+    assert_eq!(graph(chained), graph(nested));
+}

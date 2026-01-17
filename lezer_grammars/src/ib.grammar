@@ -15,7 +15,14 @@ Atom {
   | ExpressionStatement
 }
 
-IfStatement { IfKeyword Expression ThenKeyword Block (ElseKeyword Block)? EndKeyword }
+IfStatement { IfKeyword Expression ThenKeyword Block ElseClause? ~elseif EndKeyword }
+
+// `else if` either continues a chain that shares the one `end`, or opens an
+// ordinary nested if with its own. The compiler tells them apart by whether the
+// if is on the else's line; this grammar has no lines, so it keeps both
+// readings alive and lets the number of `end`s decide.
+ElseClause { ElseKeyword (ElseIf | Block) }
+ElseIf { IfKeyword Expression ThenKeyword Block ElseClause? ~elseif }
 FunctionDeclaration { FunctionKeyword Identifier ParameterList ReturnType? Block EndKeyword }
 ExpressionStatement { Expression }
 OutputStatement { OutputKeyword Expression ("," Expression)* }
