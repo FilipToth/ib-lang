@@ -17,6 +17,7 @@ const LeftBar = ({
             {files.map((file, index) => {
                 return (
                     <BarEntry
+                        key={file.id}
                         file={file}
                         click={() => click(index)}
                         del={() => {

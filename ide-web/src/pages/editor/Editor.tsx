@@ -42,6 +42,7 @@ import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
 import GraphView from "./GraphView";
 import { AccountTree } from "@mui/icons-material";
 import DeleteFileDialog from "pages/DeleteDialog";
+import { DropTarget, dropIndex, moveItem } from "./tabOrder";
 import { v4 as uuidv4 } from "uuid";
 
 export let currentFile: IBFile | null = null;
@@ -83,6 +84,53 @@ const baseExtensions = [
     indentUnit.of("    "),
 ];
 
+/// The file icon for the drag picture, loaded up front. The browser takes the
+/// picture as the drag starts, before a freshly made image could be drawn, so
+/// a copy of the tab's own icon would come out blank.
+const dragIcon = new Image(24, 24);
+dragIcon.src = "assets/ib.png";
+
+/// Holds the drag picture. It stays in the page between drags, so the icon
+/// in it never has to be drawn anew.
+let dragImage: HTMLDivElement | null = null;
+
+/// Makes the picture that follows the cursor while a tab is dragged just its
+/// icon and name. Left to itself, the browser snapshots the tab's whole area,
+/// which picks up the code beneath it.
+const setTabDragImage = (e: React.DragEvent<HTMLElement>) => {
+    const label = e.currentTarget.querySelector(".tab-label");
+    if (label == null) return;
+
+    if (dragImage == null) {
+        dragImage = document.createElement("div");
+        Object.assign(dragImage.style, {
+            position: "fixed",
+            // it has to be rendered to be pictured, but not where it can be
+            // seen
+            top: "-1000px",
+            left: "-1000px",
+            display: "flex",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            background: "white",
+            color: "rgba(0, 0, 0, 0.87)",
+        });
+        document.body.appendChild(dragImage);
+    }
+
+    const copy = label.cloneNode(true) as HTMLElement;
+    copy.querySelector("img")?.replaceWith(dragIcon);
+    dragImage.replaceChildren(copy);
+
+    // held where it was grabbed, relative to the tab
+    const rect = e.currentTarget.getBoundingClientRect();
+    e.dataTransfer.setDragImage(
+        dragImage,
+        Math.min(e.clientX - rect.left, dragImage.offsetWidth),
+        dragImage.offsetHeight / 2
+    );
+};
+
 /// How long typing has to pause before the open files are saved.
 const saveDelay = 1000;
 
@@ -92,19 +140,47 @@ const EditorTabs = ({
     isDirty,
     changeTab,
     closeTab,
+    moveTab,
 }: {
     tabState: number;
     tabs: EditorTab[];
     isDirty: (tab: EditorTab) => boolean;
     changeTab: (index: number) => void;
     closeTab: (index: number) => void;
+    moveTab: (from: number, to: number) => void;
 }) => {
+    /// The tab being dragged. Kept here rather than in the drag data, which
+    /// cannot be read until the drop, and so that drags from elsewhere (text,
+    /// files) are ignored.
+    const dragFrom = useRef<number | null>(null);
+    const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+
+    const endDrag = () => {
+        dragFrom.current = null;
+        setDropTarget(null);
+    };
+
+    const drop = () => {
+        const from = dragFrom.current;
+        endDrag();
+
+        if (from == null || dropTarget == null) return;
+
+        moveTab(from, dropIndex(from, dropTarget));
+    };
+
     return (
         <Tabs
             value={tabState}
             onChange={(_, index) => changeTab(index)}
             variant="scrollable"
             scrollButtons="auto"
+            onDragLeave={(e) => {
+                // dragleave also fires moving between a tab's children
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                    setDropTarget(null);
+                }
+            }}
             sx={{
                 ...tabStyle,
             }}
@@ -112,10 +188,52 @@ const EditorTabs = ({
             {tabs.map((tab, index) => {
                 const dirty = isDirty(tab);
 
+                const marker =
+                    dropTarget?.index == index ? dropTarget.side : null;
+
                 return (
                     <Tab
                         key={tabId(tab)}
                         value={index}
+                        // firefox does not drag buttons, which a tab
+                        // renders as by default
+                        component="div"
+                        draggable
+                        onDragStart={(e: React.DragEvent<HTMLElement>) => {
+                            dragFrom.current = index;
+                            e.dataTransfer.effectAllowed = "move";
+                            // firefox only starts a drag that carries data;
+                            // a type of its own keeps it from being dropped
+                            // into the editor as text
+                            e.dataTransfer.setData("application/x-ib-tab", "");
+                            setTabDragImage(e);
+                        }}
+                        onDragOver={(e: React.DragEvent<HTMLElement>) => {
+                            if (dragFrom.current == null) return;
+
+                            // accepting the drop
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+
+                            const { left, width } =
+                                e.currentTarget.getBoundingClientRect();
+                            const side =
+                                e.clientX < left + width / 2
+                                    ? "before"
+                                    : "after";
+
+                            if (
+                                dropTarget?.index != index ||
+                                dropTarget.side != side
+                            ) {
+                                setDropTarget({ index, side });
+                            }
+                        }}
+                        onDrop={(e: React.DragEvent) => {
+                            e.preventDefault();
+                            drop();
+                        }}
+                        onDragEnd={endDrag}
                         label={
                             <span>
                                 <Box
@@ -129,6 +247,7 @@ const EditorTabs = ({
                                     onClick={(e) => changeTab(index)}
                                 >
                                     <Box
+                                        className="tab-label"
                                         sx={{
                                             display: "flex",
                                             flexDirection: "row",
@@ -199,6 +318,13 @@ const EditorTabs = ({
                             "&:hover .dirty-dot": {
                                 display: "none",
                             },
+                            // a line on the side the dragged tab would land
+                            boxShadow:
+                                marker == "before"
+                                    ? "inset 2px 0 0 currentColor"
+                                    : marker == "after"
+                                    ? "inset -2px 0 0 currentColor"
+                                    : "none",
                         }}
                     />
                 );
@@ -305,6 +431,17 @@ const Editor = () => {
 
         setTabs([...tabs, tab]);
         setTabState(tabs.length);
+    };
+
+    /// Moves the tab at `from` to `to`, keeping the open tab open.
+    const moveTab = (from: number, to: number) => {
+        if (from == to) return;
+
+        const active = tabs[tabState];
+        const newTabs = moveItem(tabs, from, to);
+
+        setTabs(newTabs);
+        setTabState(newTabs.indexOf(active));
     };
 
     const closeTab = (index: number) => {
@@ -515,6 +652,7 @@ const Editor = () => {
                                     isDirty={isDirty}
                                     changeTab={changeTab}
                                     closeTab={closeTab}
+                                    moveTab={moveTab}
                                 />
                                 <Box>
                                     <Button

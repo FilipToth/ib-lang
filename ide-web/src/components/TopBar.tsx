@@ -8,7 +8,7 @@ import {
     Tabs,
     Box,
 } from "@mui/material";
-import { AccountCircle, MenuRounded } from "@mui/icons-material";
+import { AccountCircle } from "@mui/icons-material";
 import React, { ReactNode, useState } from "react";
 import { auth } from "services/firebase";
 import { useNavigate } from "react-router-dom";
@@ -33,9 +33,6 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
     return (
         <AppBar position="static">
             <Toolbar>
-                <IconButton size="large">
-                    <MenuRounded />
-                </IconButton>
                 {children}
                 <Box sx={{ flexGrow: 1 }}></Box>
                 <div>
