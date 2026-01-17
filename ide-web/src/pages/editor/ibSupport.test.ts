@@ -31,4 +31,32 @@ describe("indentation", () => {
 
         expect(indentAt(doc, "NESTED")).toBe(8);
     });
+
+    it("indents the body of each kind of loop", () => {
+        const loops = [
+            "loop for i from 1 to 3\n    output BODY\nend",
+            "loop i from 1 to 3\n    output BODY\nend",
+            "loop while a\n    output BODY\nend",
+            "loop until a\n    output BODY\nend",
+        ];
+
+        for (const doc of loops) {
+            expect(indentAt(doc, "BODY")).toBe(4);
+        }
+    });
+
+    it("indents a loop nested in a function and an if", () => {
+        const doc =
+            "function f()\n    if a then\n        loop while b\n            output NESTED\n        end\n    end\nend";
+
+        expect(indentAt(doc, "NESTED")).toBe(12);
+    });
+
+    /// Pressing enter in a loop body, above its end, lines the new line up
+    /// with the body rather than the loop.
+    it("indents a new line in a loop body", () => {
+        const doc = "loop while a\n    output A\n\nend";
+
+        expect(indentAt(doc, "\nend")).toBe(4);
+    });
 });

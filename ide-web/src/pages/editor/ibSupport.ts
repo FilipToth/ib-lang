@@ -61,17 +61,22 @@ const LANG_DEF = LRLanguage.define({
     },
 });
 
-export const getIndent = (tree: Tree, pos: number, unit: number) => {
-    const selectedNode = tree.resolveInner(pos, 1);
+/// The statements whose body is indented a level. An else if chain is one
+/// IfStatement, so its later branches sit level with the first.
+const indentingNodes = new Set([
+    "IfStatement",
+    "FunctionDeclaration",
+    "ForStatement",
+    "WhileStatement",
+    "UntilStatement",
+]);
 
-    let node = selectedNode;
+export const getIndent = (tree: Tree, pos: number, unit: number) => {
+    let node = tree.resolveInner(pos, 1);
     let indent = 0;
 
     while (node.parent) {
-        console.log(node.name);
-        if (node.name == "IfStatement") {
-            indent += unit;
-        } else if (node.name == "FunctionDeclaration") {
+        if (indentingNodes.has(node.name)) {
             indent += unit;
         }
 
