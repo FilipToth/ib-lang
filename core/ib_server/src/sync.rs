@@ -42,38 +42,37 @@ pub fn delete_file(uid: String, id: String) -> bool {
     true
 }
 
-pub fn sync_file(uid: String, id: String, code: String) {
+/// Writes `code` as the contents of file `id`, if it belongs to `uid`. Returns
+/// whether it was written.
+pub fn sync_file(uid: String, id: String, code: String) -> bool {
     let path = Path::new("data").join(uid.clone());
 
     // create userdir
     let _ = fs::create_dir_all(path.clone());
     let db_file = match get_filename_uid(id) {
         Some(f) => f,
-        None => return,
+        None => return false,
     };
 
     if db_file.uid != uid {
-        return;
+        return false;
     }
 
     let path = path.join(db_file.filename);
-    let mut file = if fs::metadata(path.clone()).is_ok() {
-        let file = OpenOptions::new().write(true).truncate(true).open(path);
-
-        let file = match file {
-            Ok(f) => f,
-            Err(_) => return,
-        };
-
-        file
+    let file = if fs::metadata(path.clone()).is_ok() {
+        OpenOptions::new().write(true).truncate(true).open(path)
     } else {
-        match File::create_new(path) {
-            Ok(f) => f,
-            Err(_) => return,
-        }
+        File::create_new(path)
     };
 
-    let _ = writeln!(file, "{}", code);
+    let mut file = match file {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+
+    // written as is: a trailing newline would come back on the next load and
+    // grow the file by one line every time it is saved
+    file.write_all(code.as_bytes()).is_ok()
 }
 
 pub fn get_files(uid: String) -> Vec<IbFile> {

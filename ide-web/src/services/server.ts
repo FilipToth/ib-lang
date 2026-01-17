@@ -26,14 +26,9 @@ export const runCode = async (code: string): Promise<string> => {
     return output;
 };
 
-export const runDiagnostics = async (file: IBFile): Promise<IBDiagnostic[]> => {
+export const runDiagnostics = async (code: string): Promise<IBDiagnostic[]> => {
     const headers = await getHeaders();
-    const params = {
-        id: file.id,
-    };
-
-    const req = await axios.post(`${API_BASE}diagnostics`, file.contents, {
-        params: params,
+    const req = await axios.post(`${API_BASE}diagnostics`, code, {
         headers: headers,
     });
 
@@ -76,10 +71,12 @@ export const createFile = async (id: string, filename: string) => {
         filename: filename,
     };
 
-    await axios.post(`${API_BASE}create`, undefined, {
+    const req = await axios.post(`${API_BASE}create`, undefined, {
         params: params,
         headers: headers,
     });
+
+    ensureSuccess(req.data);
 };
 
 export const deleteFile = async (id: string) => {
@@ -88,10 +85,34 @@ export const deleteFile = async (id: string) => {
         id: id,
     };
 
-    await axios.post(`${API_BASE}delete`, undefined, {
+    const req = await axios.post(`${API_BASE}delete`, undefined, {
         params: params,
         headers: headers,
     });
+
+    ensureSuccess(req.data);
+};
+
+export const saveFile = async (id: string, contents: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+    };
+
+    const req = await axios.post(`${API_BASE}save`, contents, {
+        params: params,
+        headers: headers,
+    });
+
+    ensureSuccess(req.data);
+};
+
+/// The file routes answer a refused request with `{ success: false }` rather
+/// than an error status, so that is turned into a rejection here.
+const ensureSuccess = (data: { success: boolean }) => {
+    if (!data.success) {
+        throw new Error("The server refused the request");
+    }
 };
 
 const getHeaders = async () => {

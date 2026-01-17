@@ -9,7 +9,7 @@ use axum::{
 use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
-use sync::{create_file, delete_file, get_files};
+use sync::{create_file, delete_file, get_files, sync_file};
 use throttle::Throttle;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -73,6 +73,7 @@ async fn serve() {
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
+        .route("/save", post(save_file_route))
         .layer(axum::middleware::from_fn(auth_middleware));
 
     let app = Router::new()
@@ -86,19 +87,8 @@ async fn serve() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn diagnostics(
-    Extension(uid): Extension<String>,
-    query: Query<HashMap<String, String>>,
-    body: String,
-) -> Json<Vec<Diagnostic>> {
-    let result = ibc::analysis::analyze(body.clone());
-
-    let id = match query.0.get("id") {
-        Some(i) => i.clone(),
-        None => return Json(Vec::new()),
-    };
-
-    sync::sync_file(uid, id, body);
+async fn diagnostics(body: String) -> Json<Vec<Diagnostic>> {
+    let result = ibc::analysis::analyze(body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let errors = result.errors.errors;
@@ -191,9 +181,23 @@ async fn delete_file_route(
         None => return Json(failed),
     };
 
-    delete_file(uid, id.clone());
-    let resp = RouteSuccess { success: true };
-    Json(resp)
+    let success = delete_file(uid, id.clone());
+    Json(RouteSuccess { success: success })
+}
+
+/// Stores the posted source as the contents of file `id`.
+async fn save_file_route(
+    Extension(uid): Extension<String>,
+    query: Query<HashMap<String, String>>,
+    body: String,
+) -> Json<RouteSuccess> {
+    let id = match query.0.get("id") {
+        Some(id) => id,
+        None => return Json(RouteSuccess { success: false }),
+    };
+
+    let success = sync_file(uid, id.clone(), body);
+    Json(RouteSuccess { success: success })
 }
 
 fn setup_db() {

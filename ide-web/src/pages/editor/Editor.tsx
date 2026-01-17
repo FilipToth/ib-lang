@@ -5,21 +5,29 @@ import { indentLess, indentMore, indentWithTab } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TopBar } from "components/TopBar";
 import {
+    Alert,
     Box,
     Button,
     GlobalStyles,
     IconButton,
     Stack,
+    Snackbar,
     SxProps,
     Tab,
     Tabs,
     Typography,
 } from "@mui/material";
-import { IBFile, createFile, deleteFile, getFiles } from "services/server";
-import { Add, Clear } from "@mui/icons-material";
+import {
+    IBFile,
+    createFile,
+    deleteFile,
+    getFiles,
+    saveFile,
+} from "services/server";
+import { Add, Clear, FiberManualRecord } from "@mui/icons-material";
 import NewFileDialog from "./NewFileDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
@@ -49,14 +57,19 @@ const tabStyle: SxProps = {
     minHeight: tabHeight,
 };
 
+/// How long typing has to pause before the open files are saved.
+const saveDelay = 1000;
+
 const EditorTabs = ({
     tabState,
     tabs,
+    isDirty,
     changeTab,
     closeTab,
 }: {
     tabState: number;
     tabs: EditorTab[];
+    isDirty: (tab: EditorTab) => boolean;
     changeTab: (index: number) => void;
     closeTab: (index: number) => void;
 }) => {
@@ -71,6 +84,8 @@ const EditorTabs = ({
             }}
         >
             {tabs.map((tab, index) => {
+                const dirty = isDirty(tab);
+
                 return (
                     <Tab
                         key={tabId(tab)}
@@ -102,8 +117,27 @@ const EditorTabs = ({
                                         )}
                                         <Typography>{tabTitle(tab)}</Typography>
                                     </Box>
-                                    {tabState == index && (
+                                    {/* the slot keeps its width whatever
+                                        it shows, so hovering does not
+                                        shift the tabs */}
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            width: 24,
+                                            height: 24,
+                                        }}
+                                    >
+                                        {dirty && (
+                                            <FiberManualRecord
+                                                className="dirty-dot"
+                                                titleAccess="Unsaved changes"
+                                                sx={{ fontSize: 12 }}
+                                            />
+                                        )}
                                         <IconButton
+                                            className="close-button"
                                             onClick={(e) => {
                                                 // prevent mui tab switches
                                                 e.stopPropagation();
@@ -115,7 +149,7 @@ const EditorTabs = ({
                                         >
                                             <Clear />
                                         </IconButton>
-                                    )}
+                                    </Box>
                                 </Box>
                             </span>
                         }
@@ -124,6 +158,21 @@ const EditorTabs = ({
                             ...tabStyle,
                             textTransform: "none",
                             p: 1.5,
+                            // like vscode: the open tab shows its close
+                            // button, an unsaved one a dot in its place, and
+                            // hovering any tab turns either into the button
+                            "& .close-button": {
+                                display:
+                                    tabState == index && !dirty
+                                        ? "inline-flex"
+                                        : "none",
+                            },
+                            "&:hover .close-button": {
+                                display: "inline-flex",
+                            },
+                            "&:hover .dirty-dot": {
+                                display: "none",
+                            },
                         }}
                     />
                 );
@@ -142,6 +191,23 @@ const Editor = () => {
     const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
     const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    /// The contents the server last confirmed storing, by file id. A file whose
+    /// contents differ has unsaved changes.
+    const [saved, setSaved] = useState<Record<string, string>>({});
+    /// Files with a save request in flight, so a slow one is not sent again.
+    const saving = useRef(new Set<string>());
+
+    const isSaved = (file: IBFile) => saved[file.id] == file.contents;
+
+    const isDirty = (tab: EditorTab) =>
+        tab.kind == "file" && !isSaved(tab.file);
+
+    const markSaved = (id: string, contents: string) => {
+        setSaved((s) => ({ ...s, [id]: contents }));
+    };
 
     /// The editor's buffer belongs to whichever file tab is open, so it has to
     /// be written back before the open tab changes.
@@ -242,8 +308,20 @@ const Editor = () => {
         setNewFileDialogOpen(true);
     };
 
-    const handleCreateFile = (filename: string) => {
+    /// Creates the file on the server first, and only then in the workspace, so
+    /// a refused request leaves nothing behind. The dialog stays open until
+    /// then, which keeps the tabs from changing under the request.
+    const handleCreateFile = async (filename: string) => {
         const uuid = uuidv4();
+
+        try {
+            await createFile(uuid, filename);
+        } catch {
+            setNewFileDialogOpen(false);
+            setError(`Could not create ${filename}.`);
+            return;
+        }
+
         const file: IBFile = {
             filename: filename,
             contents: "",
@@ -257,22 +335,31 @@ const Editor = () => {
         // tabs length isn't updated yet :D
         setTabState(tabs.length);
         setCode("");
+        markSaved(uuid, "");
 
         setNewFileDialogOpen(false);
-
-        createFile(uuid, filename);
     };
 
     const deleteFileClick = (index: number) => {
         setDelDialogIndex(index);
     };
 
-    const deleteFileDialogOK = () => {
+    /// Like creating, the file leaves the workspace only once the server has
+    /// deleted it, and the dialog stays open meanwhile.
+    const deleteFileDialogOK = async () => {
         if (delFileIndex == null) return;
         const file = files[delFileIndex];
 
-        deleteFile(file.id);
-        setDelDialogIndex(null);
+        setDeleting(true);
+        try {
+            await deleteFile(file.id);
+        } catch {
+            setError(`Could not delete ${file.filename}.`);
+            return;
+        } finally {
+            setDeleting(false);
+            setDelDialogIndex(null);
+        }
 
         setFiles((fs) => fs.filter((f) => f.id != file.id));
 
@@ -289,6 +376,9 @@ const Editor = () => {
         const loadFiles = async () => {
             const f = await getFiles();
             setFiles(f);
+            setSaved(
+                Object.fromEntries(f.map((file) => [file.id, file.contents]))
+            );
 
             if (f.length == 0) return;
 
@@ -300,6 +390,43 @@ const Editor = () => {
 
         loadFiles();
     }, []);
+
+    /// Saves every file with unsaved changes once typing pauses. Files are
+    /// saved whether or not their tab is still open, so closing one right
+    /// after an edit does not lose it.
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            for (const file of files) {
+                if (isSaved(file) || saving.current.has(file.id)) continue;
+
+                const contents = file.contents;
+                saving.current.add(file.id);
+
+                saveFile(file.id, contents)
+                    .then(() => markSaved(file.id, contents))
+                    // the dot stays, and the next edit tries again
+                    .catch(() => setError(`Could not save ${file.filename}.`))
+                    .finally(() => saving.current.delete(file.id));
+            }
+        }, saveDelay);
+
+        return () => clearTimeout(timeout);
+    }, [code, files, saved]);
+
+    const unsaved = files.some((file) => !isSaved(file));
+
+    useEffect(() => {
+        if (!unsaved) return;
+
+        // the browser asks before leaving; the text it shows is its own
+        const warn = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", warn);
+        return () => window.removeEventListener("beforeunload", warn);
+    }, [unsaved]);
 
     const ibSupport = ib();
     const keys = keymap.of([
@@ -355,6 +482,7 @@ const Editor = () => {
                                 <EditorTabs
                                     tabState={tabState}
                                     tabs={tabs}
+                                    isDirty={isDirty}
                                     changeTab={changeTab}
                                     closeTab={closeTab}
                                 />
@@ -430,9 +558,26 @@ const Editor = () => {
                 />
                 <DeleteFileDialog
                     isOpen={delFileIndex != null}
+                    busy={deleting}
                     close={() => setDelDialogIndex(null)}
                     dialogOK={deleteFileDialogOK}
                 />
+                <Snackbar
+                    anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                    open={error != null}
+                    autoHideDuration={4000}
+                    onClose={(_, reason) => {
+                        if (reason != "clickaway") setError(null);
+                    }}
+                >
+                    <Alert
+                        severity="error"
+                        variant="filled"
+                        onClose={() => setError(null)}
+                    >
+                        {error}
+                    </Alert>
+                </Snackbar>
             </Stack>
         </>
     );

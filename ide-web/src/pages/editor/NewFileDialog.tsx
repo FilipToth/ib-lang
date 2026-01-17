@@ -17,11 +17,12 @@ const NewFileDialog = ({
     close,
 }: {
     isOpen: boolean;
-    dialogOK: (file: string) => void;
+    dialogOK: (file: string) => Promise<void>;
     close: () => void;
 }) => {
     const [filename, setFilename] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
 
     const createError = (err: string) => {
         setError(err);
@@ -30,7 +31,7 @@ const NewFileDialog = ({
         }, 2500);
     };
 
-    const doneClick = () => {
+    const doneClick = async () => {
         const filtered = filename.trim();
         if (filtered == "") {
             createError("File name cannot be empty");
@@ -42,7 +43,10 @@ const NewFileDialog = ({
             return;
         }
 
-        dialogOK(filtered + ".ib");
+        // held until the server answers, so the file is not created twice
+        setBusy(true);
+        await dialogOK(filtered + ".ib");
+        setBusy(false);
 
         setError("");
         setFilename("");
@@ -73,8 +77,12 @@ const NewFileDialog = ({
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={close}>Cancel</Button>
-                    <Button onClick={doneClick}>Done</Button>
+                    <Button onClick={close} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button onClick={doneClick} disabled={busy}>
+                        Done
+                    </Button>
                 </DialogActions>
             </Dialog>
         </>
