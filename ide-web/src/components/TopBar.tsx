@@ -12,6 +12,7 @@ import { AccountCircle } from "@mui/icons-material";
 import React, { ReactNode, useState } from "react";
 import { auth } from "services/firebase";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 
 export const TopBar = ({ children }: { children: ReactNode }) => {
     const navigate = useNavigate();
@@ -35,6 +36,7 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
             <Toolbar>
                 {children}
                 <Box sx={{ flexGrow: 1 }}></Box>
+                <ThemeToggle />
                 <div>
                     <IconButton
                         size="large"

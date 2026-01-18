@@ -87,12 +87,15 @@ const LoginPage = () => {
             </Snackbar>
 
             <Stack
-                sx={{ height: "100vh" }}
+                // at least the window's height, centring the card, but free
+                // to grow and scroll when the window is shorter than it
+                sx={{ minHeight: "100dvh", p: 2 }}
                 justifyContent={"center"}
                 alignItems={"center"}
             >
                 <Card
-                    style={{ maxWidth: "600px", width: "400px" }}
+                    // the full width on a phone, 400px on anything wider
+                    style={{ width: "100%", maxWidth: "400px" }}
                     sx={{ bgcolor: "background.paper", p: 3 }}
                 >
                     <Stack direction={"column"} spacing={2}>

@@ -90,10 +90,18 @@ const GraphView = ({ code }: { code: string }) => {
         <Box
             sx={{
                 position: "relative",
-                flexGrow: 1,
+                flex: 1,
+                minHeight: 0,
                 width: "100%",
                 overflow: "hidden",
-                bgcolor: "#ffffff",
+                bgcolor: "background.default",
+                // graphviz draws in black on white; the drawing takes the
+                // page's colours instead, so it reads in either mode
+                "& svg": { color: "text.primary" },
+                "& svg [fill='white']": { fill: "transparent" },
+                "& svg [stroke='black']": { stroke: "currentColor" },
+                "& svg [fill='black']": { fill: "currentColor" },
+                "& svg text": { fill: "currentColor" },
             }}
         >
             {loading && (

@@ -72,7 +72,7 @@ const NewFileDialog = ({
                         // spacer
                         <>
                             <Box sx={{ height: "12px" }} />
-                            <Typography color="red">{error}</Typography>
+                            <Typography color="error">{error}</Typography>
                         </>
                     )}
                 </DialogContent>

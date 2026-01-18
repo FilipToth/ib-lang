@@ -35,26 +35,35 @@ const OutputView = ({ output }: { output: string }) => {
             ref={panel}
             onScroll={onScroll}
             data-testid="output"
-            sx={{
-                flex: 1,
-                minHeight: 0,
-                // the text wraps to the panel rather than widening it: a zero
-                // width keeps long lines out of the layout, and the minimum
-                // stretches it back across
-                width: 0,
-                minWidth: "100%",
-                overflowY: "auto",
-                p: 1,
-                border: 1,
-                borderColor: "grey.300",
-                borderRadius: 1,
-                bgcolor: "grey.50",
-                fontFamily: "monospace",
-                fontSize: 14,
-                lineHeight: 1.5,
-                whiteSpace: "pre-wrap",
-                overflowWrap: "anywhere",
-            }}
+            sx={[
+                {
+                    flex: 1,
+                    minHeight: 0,
+                    // the text wraps to the panel rather than widening it: a
+                    // zero width keeps long lines out of the layout, and the
+                    // minimum stretches it back across
+                    width: 0,
+                    minWidth: "100%",
+                    overflowY: "auto",
+                    p: 1,
+                    border: 1,
+                    borderColor: "grey.300",
+                    borderRadius: 1,
+                    bgcolor: "grey.50",
+                    fontFamily: "monospace",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                },
+                // set off from the page by a lighter surface on dark, as it is
+                // by a greyer one on light
+                (theme) =>
+                    theme.applyStyles("dark", {
+                        borderColor: "grey.800",
+                        bgcolor: "background.paper",
+                    }),
+            ]}
         >
             {output == "" ? (
                 <Typography

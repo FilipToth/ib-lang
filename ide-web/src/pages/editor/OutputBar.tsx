@@ -220,6 +220,9 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                 <Stack direction={"row"} gap={1} alignItems={"flex-start"}>
                     <TextField
                         multiline
+                        // grows with what is typed, up to a point, then
+                        // scrolls instead of eating the output's space
+                        maxRows={4}
                         fullWidth
                         size="small"
                         placeholder="Input"

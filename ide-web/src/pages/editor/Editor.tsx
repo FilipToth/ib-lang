@@ -1,5 +1,4 @@
 import CodeMirror, { Prec, ViewUpdate, keymap } from "@uiw/react-codemirror";
-import { coolGlow } from "thememirror";
 import { ib } from "./ibSupport";
 import { indentLess, indentMore } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
@@ -16,9 +15,9 @@ import { TopBar } from "components/TopBar";
 import {
     Alert,
     Box,
-    Button,
     GlobalStyles,
     IconButton,
+    Tooltip,
     Stack,
     Snackbar,
     SxProps,
@@ -41,6 +40,8 @@ import IbIcon from "./IbIcon";
 import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
 import GraphView from "./GraphView";
 import { AutoSaver } from "./autosave";
+import { darkEditorTheme, lightEditorTheme } from "./editorTheme";
+import { useResolvedMode } from "theme";
 import Splitter from "./Splitter";
 import { AccountTree } from "@mui/icons-material";
 import DeleteFileDialog from "pages/DeleteDialog";
@@ -60,7 +61,7 @@ const tabId = (tab: EditorTab) => (tab.kind == "file" ? tab.file.id : tab.id);
 const tabTitle = (tab: EditorTab) =>
     tab.kind == "file" ? tab.file.filename : tab.title;
 
-const tabHeight = 30;
+const tabHeight = 36;
 const tabStyle: SxProps = {
     height: tabHeight,
     minHeight: tabHeight,
@@ -114,8 +115,10 @@ const setTabDragImage = (e: React.DragEvent<HTMLElement>) => {
             display: "flex",
             padding: "4px 8px",
             borderRadius: "4px",
-            background: "white",
-            color: "rgba(0, 0, 0, 0.87)",
+            // the page's colours, whichever mode it is in
+            background: "var(--mui-palette-background-paper)",
+            color: "var(--mui-palette-text-primary)",
+            border: "1px solid var(--mui-palette-divider)",
         });
         document.body.appendChild(dragImage);
     }
@@ -199,6 +202,10 @@ const EditorTabs = ({
             }}
             sx={{
                 ...tabStyle,
+                // takes the row's spare width, and scrolls when the tabs
+                // need more
+                flex: 1,
+                minWidth: 0,
             }}
         >
             {tabs.map((tab, index) => {
@@ -276,7 +283,12 @@ const EditorTabs = ({
                                         ) : (
                                             <AccountTree fontSize="small" />
                                         )}
-                                        <Typography>{tabTitle(tab)}</Typography>
+                                        <Typography
+                                            noWrap
+                                            sx={{ maxWidth: 240 }}
+                                        >
+                                            {tabTitle(tab)}
+                                        </Typography>
                                     </Box>
                                     {/* the slot keeps its width whatever
                                         it shows, so hovering does not
@@ -318,7 +330,10 @@ const EditorTabs = ({
                         sx={{
                             ...tabStyle,
                             textTransform: "none",
-                            p: 1.5,
+                            // no vertical padding: the height above sets
+                            // it, and padding would squeeze the label
+                            py: 0,
+                            px: 1.5,
                             // like vscode: the open tab shows its close
                             // button, an unsaved one a dot in its place, and
                             // hovering any tab turns either into the button
@@ -695,105 +710,131 @@ const Editor = () => {
     };
 
     const activeTab = tabs[tabState];
+    const mode = useResolvedMode();
 
     return (
         <>
             <GlobalStyles styles={{ body: { overflow: "hidden" } }} />
-            <Stack height={"100vh"} maxHeight={"100vh"} overflow={"hidden"}>
+            {/* the page is exactly the window's height, and each pane scrolls
+                on its own inside it. dvh rather than vh: on phones and
+                tablets vh counts the space under the browser's toolbars too,
+                which would push the bottom of the page out of sight */}
+            <Stack height={"100dvh"} overflow={"hidden"}>
                 <TopBar>
-                    <Typography variant="h6">Code Editor</Typography>
+                    <Typography variant="h6" noWrap>
+                        Code Editor
+                    </Typography>
                 </TopBar>
-                <Stack flex={1} overflow={"hidden"}>
-                    <Stack direction="row" height={"100%"}>
-                        <LeftBar
-                            files={files}
-                            click={openFileOrChangeTab}
-                            del={deleteFileClick}
-                        />
-                        <Stack
-                            direction="column"
-                            height={"100%"}
-                            flex={1}
-                            minWidth={0}
+                {/* minHeight 0 throughout: a flex item will not shrink below
+                    its content otherwise, so a long file or output would
+                    stretch the page instead of scrolling */}
+                <Stack direction="row" flex={1} minHeight={0}>
+                    <LeftBar
+                        files={files}
+                        click={openFileOrChangeTab}
+                        del={deleteFileClick}
+                    />
+                    <Stack
+                        direction="column"
+                        flex={1}
+                        minWidth={0}
+                        minHeight={0}
+                    >
+                        <Box
+                            display="flex"
+                            flexDirection="row"
+                            alignItems="center"
+                            flexShrink={0}
                         >
-                            <Box
-                                display="flex"
-                                flexDirection="row"
-                                justifyContent="space-between"
-                            >
-                                <EditorTabs
-                                    tabState={tabState}
-                                    tabs={tabs}
-                                    isDirty={isDirty}
-                                    changeTab={changeTab}
-                                    closeTab={closeTab}
-                                    moveTab={moveTab}
-                                />
-                                <Box>
-                                    <Button
+                            <EditorTabs
+                                tabState={tabState}
+                                tabs={tabs}
+                                isDirty={isDirty}
+                                changeTab={changeTab}
+                                closeTab={closeTab}
+                                moveTab={moveTab}
+                            />
+                            {/* icon buttons: a Button with only an icon
+                                keeps the width of a text button */}
+                            <Box flexShrink={0} px={0.5}>
+                                <Tooltip title="Control flow graph">
+                                    <IconButton
+                                        size="small"
                                         onClick={openGraph}
-                                        startIcon={<AccountTree />}
-                                        title="Control flow graph"
-                                    ></Button>
-                                    <Button
+                                        aria-label="Control flow graph"
+                                    >
+                                        <AccountTree fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="New file">
+                                    <IconButton
+                                        size="small"
                                         onClick={addFile}
-                                        startIcon={<Add />}
-                                    ></Button>
-                                </Box>
+                                        aria-label="New file"
+                                    >
+                                        <Add fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
                             </Box>
-                            {tabs.length == 0 ? (
-                                <EmptyWorkspace newFileClick={addFile} />
-                            ) : activeTab?.kind == "graph" ? (
-                                // keyed so switching between graphs redraws
-                                // rather than reusing the previous one's state
-                                <GraphView
-                                    key={activeTab.id}
-                                    code={graphSource(activeTab.fileId)}
-                                />
-                            ) : (
-                                <CodeMirror
-                                    height="100%"
-                                    width="100%"
-                                    maxHeight="100%"
-                                    theme={coolGlow}
-                                    extensions={extensions}
-                                    value={code}
-                                    onChange={onChange}
-                                    style={{
-                                        flexGrow: 1,
-                                        overflow: "scroll",
-                                    }}
-                                />
-                            )}
-                        </Stack>
-                        {activeTab?.kind == "file" && (
-                            <>
-                                <Splitter
-                                    width={outputWidth}
-                                    setWidth={resizeOutput}
-                                    minWidth={minOutputWidth}
-                                    minBefore={minCodeWidth}
-                                />
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        flexShrink: 0,
-                                        width: outputWidth,
-                                        // a narrowed window takes room from
-                                        // the output before hiding the code
-                                        maxWidth: "60%",
-                                    }}
-                                >
-                                    <OutputBar
-                                        code={code}
-                                        fileId={activeTab.file.id}
-                                        filename={activeTab.file.filename}
-                                        onRuntimeError={setRuntimeError}
-                                    />
-                                </Box>
-                            </>
+                        </Box>
+                        {tabs.length == 0 ? (
+                            <EmptyWorkspace newFileClick={addFile} />
+                        ) : activeTab?.kind == "graph" ? (
+                            // keyed so switching between graphs redraws
+                            // rather than reusing the previous one's state
+                            <GraphView
+                                key={activeTab.id}
+                                code={graphSource(activeTab.fileId)}
+                            />
+                        ) : (
+                            <CodeMirror
+                                height="100%"
+                                width="100%"
+                                theme={
+                                    mode == "dark"
+                                        ? darkEditorTheme
+                                        : lightEditorTheme
+                                }
+                                extensions={extensions}
+                                value={code}
+                                onChange={onChange}
+                                // the editor scrolls itself; its box
+                                // only has to fill the space
+                                style={{
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflow: "hidden",
+                                }}
+                            />
                         )}
                     </Stack>
+                    {activeTab?.kind == "file" && (
+                        <>
+                            <Splitter
+                                width={outputWidth}
+                                setWidth={resizeOutput}
+                                minWidth={minOutputWidth}
+                                minBefore={minCodeWidth}
+                            />
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexShrink: 0,
+                                    width: outputWidth,
+                                    // a narrowed window takes room from
+                                    // the output before hiding the code
+                                    maxWidth: "60%",
+                                }}
+                            >
+                                <OutputBar
+                                    code={code}
+                                    fileId={activeTab.file.id}
+                                    filename={activeTab.file.filename}
+                                    onRuntimeError={setRuntimeError}
+                                />
+                            </Box>
+                        </>
+                    )}
                 </Stack>
                 <NewFileDialog
                     isOpen={newFileDialogOpen}

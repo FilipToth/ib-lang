@@ -25,6 +25,22 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>React App</title>
+    <script>
+      // puts the saved light or dark mode on the page before it is first
+      // drawn, so a dark page does not flash light while the app loads. The
+      // key and class names are the ones MUI uses (see src/theme.ts).
+      (function () {
+        try {
+          var mode = localStorage.getItem("mui-mode") || "system";
+          if (mode === "system") {
+            mode = matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          }
+          document.documentElement.classList.add(mode);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

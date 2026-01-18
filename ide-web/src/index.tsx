@@ -12,8 +12,11 @@ const root = ReactDOM.createRoot(
 );
 root.render(
     <React.StrictMode>
-        <CssBaseline />
-        <App />
+        <ThemeProvider theme={theme}>
+            {/* also tells the browser the mode, for scrollbars and inputs */}
+            <CssBaseline enableColorScheme />
+            <App />
+        </ThemeProvider>
     </React.StrictMode>
 );
 

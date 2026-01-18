@@ -2,6 +2,7 @@ import { Box, IconButton, Stack, Typography } from "@mui/material";
 import { IBFile } from "services/server";
 import IbIcon from "./IbIcon";
 import ClearIcon from "@mui/icons-material/Clear";
+import { surfaces } from "theme";
 
 const LeftBar = ({
     files,
@@ -13,7 +14,28 @@ const LeftBar = ({
     del: (index: number) => void;
 }) => {
     return (
-        <Stack direction={"column"} height={"100vh"} width={"20vw"}>
+        <Stack
+            direction={"column"}
+            sx={[
+                {
+                    // grows with the window, but stays usable on a small
+                    // screen and does not take a quarter of a large one
+                    width: "clamp(180px, 18vw, 280px)",
+                    flexShrink: 0,
+                    // the height is the row's; a long list scrolls in it
+                    minHeight: 0,
+                    overflowY: "auto",
+                    py: 0.5,
+                    bgcolor: surfaces.light.sidebar,
+                    borderRight: 1,
+                    borderColor: "divider",
+                },
+                (theme) =>
+                    theme.applyStyles("dark", {
+                        bgcolor: surfaces.dark.sidebar,
+                    }),
+            ]}
+        >
             {files.map((file, index) => {
                 return (
                     <BarEntry
@@ -44,25 +66,34 @@ const BarEntry = ({
             sx={{
                 display: "flex",
                 flexDirection: "row",
-                justifyContent: "space-between",
+                alignItems: "center",
+                flexShrink: 0,
+                pr: 0.5,
             }}
         >
             <Stack
-                width={"100%"}
                 sx={{
-                    padding: 0.5,
-                    paddingLeft: 2,
+                    // takes the row's width, leaving the delete button its
+                    // own, and cuts a long name short rather than pushing it
+                    // out
+                    flex: 1,
+                    minWidth: 0,
+                    py: 0.5,
+                    pl: 2,
                     cursor: "pointer",
                 }}
                 onClick={click}
                 direction={"row"}
+                alignItems={"center"}
                 gap={1}
             >
                 <IbIcon />
-                <Typography>{file.filename}</Typography>
+                <Typography noWrap title={file.filename}>
+                    {file.filename}
+                </Typography>
             </Stack>
-            <IconButton onClick={del}>
-                <ClearIcon />
+            <IconButton size="small" onClick={del} aria-label="Delete file">
+                <ClearIcon fontSize="small" />
             </IconButton>
         </Box>
     );

@@ -5,7 +5,7 @@ import { CircularProgress, Stack } from "@mui/material";
 const AuthLoading = () => {
     return (
         <Stack
-            sx={{ height: "100vh" }}
+            sx={{ height: "100dvh" }}
             justifyContent={"center"}
             alignItems={"center"}
         >
