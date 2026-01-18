@@ -196,7 +196,10 @@ async fn save_file_route(
         None => return Json(RouteSuccess { success: false }),
     };
 
-    let success = sync_file(uid, id.clone(), body);
+    // missing or malformed, the save is written unguarded
+    let seq = query.0.get("seq").and_then(|s| s.parse::<u64>().ok());
+
+    let success = sync_file(uid, id.clone(), body, seq);
     Json(RouteSuccess { success: success })
 }
 

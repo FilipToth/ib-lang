@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, time::Duration};
 
 use axum::{
     extract::Request,
@@ -12,7 +12,12 @@ use reqwest::header::AUTHORIZATION;
 /// Returns `None` for any failure: unreachable backend, malformed response,
 /// or a token the backend rejected.
 pub async fn verify_jwt(jwt: &str) -> Option<String> {
-    let client = reqwest::Client::new();
+    // an auth-server that never answers would otherwise hold every request
+    // behind it open indefinitely
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok()?;
     let authorization = format!("Bearer {}", jwt);
     let url = env::var("AUTH_BACKEND_URL").unwrap();
 

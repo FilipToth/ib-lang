@@ -7,16 +7,19 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import { PlayArrowRounded } from "@mui/icons-material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
 import { RuntimeErrorRange } from "./runtimeError";
+import OutputView from "./OutputView";
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
 interface OutputProps {
     code: string;
     fileId: string | undefined;
+    filename: string | undefined;
     /// Reports where a runtime error happened so the editor can highlight it,
     /// and null once a new run starts.
     onRuntimeError: (error: RuntimeErrorRange | null) => void;
@@ -41,9 +44,13 @@ interface WebSocketMessage {
 const OutputBar: FunctionComponent<OutputProps> = ({
     code,
     fileId,
+    filename,
     onRuntimeError,
 }) => {
     const [output, setOutput] = useState("");
+    /// The file the output came from. The panel stays put when another tab is
+    /// opened, so without it the output could pass for that file's.
+    const [ranFile, setRanFile] = useState<string | null>(null);
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
     const [running, setRunning] = useState(false);
@@ -79,6 +86,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             return;
         }
 
+        setRanFile(filename ?? null);
         setSocketUrl(`${WS_URL}?token=${encodeURIComponent(jwt)}`);
     };
 
@@ -171,45 +179,59 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                     {error}
                 </Alert>
             </Snackbar>
-            <Stack>
-                <Stack direction={"row"}>
-                    <Button
-                        onClick={onClick}
-                        fullWidth
-                        sx={{
-                            gap: "10%",
-                        }}
-                        disabled={running}
+            <Stack flex={1} minWidth={0} p={1} gap={1}>
+                <Stack
+                    direction={"row"}
+                    alignItems={"center"}
+                    justifyContent={"space-between"}
+                >
+                    <Typography
+                        variant="subtitle1"
+                        fontWeight={600}
+                        noWrap
+                        title={ranFile ?? undefined}
+                        sx={{ minWidth: 0 }}
                     >
-                        <Typography>Run</Typography>
-                        {running && <CircularProgress size={20} />}
+                        {ranFile == null ? "Output" : `Output: ${ranFile}`}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        onClick={onClick}
+                        disabled={running}
+                        // a long file name is cut short instead
+                        sx={{ flexShrink: 0 }}
+                        startIcon={
+                            running ? (
+                                <CircularProgress size={16} color="inherit" />
+                            ) : (
+                                <PlayArrowRounded />
+                            )
+                        }
+                    >
+                        Run
                     </Button>
                 </Stack>
-                <TextField
-                    multiline
-                    fullWidth
-                    value={output}
-                    slotProps={{
-                        input: {
-                            readOnly: true,
-                        },
-                    }}
-                    sx={{
-                        flex: 1,
-                        "& .MuiInputBase-root": {
-                            height: "100%",
-                            alignItems: "start",
-                        },
-                    }}
-                />
-                {awaitingInput && <Typography>Awaiting User Input</Typography>}
-                <Stack direction={"row"}>
+                <OutputView output={output} />
+                {awaitingInput && (
+                    <Typography variant="body2" color="primary">
+                        Waiting for input
+                    </Typography>
+                )}
+                <Stack direction={"row"} gap={1} alignItems={"flex-start"}>
                     <TextField
                         multiline
+                        fullWidth
+                        size="small"
+                        placeholder="Input"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                     />
-                    <Button disabled={!awaitingInput} onClick={sendInput}>
+                    <Button
+                        variant="outlined"
+                        disabled={!awaitingInput}
+                        onClick={sendInput}
+                        sx={{ height: 40 }}
+                    >
                         Send
                     </Button>
                 </Stack>

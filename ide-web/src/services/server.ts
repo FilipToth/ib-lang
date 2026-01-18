@@ -93,15 +93,25 @@ export const deleteFile = async (id: string) => {
     ensureSuccess(req.data);
 };
 
-export const saveFile = async (id: string, contents: string) => {
+/// Stores `contents` as file `id`. The server refuses a save whose `seq` is no
+/// higher than one it already wrote, so a late request cannot put back older
+/// contents. `signal` abandons the request.
+export const saveFile = async (
+    id: string,
+    contents: string,
+    seq: number,
+    signal?: AbortSignal
+) => {
     const headers = await getHeaders();
     const params = {
         id: id,
+        seq: seq,
     };
 
     const req = await axios.post(`${API_BASE}save`, contents, {
         params: params,
         headers: headers,
+        signal: signal,
     });
 
     ensureSuccess(req.data);

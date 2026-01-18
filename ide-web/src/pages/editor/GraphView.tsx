@@ -91,7 +91,7 @@ const GraphView = ({ code }: { code: string }) => {
             sx={{
                 position: "relative",
                 flexGrow: 1,
-                width: "70vw",
+                width: "100%",
                 overflow: "hidden",
                 bgcolor: "#ffffff",
             }}

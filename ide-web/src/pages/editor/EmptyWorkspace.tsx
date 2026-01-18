@@ -3,8 +3,7 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 const EmptyWorkspace = ({ newFileClick }: { newFileClick: () => void }) => {
     return (
         <Box
-            width={"90vw"}
-            height={"100vh"}
+            flex={1}
             sx={{
                 display: "flex",
                 alignItems: "center",

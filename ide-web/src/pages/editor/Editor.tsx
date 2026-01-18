@@ -40,6 +40,8 @@ import LeftBar from "./LeftBar";
 import IbIcon from "./IbIcon";
 import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
 import GraphView from "./GraphView";
+import { AutoSaver } from "./autosave";
+import Splitter from "./Splitter";
 import { AccountTree } from "@mui/icons-material";
 import DeleteFileDialog from "pages/DeleteDialog";
 import { DropTarget, dropIndex, moveItem } from "./tabOrder";
@@ -131,8 +133,22 @@ const setTabDragImage = (e: React.DragEvent<HTMLElement>) => {
     );
 };
 
-/// How long typing has to pause before the open files are saved.
-const saveDelay = 1000;
+/// The output panel's width is kept across reloads under this key.
+const outputWidthKey = "ib.outputWidth";
+const minOutputWidth = 240;
+/// The narrowest the code can be squeezed by widening the output.
+const minCodeWidth = 320;
+
+const storedOutputWidth = () => {
+    try {
+        const stored = Number(localStorage.getItem(outputWidthKey));
+        if (stored >= minOutputWidth) return stored;
+    } catch {
+        // storage can be off, which leaves the default
+    }
+
+    return Math.max(minOutputWidth, Math.round(window.innerWidth * 0.35));
+};
 
 const EditorTabs = ({
     tabState,
@@ -345,12 +361,21 @@ const Editor = () => {
     const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [outputWidth, setOutputWidth] = useState(storedOutputWidth);
+
+    const resizeOutput = (width: number) => {
+        setOutputWidth(width);
+
+        try {
+            localStorage.setItem(outputWidthKey, String(width));
+        } catch {
+            // storage can be off; the width then lasts only until a reload
+        }
+    };
 
     /// The contents the server last confirmed storing, by file id. A file whose
     /// contents differ has unsaved changes.
     const [saved, setSaved] = useState<Record<string, string>>({});
-    /// Files with a save request in flight, so a slow one is not sent again.
-    const saving = useRef(new Set<string>());
 
     const isSaved = (file: IBFile) => saved[file.id] == file.contents;
 
@@ -360,6 +385,28 @@ const Editor = () => {
     const markSaved = (id: string, contents: string) => {
         setSaved((s) => ({ ...s, [id]: contents }));
     };
+
+    /// For naming a file in an error that arrives after later renders.
+    const filesRef = useRef(files);
+    filesRef.current = files;
+
+    /// Saves files as they are edited, retrying failed and hung saves until
+    /// they go through. Made once, so edits and saves outlive any one render.
+    const [saver] = useState(
+        () =>
+            new AutoSaver({
+                save: saveFile,
+                onSaved: markSaved,
+                onError: (id, _error, failures) => {
+                    // retries go on quietly; the dot shows it is still unsaved
+                    if (failures != 1) return;
+
+                    const file = filesRef.current.find((f) => f.id == id);
+                    const name = file?.filename ?? "a file";
+                    setError(`Could not save ${name}. Retrying…`);
+                },
+            })
+    );
 
     /// The editor's buffer belongs to whichever file tab is open, so it has to
     /// be written back before the open tab changes.
@@ -499,6 +546,7 @@ const Editor = () => {
         setTabState(tabs.length);
         setCode("");
         markSaved(uuid, "");
+        saver.known(uuid, "");
 
         setNewFileDialogOpen(false);
     };
@@ -524,6 +572,7 @@ const Editor = () => {
             setDelDialogIndex(null);
         }
 
+        saver.forget(file.id);
         setFiles((fs) => fs.filter((f) => f.id != file.id));
 
         // close tab
@@ -537,11 +586,19 @@ const Editor = () => {
 
     useEffect(() => {
         const loadFiles = async () => {
-            const f = await getFiles();
+            let f: IBFile[];
+            try {
+                f = await getFiles();
+            } catch {
+                setError("Could not load your files. Try reloading the page.");
+                return;
+            }
+
             setFiles(f);
             setSaved(
                 Object.fromEntries(f.map((file) => [file.id, file.contents]))
             );
+            f.forEach((file) => saver.known(file.id, file.contents));
 
             if (f.length == 0) return;
 
@@ -554,27 +611,34 @@ const Editor = () => {
         loadFiles();
     }, []);
 
-    /// Saves every file with unsaved changes once typing pauses. Files are
-    /// saved whether or not their tab is still open, so closing one right
-    /// after an edit does not lose it.
+    /// Saves at once, rather than after the pause, when the page is hidden or
+    /// left, on Ctrl/Cmd+S, and when the editor goes away (signing out).
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            for (const file of files) {
-                if (isSaved(file) || saving.current.has(file.id)) continue;
+        const onHidden = () => {
+            if (document.visibilityState == "hidden") saver.flush();
+        };
 
-                const contents = file.contents;
-                saving.current.add(file.id);
-
-                saveFile(file.id, contents)
-                    .then(() => markSaved(file.id, contents))
-                    // the dot stays, and the next edit tries again
-                    .catch(() => setError(`Could not save ${file.filename}.`))
-                    .finally(() => saving.current.delete(file.id));
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "s") {
+                // instead of the browser saving the page
+                e.preventDefault();
+                saver.flush();
             }
-        }, saveDelay);
+        };
 
-        return () => clearTimeout(timeout);
-    }, [code, files, saved]);
+        const flush = () => saver.flush();
+
+        document.addEventListener("visibilitychange", onHidden);
+        window.addEventListener("pagehide", flush);
+        window.addEventListener("keydown", onKey);
+
+        return () => {
+            document.removeEventListener("visibilitychange", onHidden);
+            window.removeEventListener("pagehide", flush);
+            window.removeEventListener("keydown", onKey);
+            saver.flush();
+        };
+    }, [saver]);
 
     const unsaved = files.some((file) => !isSaved(file));
 
@@ -599,14 +663,20 @@ const Editor = () => {
     );
 
     // CodeMirror reconfigures when this changes too, so it has to be stable
-    const onChange = useCallback((value: string, _viewUpdate: ViewUpdate) => {
-        setCode(value);
-        if (currentFile != null) currentFile.contents = value;
+    const onChange = useCallback(
+        (value: string, _viewUpdate: ViewUpdate) => {
+            setCode(value);
+            if (currentFile != null) {
+                currentFile.contents = value;
+                saver.changed(currentFile.id, value);
+            }
 
-        // the highlight belongs to the source that was run, so an edit
-        // retires it
-        setRuntimeError(null);
-    }, []);
+            // the highlight belongs to the source that was run, so an edit
+            // retires it
+            setRuntimeError(null);
+        },
+        [saver]
+    );
 
     /// The source a graph tab draws. `saveActiveCode` writes the buffer back
     /// whenever a tab changes, so the file's contents are current by the time
@@ -640,7 +710,12 @@ const Editor = () => {
                             click={openFileOrChangeTab}
                             del={deleteFileClick}
                         />
-                        <Stack direction="column" height={"100%"}>
+                        <Stack
+                            direction="column"
+                            height={"100%"}
+                            flex={1}
+                            minWidth={0}
+                        >
                             <Box
                                 display="flex"
                                 flexDirection="row"
@@ -678,7 +753,7 @@ const Editor = () => {
                             ) : (
                                 <CodeMirror
                                     height="100%"
-                                    width="70vw"
+                                    width="100%"
                                     maxHeight="100%"
                                     theme={coolGlow}
                                     extensions={extensions}
@@ -692,11 +767,31 @@ const Editor = () => {
                             )}
                         </Stack>
                         {activeTab?.kind == "file" && (
-                            <OutputBar
-                                code={code}
-                                fileId={activeTab.file.id}
-                                onRuntimeError={setRuntimeError}
-                            />
+                            <>
+                                <Splitter
+                                    width={outputWidth}
+                                    setWidth={resizeOutput}
+                                    minWidth={minOutputWidth}
+                                    minBefore={minCodeWidth}
+                                />
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexShrink: 0,
+                                        width: outputWidth,
+                                        // a narrowed window takes room from
+                                        // the output before hiding the code
+                                        maxWidth: "60%",
+                                    }}
+                                >
+                                    <OutputBar
+                                        code={code}
+                                        fileId={activeTab.file.id}
+                                        filename={activeTab.file.filename}
+                                        onRuntimeError={setRuntimeError}
+                                    />
+                                </Box>
+                            </>
                         )}
                     </Stack>
                 </Stack>
