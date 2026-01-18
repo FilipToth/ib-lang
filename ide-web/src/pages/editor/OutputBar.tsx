@@ -12,7 +12,7 @@ import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
 import { RuntimeErrorRange } from "./runtimeError";
-import OutputView from "./OutputView";
+import OutputView, { OutputEntry, appendEntry } from "./OutputView";
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
@@ -47,7 +47,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     filename,
     onRuntimeError,
 }) => {
-    const [output, setOutput] = useState("");
+    const [entries, setEntries] = useState<OutputEntry[]>([]);
     /// The file the output came from. The panel stays put when another tab is
     /// opened, so without it the output could pass for that file's.
     const [ranFile, setRanFile] = useState<string | null>(null);
@@ -59,13 +59,18 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
     const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
 
-    const showError = (msg: string) => {
-        setError(msg);
-        setTimeout(() => setError(null), 4000);
+    /// Puts a line in the output panel: what the program printed, or why it
+    /// stopped.
+    const append = (kind: OutputEntry["kind"], text: string) => {
+        setEntries((es) => appendEntry(es, kind, text));
     };
 
+    /// For problems that are not the program's: the snackbar clears itself,
+    /// rather than on a timer of its own that a later error would outlive.
+    const showError = (msg: string) => setError(msg);
+
     const onClick = async () => {
-        setOutput("");
+        setEntries([]);
         onRuntimeError(null);
         if (WS_URL == undefined) {
             console.error("Wrong env config, websockets url is undefined");
@@ -104,17 +109,14 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                 setAwaitingInput(true);
                 break;
             case WebSocketMessageKind.Output:
-                setOutput((val) => (val += msg.payload));
+                append("output", msg.payload);
                 break;
             case WebSocketMessageKind.RuntimeError:
-                // display error
-                setError("Runtime Error: " + msg.payload);
-                setTimeout(() => {
-                    setError(null);
-                }, 4000);
+                // in the output, where it belongs to the run that caused it
+                // and stays until the next one
+                append("error", `\nRuntime error: ${msg.payload}\n`);
 
-                // the snackbar goes away on its own, the highlight stays until
-                // the next run or the next edit
+                // the highlight stays until the next run or the next edit
                 if (
                     msg.offset_start != undefined &&
                     msg.offset_end != undefined
@@ -129,7 +131,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             case WebSocketMessageKind.AnalysisError:
                 // the program was not run at all, and the linter already
                 // underlines why
-                showError("Cannot run: " + msg.payload);
+                append("error", `Cannot run: ${msg.payload}\n`);
                 break;
         }
     }, [lastMessage]);
@@ -174,8 +176,16 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             <Snackbar
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
                 open={error != null}
+                autoHideDuration={4000}
+                onClose={(_, reason) => {
+                    if (reason != "clickaway") setError(null);
+                }}
             >
-                <Alert severity="error" variant="filled">
+                <Alert
+                    severity="error"
+                    variant="filled"
+                    onClose={() => setError(null)}
+                >
                     {error}
                 </Alert>
             </Snackbar>
@@ -211,7 +221,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                         Run
                     </Button>
                 </Stack>
-                <OutputView output={output} />
+                <OutputView entries={entries} />
                 {awaitingInput && (
                     <Typography variant="body2" color="primary">
                         Waiting for input

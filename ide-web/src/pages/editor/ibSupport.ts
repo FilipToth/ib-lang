@@ -10,7 +10,7 @@ import {
 import { styleTags, tags as t } from "@lezer/highlight";
 import ibCompletions from "./autocomplete";
 import ibLinter from "./lint";
-import { Tree } from "@lezer/common";
+import { SyntaxNode, Tree } from "@lezer/common";
 
 const LANG_DEF = LRLanguage.define({
     parser: parser.configure({
@@ -71,14 +71,27 @@ const indentingNodes = new Set([
     "UntilStatement",
 ]);
 
+/// Whether `pos` is inside the body of `node`, which is what earns a level of
+/// indentation.
+const insideBody = (node: SyntaxNode, pos: number) => {
+    if (!indentingNodes.has(node.name)) return false;
+
+    // past the statement's `end`, its body is behind us: a line after a
+    // finished if is no deeper than the if itself
+    const end = node.getChild("EndKeyword");
+    return end == null || pos <= end.from;
+};
+
 export const getIndent = (tree: Tree, pos: number, unit: number) => {
-    let node = tree.resolveInner(pos, 1);
+    // the statement being typed has nothing after the cursor to hold it
+    // together yet, so what encloses the cursor is found from the text before
+    // it. Looking forward instead finds only the whole program, which is why
+    // a line after `if a then` at the end of the file was not indented.
+    let node: SyntaxNode | null = tree.resolveInner(pos, -1);
     let indent = 0;
 
-    while (node.parent) {
-        if (indentingNodes.has(node.name)) {
-            indent += unit;
-        }
+    while (node != null) {
+        if (insideBody(node, pos)) indent += unit;
 
         node = node.parent;
     }

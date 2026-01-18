@@ -4,12 +4,36 @@ import { useLayoutEffect, useRef } from "react";
 /// How close to the bottom, in pixels, still counts as at the bottom.
 const bottomSlack = 16;
 
-/// A program's output, as it printed it, following along as more arrives.
+/// A piece of what a run has put out: what the program printed, or a problem
+/// that stopped it.
+export interface OutputEntry {
+    kind: "output" | "error";
+    text: string;
+}
+
+/// `entries` with `text` added to it. Text of the kind the last piece already
+/// has joins it, rather than making a piece of its own.
+export const appendEntry = (
+    entries: OutputEntry[],
+    kind: OutputEntry["kind"],
+    text: string
+): OutputEntry[] => {
+    const last = entries[entries.length - 1];
+    if (last?.kind != kind) return [...entries, { kind, text }];
+
+    return [
+        ...entries.slice(0, -1),
+        { kind, text: last.text + text },
+    ];
+};
+
+/// A program's output, as it printed it, with anything that went wrong in
+/// the error colour, following along as more arrives.
 ///
 /// Following stops once the reader scrolls up to look at something, so new
 /// output does not pull them away from it, and starts again when they scroll
 /// back to the bottom or a new run clears the output.
-const OutputView = ({ output }: { output: string }) => {
+const OutputView = ({ entries }: { entries: OutputEntry[] }) => {
     const panel = useRef<HTMLDivElement | null>(null);
     const following = useRef(true);
 
@@ -26,9 +50,9 @@ const OutputView = ({ output }: { output: string }) => {
         const el = panel.current;
         if (el == null) return;
 
-        if (output == "") following.current = true;
+        if (entries.length == 0) following.current = true;
         if (following.current) el.scrollTop = el.scrollHeight;
-    }, [output]);
+    }, [entries]);
 
     return (
         <Box
@@ -65,7 +89,7 @@ const OutputView = ({ output }: { output: string }) => {
                     }),
             ]}
         >
-            {output == "" ? (
+            {entries.length == 0 ? (
                 <Typography
                     component="span"
                     sx={{ font: "inherit", color: "text.disabled" }}
@@ -73,7 +97,21 @@ const OutputView = ({ output }: { output: string }) => {
                     Output appears here when you run the program.
                 </Typography>
             ) : (
-                output
+                entries.map((entry, index) => (
+                    <Box
+                        component="span"
+                        key={index}
+                        data-kind={entry.kind}
+                        sx={{
+                            color:
+                                entry.kind == "error"
+                                    ? "error.main"
+                                    : "inherit",
+                        }}
+                    >
+                        {entry.text}
+                    </Box>
+                ))
             )}
         </Box>
     );
