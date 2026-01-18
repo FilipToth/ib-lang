@@ -3,15 +3,29 @@ import { DropTarget, dropIndex, moveItem } from "./tabOrder";
 
 /// An open tab. Files are edited; graphs are drawn from the DOT the analyzer
 /// produces, and are read-only.
-export type EditorTab =
-    | { kind: "file"; file: IBFile }
-    | { kind: "graph"; id: string; title: string; fileId: string | null };
+export interface GraphTab {
+    kind: "graph";
+    id: string;
+    title: string;
+    fileId: string | null;
+}
+
+export type EditorTab = { kind: "file"; file: IBFile } | GraphTab;
 
 export const tabId = (tab: EditorTab) =>
     tab.kind == "file" ? tab.file.id : tab.id;
 
 export const tabTitle = (tab: EditorTab) =>
     tab.kind == "file" ? tab.file.filename : tab.title;
+
+/// The graph tab of `file`. Its id is what tells one graph tab from another,
+/// so it is made here rather than at each place one is opened.
+export const graphTab = (file: IBFile | null): GraphTab => ({
+    kind: "graph",
+    id: file == null ? "graph" : `graph:${file.id}`,
+    title: file == null ? "Control Flow" : `${file.filename} flow`,
+    fileId: file?.id ?? null,
+});
 
 /// One side of the editor: its own tabs, one of them open.
 export interface Pane {

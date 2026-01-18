@@ -45,11 +45,18 @@ import {
     eachTab,
     findTab,
     focusTab,
+    graphTab,
     moveTab,
     openTab,
     singlePane,
 } from "./panes";
 import { DropTarget } from "./tabOrder";
+import {
+    loadStoredSession,
+    restoreSession,
+    sessionOf,
+    storeSession,
+} from "./session";
 import { v4 as uuidv4 } from "uuid";
 
 /// Widths the panels are dragged to are kept across reloads under these keys.
@@ -238,23 +245,16 @@ const Editor = () => {
     /// the other pane afterwards leaves it a full-width tab of its own.
     const openGraph = () => {
         const file = graphFile();
-        const id = file == null ? "graph" : `graph:${file.id}`;
+        const tab = graphTab(file);
 
         const open = findTab(
             panes,
-            (tab) => tab.kind == "graph" && tab.id == id
+            (t) => t.kind == "graph" && t.id == tab.id
         );
         if (open != null) {
             focusPane(open);
             return;
         }
-
-        const tab: EditorTab = {
-            kind: "graph",
-            id: id,
-            title: file == null ? "Control Flow" : `${file.filename} flow`,
-            fileId: file?.id ?? null,
-        };
 
         // beside the code rather than over it: the other pane, made if the
         // editor is not split yet
@@ -384,6 +384,10 @@ const Editor = () => {
         if (open != null) closePaneTab(open.pane, open.index);
     };
 
+    /// Whether the tabs from last time have been reopened. Until they have,
+    /// the panes are empty and must not be stored over them.
+    const restored = useRef(false);
+
     useEffect(() => {
         const loadFiles = async () => {
             let f: IBFile[];
@@ -399,10 +403,22 @@ const Editor = () => {
                 Object.fromEntries(f.map((file) => [file.id, file.contents]))
             );
             f.forEach((file) => saver.known(file.id, file.contents));
+
+            const session = restoreSession(loadStoredSession(), f);
+            setPanes(session.panes);
+            setFocused(session.focused);
+            restored.current = true;
         };
 
         loadFiles();
     }, [saver]);
+
+    /// Keeps the open tabs for the next visit.
+    useEffect(() => {
+        if (!restored.current) return;
+
+        storeSession(sessionOf(panes, focused));
+    }, [panes, focused]);
 
     /// Saves at once, rather than after the pause, when the page is hidden or
     /// left, on Ctrl/Cmd+S, and when the editor goes away (signing out).
