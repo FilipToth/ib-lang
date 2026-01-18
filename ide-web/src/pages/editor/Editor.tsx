@@ -1,10 +1,5 @@
-import CodeMirror, { Prec, ViewUpdate, keymap } from "@uiw/react-codemirror";
-import { ib } from "./ibSupport";
-import { indentLess, indentMore } from "@codemirror/commands";
-import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
-import { indentUnit } from "@codemirror/language";
 import OutputBar from "./OutputBar";
-import React, {
+import {
     useCallback,
     useEffect,
     useMemo,
@@ -20,9 +15,6 @@ import {
     Tooltip,
     Stack,
     Snackbar,
-    SxProps,
-    Tab,
-    Tabs,
     Typography,
 } from "@mui/material";
 import {
@@ -34,363 +26,106 @@ import {
     renameFile,
     saveFile,
 } from "services/server";
-import { Add, Clear, FiberManualRecord } from "@mui/icons-material";
+import { AccountTree, Add, VerticalSplit } from "@mui/icons-material";
 import FileNameDialog from "./FileNameDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
-import IbIcon from "./IbIcon";
-import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
-import GraphView from "./GraphView";
+import { RuntimeErrorRange } from "./runtimeError";
 import { AutoSaver } from "./autosave";
-import { darkEditorTheme, lightEditorTheme } from "./editorTheme";
-import { useResolvedMode } from "theme";
 import Splitter from "./Splitter";
-import { AccountTree } from "@mui/icons-material";
 import DeleteFileDialog from "pages/DeleteDialog";
-import { DropTarget, dropIndex, moveItem } from "./tabOrder";
+import EditorPane from "./EditorPane";
+import { TabDrag } from "./EditorTabs";
+import {
+    EditorTab,
+    Pane,
+    TabRef,
+    activeTab,
+    closeTab,
+    eachTab,
+    findTab,
+    focusTab,
+    moveTab,
+    openTab,
+    singlePane,
+} from "./panes";
+import { DropTarget } from "./tabOrder";
 import { v4 as uuidv4 } from "uuid";
 
-export let currentFile: IBFile | null = null;
-
-/// An open tab. Files are edited; graphs are drawn from the DOT the analyzer
-/// produces, and are read-only.
-type EditorTab =
-    | { kind: "file"; file: IBFile }
-    | { kind: "graph"; id: string; title: string; fileId: string | null };
-
-const tabId = (tab: EditorTab) => (tab.kind == "file" ? tab.file.id : tab.id);
-
-const tabTitle = (tab: EditorTab) =>
-    tab.kind == "file" ? tab.file.filename : tab.title;
-
-const tabHeight = 36;
-const tabStyle: SxProps = {
-    height: tabHeight,
-    minHeight: tabHeight,
-};
-
-/// The editor's extensions that never change. They are built once, because
-/// CodeMirror reconfigures itself whenever it is handed new ones.
-const baseExtensions = [
-    ib(),
-    Prec.highest(
-        keymap.of([
-            {
-                key: "Tab",
-                run: (e) => {
-                    if (!completionStatus(e.state)) return indentMore(e);
-
-                    return acceptCompletion(e);
-                },
-                shift: indentLess,
-            },
-        ])
-    ),
-    indentUnit.of("    "),
-];
-
-/// The file icon for the drag picture, loaded up front. The browser takes the
-/// picture as the drag starts, before a freshly made image could be drawn, so
-/// a copy of the tab's own icon would come out blank.
-const dragIcon = new Image(24, 24);
-dragIcon.src = "assets/ib.png";
-
-/// Holds the drag picture. It stays in the page between drags, so the icon
-/// in it never has to be drawn anew.
-let dragImage: HTMLDivElement | null = null;
-
-/// Makes the picture that follows the cursor while a tab is dragged just its
-/// icon and name. Left to itself, the browser snapshots the tab's whole area,
-/// which picks up the code beneath it.
-const setTabDragImage = (e: React.DragEvent<HTMLElement>) => {
-    const label = e.currentTarget.querySelector(".tab-label");
-    if (label == null) return;
-
-    if (dragImage == null) {
-        dragImage = document.createElement("div");
-        Object.assign(dragImage.style, {
-            position: "fixed",
-            // it has to be rendered to be pictured, but not where it can be
-            // seen
-            top: "-1000px",
-            left: "-1000px",
-            display: "flex",
-            padding: "4px 8px",
-            borderRadius: "4px",
-            // the page's colours, whichever mode it is in
-            background: "var(--mui-palette-background-paper)",
-            color: "var(--mui-palette-text-primary)",
-            border: "1px solid var(--mui-palette-divider)",
-        });
-        document.body.appendChild(dragImage);
-    }
-
-    const copy = label.cloneNode(true) as HTMLElement;
-    copy.querySelector("img")?.replaceWith(dragIcon);
-    dragImage.replaceChildren(copy);
-
-    // held where it was grabbed, relative to the tab
-    const rect = e.currentTarget.getBoundingClientRect();
-    e.dataTransfer.setDragImage(
-        dragImage,
-        Math.min(e.clientX - rect.left, dragImage.offsetWidth),
-        dragImage.offsetHeight / 2
-    );
-};
-
-/// The output panel's width is kept across reloads under this key.
+/// Widths the panels are dragged to are kept across reloads under these keys.
 const outputWidthKey = "ib.outputWidth";
+const splitWidthKey = "ib.splitWidth";
+
 const minOutputWidth = 240;
-/// The narrowest the code can be squeezed by widening the output.
+const minSplitWidth = 280;
+/// The narrowest the code can be squeezed by widening what is beside it.
 const minCodeWidth = 320;
 
-const storedOutputWidth = () => {
-    try {
-        const stored = Number(localStorage.getItem(outputWidthKey));
-        if (stored >= minOutputWidth) return stored;
-    } catch {
-        // storage can be off, which leaves the default
-    }
+/// A width the panel keeps across reloads, starting at `fraction` of the
+/// window.
+const useStoredWidth = (key: string, min: number, fraction: number) => {
+    const [width, setWidth] = useState(() => {
+        try {
+            const stored = Number(localStorage.getItem(key));
+            if (stored >= min) return stored;
+        } catch {
+            // storage can be off, which leaves the default
+        }
 
-    return Math.max(minOutputWidth, Math.round(window.innerWidth * 0.35));
-};
+        return Math.max(min, Math.round(window.innerWidth * fraction));
+    });
 
-const EditorTabs = ({
-    tabState,
-    tabs,
-    isDirty,
-    changeTab,
-    closeTab,
-    moveTab,
-}: {
-    tabState: number;
-    tabs: EditorTab[];
-    isDirty: (tab: EditorTab) => boolean;
-    changeTab: (index: number) => void;
-    closeTab: (index: number) => void;
-    moveTab: (from: number, to: number) => void;
-}) => {
-    /// The tab being dragged. Kept here rather than in the drag data, which
-    /// cannot be read until the drop, and so that drags from elsewhere (text,
-    /// files) are ignored.
-    const dragFrom = useRef<number | null>(null);
-    const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+    const resize = (width: number) => {
+        setWidth(width);
 
-    const endDrag = () => {
-        dragFrom.current = null;
-        setDropTarget(null);
+        try {
+            localStorage.setItem(key, String(width));
+        } catch {
+            // storage can be off; the width then lasts only until a reload
+        }
     };
 
-    const drop = () => {
-        const from = dragFrom.current;
-        endDrag();
-
-        if (from == null || dropTarget == null) return;
-
-        moveTab(from, dropIndex(from, dropTarget));
-    };
-
-    return (
-        <Tabs
-            value={tabState}
-            onChange={(_, index) => changeTab(index)}
-            variant="scrollable"
-            scrollButtons="auto"
-            onDragLeave={(e) => {
-                // dragleave also fires moving between a tab's children
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                    setDropTarget(null);
-                }
-            }}
-            sx={{
-                ...tabStyle,
-                // takes the row's spare width, and scrolls when the tabs
-                // need more
-                flex: 1,
-                minWidth: 0,
-            }}
-        >
-            {tabs.map((tab, index) => {
-                const dirty = isDirty(tab);
-
-                const marker =
-                    dropTarget?.index == index ? dropTarget.side : null;
-
-                return (
-                    <Tab
-                        key={tabId(tab)}
-                        value={index}
-                        // firefox does not drag buttons, which a tab
-                        // renders as by default
-                        component="div"
-                        draggable
-                        onDragStart={(e: React.DragEvent<HTMLElement>) => {
-                            dragFrom.current = index;
-                            e.dataTransfer.effectAllowed = "move";
-                            // firefox only starts a drag that carries data;
-                            // a type of its own keeps it from being dropped
-                            // into the editor as text
-                            e.dataTransfer.setData("application/x-ib-tab", "");
-                            setTabDragImage(e);
-                        }}
-                        onDragOver={(e: React.DragEvent<HTMLElement>) => {
-                            if (dragFrom.current == null) return;
-
-                            // accepting the drop
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = "move";
-
-                            const { left, width } =
-                                e.currentTarget.getBoundingClientRect();
-                            const side =
-                                e.clientX < left + width / 2
-                                    ? "before"
-                                    : "after";
-
-                            if (
-                                dropTarget?.index != index ||
-                                dropTarget.side != side
-                            ) {
-                                setDropTarget({ index, side });
-                            }
-                        }}
-                        onDrop={(e: React.DragEvent) => {
-                            e.preventDefault();
-                            drop();
-                        }}
-                        onDragEnd={endDrag}
-                        label={
-                            <span>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        flexDirection: "row",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        gap: 1,
-                                    }}
-                                    onClick={(e) => changeTab(index)}
-                                >
-                                    <Box
-                                        className="tab-label"
-                                        sx={{
-                                            display: "flex",
-                                            flexDirection: "row",
-                                            alignItems: "center",
-                                            gap: 1,
-                                        }}
-                                    >
-                                        {tab.kind == "file" ? (
-                                            <IbIcon />
-                                        ) : (
-                                            <AccountTree fontSize="small" />
-                                        )}
-                                        <Typography
-                                            noWrap
-                                            sx={{ maxWidth: 240 }}
-                                        >
-                                            {tabTitle(tab)}
-                                        </Typography>
-                                    </Box>
-                                    {/* the slot keeps its width whatever
-                                        it shows, so hovering does not
-                                        shift the tabs */}
-                                    <Box
-                                        sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            width: 24,
-                                            height: 24,
-                                        }}
-                                    >
-                                        {dirty && (
-                                            <FiberManualRecord
-                                                className="dirty-dot"
-                                                titleAccess="Unsaved changes"
-                                                sx={{ fontSize: 12 }}
-                                            />
-                                        )}
-                                        <IconButton
-                                            className="close-button"
-                                            onClick={(e) => {
-                                                // prevent mui tab switches
-                                                e.stopPropagation();
-                                                closeTab(index);
-                                            }}
-                                            sx={{
-                                                p: 0,
-                                            }}
-                                        >
-                                            <Clear />
-                                        </IconButton>
-                                    </Box>
-                                </Box>
-                            </span>
-                        }
-                        iconPosition="start"
-                        sx={{
-                            ...tabStyle,
-                            textTransform: "none",
-                            // no vertical padding: the height above sets
-                            // it, and padding would squeeze the label
-                            py: 0,
-                            px: 1.5,
-                            // like vscode: the open tab shows its close
-                            // button, an unsaved one a dot in its place, and
-                            // hovering any tab turns either into the button
-                            "& .close-button": {
-                                display:
-                                    tabState == index && !dirty
-                                        ? "inline-flex"
-                                        : "none",
-                            },
-                            "&:hover .close-button": {
-                                display: "inline-flex",
-                            },
-                            "&:hover .dirty-dot": {
-                                display: "none",
-                            },
-                            // a line on the side the dragged tab would land
-                            boxShadow:
-                                marker == "before"
-                                    ? "inset 2px 0 0 currentColor"
-                                    : marker == "after"
-                                    ? "inset -2px 0 0 currentColor"
-                                    : "none",
-                        }}
-                    />
-                );
-            })}
-        </Tabs>
-    );
+    return [width, resize] as const;
 };
+
+/// Where a runtime error happened, and in which file: the panes each show the
+/// highlight only if they hold that file.
+interface FileRuntimeError {
+    fileId: string;
+    range: RuntimeErrorRange;
+}
 
 const Editor = () => {
-    const [code, setCode] = useState("");
-    const [runtimeError, setRuntimeError] = useState<RuntimeErrorRange | null>(
+    /// The editor is one pane, or two side by side. A tab is open in one of
+    /// them, never both.
+    const [panes, setPanes] = useState<Pane[]>(singlePane);
+    /// The pane a new file or graph opens in.
+    const [focused, setFocused] = useState(0);
+    const [files, setFiles] = useState<IBFile[]>([]);
+    const [runtimeError, setRuntimeError] = useState<FileRuntimeError | null>(
         null
     );
-    const [tabState, setTabState] = useState(0);
-    const [tabs, setTabs] = useState<EditorTab[]>([]);
-    const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
     /// The file the rename dialog is open for.
     const [renaming, setRenaming] = useState<IBFile | null>(null);
     const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [outputWidth, setOutputWidth] = useState(storedOutputWidth);
 
-    const resizeOutput = (width: number) => {
-        setOutputWidth(width);
+    const [outputWidth, resizeOutput] = useStoredWidth(
+        outputWidthKey,
+        minOutputWidth,
+        0.35
+    );
+    const [splitWidth, resizeSplit] = useStoredWidth(
+        splitWidthKey,
+        minSplitWidth,
+        0.4
+    );
 
-        try {
-            localStorage.setItem(outputWidthKey, String(width));
-        } catch {
-            // storage can be off; the width then lasts only until a reload
-        }
-    };
+    /// Bumped by every edit. Files are edited in place, so this is what tells
+    /// the tabs, the graphs and the output panel that they have changed.
+    const [, setEdits] = useState(0);
 
     /// The contents the server last confirmed storing, by file id. A file whose
     /// contents differ has unsaved changes.
@@ -427,66 +162,92 @@ const Editor = () => {
             })
     );
 
-    /// The editor's buffer belongs to whichever file tab is open, so it has to
-    /// be written back before the open tab changes.
-    const saveActiveCode = () => {
-        const active = tabs[tabState];
-        if (active == null || active.kind != "file") return;
+    /// An edit of `file` in one of the panes.
+    const onEdit = useCallback(
+        (file: IBFile, contents: string) => {
+            file.contents = contents;
+            saver.changed(file.id, contents);
+            setEdits((n) => n + 1);
 
-        active.file.contents = code;
+            // the highlight belongs to the source that was run
+            setRuntimeError((e) => (e?.fileId == file.id ? null : e));
+        },
+        [saver]
+    );
+
+    const focusPane = (ref: TabRef) => {
+        setPanes((ps) => focusTab(ps, ref));
+        setFocused(ref.pane);
     };
 
-    /// Points the editor at `tab`, if it is a file. A graph tab leaves the
-    /// buffer alone: it is opened alongside a file, not instead of one.
-    const showTab = (tab: EditorTab | undefined) => {
-        if (tab == null || tab.kind != "file") return;
+    /// Moves a tab within its pane or to the other one, and follows it.
+    const dragFrom = useRef<TabRef | null>(null);
+    const drag: TabDrag = useMemo(
+        () => ({
+            begin: (from) => {
+                dragFrom.current = from;
+            },
+            from: () => dragFrom.current,
+            end: () => {
+                dragFrom.current = null;
+            },
+            drop: (pane: number, target: DropTarget | null) => {
+                const from = dragFrom.current;
+                dragFrom.current = null;
+                if (from == null) return;
 
-        currentFile = tab.file;
-        setCode(tab.file.contents);
-    };
+                setPanes((ps) => {
+                    const moved = moveTab(ps, from, pane, target);
+                    setFocused(moved.focus.pane);
 
-    const changeTab = (index: number) => {
-        saveActiveCode();
-        showTab(tabs[index]);
-        setTabState(index);
-    };
+                    return moved.panes;
+                });
+            },
+        }),
+        []
+    );
 
     const openFileOrChangeTab = (fileIndex: number) => {
         const file = files[fileIndex];
-        const tabIndex = tabs.findIndex(
+        const open = findTab(
+            panes,
             (tab) => tab.kind == "file" && tab.file.id == file.id
         );
 
-        if (tabIndex != -1) {
-            changeTab(tabIndex);
+        // a file is open in one pane only; opening it again goes to it
+        if (open != null) {
+            focusPane(open);
             return;
         }
 
-        saveActiveCode();
-        setTabs([...tabs, { kind: "file", file: file }]);
-
-        currentFile = file;
-        setCode(file.contents);
-        setTabState(tabs.length);
+        setPanes(openTab(panes, focused, { kind: "file", file: file }));
     };
 
-    /// Opens the control flow graph of the file in the open tab, as a tab of
-    /// its own, or returns to it when it is already open.
+    /// The file whose graph a graph tab of the focused pane would draw: the
+    /// open one, or the one open in the other pane when a graph is in front.
+    const graphFile = (): IBFile | null => {
+        const inFocus = activeTab(panes[focused]);
+        if (inFocus?.kind == "file") return inFocus.file;
+
+        const other = activeTab(panes[1 - focused]);
+        return other?.kind == "file" ? other.file : null;
+    };
+
+    /// Opens the control flow graph of the open file beside it, splitting the
+    /// editor, or returns to it when it is already open. Dragging the tab to
+    /// the other pane afterwards leaves it a full-width tab of its own.
     const openGraph = () => {
-        const active = tabs[tabState];
-        const file = active?.kind == "file" ? active.file : null;
+        const file = graphFile();
         const id = file == null ? "graph" : `graph:${file.id}`;
 
-        const existing = tabs.findIndex(
+        const open = findTab(
+            panes,
             (tab) => tab.kind == "graph" && tab.id == id
         );
-
-        if (existing != -1) {
-            changeTab(existing);
+        if (open != null) {
+            focusPane(open);
             return;
         }
-
-        saveActiveCode();
 
         const tab: EditorTab = {
             kind: "graph",
@@ -495,42 +256,42 @@ const Editor = () => {
             fileId: file?.id ?? null,
         };
 
-        setTabs([...tabs, tab]);
-        setTabState(tabs.length);
+        // beside the code rather than over it: the other pane, made if the
+        // editor is not split yet
+        const beside = panes.length > 1 ? 1 - focused : focused + 1;
+
+        setPanes(openTab(panes, beside, tab));
+        setFocused(beside);
     };
 
-    /// Moves the tab at `from` to `to`, keeping the open tab open.
-    const moveTab = (from: number, to: number) => {
-        if (from == to) return;
+    /// Moves the open tab to the other side, splitting the editor or, when
+    /// the pane it leaves empties, ending the split.
+    const moveToOtherSide = () => {
+        const pane = panes[focused];
+        if (activeTab(pane) == null) return;
 
-        const active = tabs[tabState];
-        const newTabs = moveItem(tabs, from, to);
+        const other = panes.length > 1 ? 1 - focused : focused + 1;
+        const moved = moveTab(
+            panes,
+            { pane: focused, index: pane.active },
+            other,
+            null
+        );
 
-        setTabs(newTabs);
-        setTabState(newTabs.indexOf(active));
+        setPanes(moved.panes);
+        setFocused(moved.focus.pane);
     };
 
-    const closeTab = (index: number) => {
-        const closed = tabs[index];
-        const newTabs = tabs.filter((_, i) => i != index);
+    const changeTab = (pane: number, index: number) => {
+        focusPane({ pane, index });
+    };
 
-        // closing a tab before the open one shifts it left; closing the open
-        // one falls back to its neighbour
-        let newIndex = tabState;
-        if (index < tabState) {
-            newIndex = tabState - 1;
-        } else if (index == tabState) {
-            newIndex = index > 0 ? index - 1 : 0;
-        }
+    const closePaneTab = (pane: number, index: number) => {
+        const next = closeTab(panes, { pane, index });
 
-        if (closed.kind == "file" && currentFile?.id == closed.file.id) {
-            currentFile = null;
-        }
-
-        showTab(newTabs[newIndex]);
-
-        setTabs(newTabs);
-        setTabState(newIndex);
+        setPanes(next);
+        // the pane may have gone with its last tab
+        setFocused((f) => Math.min(f, next.length - 1));
     };
 
     const addFile = () => {
@@ -557,12 +318,7 @@ const Editor = () => {
         };
 
         setFiles([...files, file]);
-        setTabs([...tabs, { kind: "file", file: file }]);
-        currentFile = file;
-
-        // tabs length isn't updated yet :D
-        setTabState(tabs.length);
-        setCode("");
+        setPanes(openTab(panes, focused, { kind: "file", file: file }));
         markSaved(uuid, "");
         saver.known(uuid, "");
 
@@ -583,12 +339,15 @@ const Editor = () => {
 
         file.filename = filename;
         setFiles((fs) => [...fs]);
-        setTabs((ts) =>
-            ts.map((tab) =>
-                tab.kind == "graph" && tab.fileId == file.id
-                    ? { ...tab, title: `${filename} flow` }
-                    : tab
-            )
+        setPanes((ps) =>
+            ps.map((pane) => ({
+                ...pane,
+                tabs: pane.tabs.map((tab) =>
+                    tab.kind == "graph" && tab.fileId == file.id
+                        ? { ...tab, title: `${filename} flow` }
+                        : tab
+                ),
+            }))
         );
 
         setRenaming(null);
@@ -618,13 +377,11 @@ const Editor = () => {
         saver.forget(file.id);
         setFiles((fs) => fs.filter((f) => f.id != file.id));
 
-        // close tab
-        const tabIndex = tabs.findIndex(
-            (t) => t.kind == "file" && t.file.id == file.id
+        const open = findTab(
+            panes,
+            (tab) => tab.kind == "file" && tab.file.id == file.id
         );
-        if (tabIndex != -1) {
-            closeTab(tabIndex);
-        }
+        if (open != null) closePaneTab(open.pane, open.index);
     };
 
     useEffect(() => {
@@ -642,17 +399,10 @@ const Editor = () => {
                 Object.fromEntries(f.map((file) => [file.id, file.contents]))
             );
             f.forEach((file) => saver.known(file.id, file.contents));
-
-            if (f.length == 0) return;
-
-            const file = f[tabState];
-            setCode(file.contents);
-
-            currentFile = file;
         };
 
         loadFiles();
-    }, []);
+    }, [saver]);
 
     /// Saves at once, rather than after the pause, when the page is hidden or
     /// left, on Ctrl/Cmd+S, and when the editor goes away (signing out).
@@ -698,47 +448,82 @@ const Editor = () => {
         return () => window.removeEventListener("beforeunload", warn);
     }, [unsaved]);
 
-    // a new array would make CodeMirror reconfigure itself, so it is rebuilt
-    // only when the highlight changes, not on every keystroke
-    const extensions = useMemo(
-        () => [...baseExtensions, runtimeErrorHighlight(runtimeError)],
-        [runtimeError]
-    );
-
-    // CodeMirror reconfigures when this changes too, so it has to be stable
-    const onChange = useCallback(
-        (value: string, _viewUpdate: ViewUpdate) => {
-            setCode(value);
-            if (currentFile != null) {
-                currentFile.contents = value;
-                saver.changed(currentFile.id, value);
-            }
-
-            // the highlight belongs to the source that was run, so an edit
-            // retires it
-            setRuntimeError(null);
-        },
-        [saver]
-    );
-
-    /// The source a graph tab draws. `saveActiveCode` writes the buffer back
-    /// whenever a tab changes, so the file's contents are current by the time
-    /// its graph is on screen.
+    /// The source a graph draws, read from the file itself, so it follows
+    /// edits made in the pane beside it.
     const graphSource = (fileId: string | null) => {
         if (fileId == null) return "";
 
-        const open = tabs.find(
-            (tab) => tab.kind == "file" && tab.file.id == fileId
-        );
-
-        if (open?.kind == "file") return open.file.contents;
-
-        // the file's tab may have been closed while its graph stayed open
         return files.find((f) => f.id == fileId)?.contents ?? "";
     };
 
-    const activeTab = tabs[tabState];
-    const mode = useResolvedMode();
+    /// The file the output panel runs and reports on: the one in front of the
+    /// focused pane, or the one the other pane holds while a graph is.
+    const outputFile = graphFile();
+
+    const paneActions = (pane: number) =>
+        pane != focused ? null : (
+            // icon buttons: a Button with only an icon keeps the width of a
+            // text button
+            <Box flexShrink={0} px={0.5}>
+                <Tooltip title="Control flow graph">
+                    <IconButton
+                        size="small"
+                        onClick={openGraph}
+                        aria-label="Control flow graph"
+                    >
+                        <AccountTree fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip
+                    title={
+                        panes.length > 1
+                            ? "Move to the other side"
+                            : "Split: move to the other side"
+                    }
+                >
+                    <IconButton
+                        size="small"
+                        onClick={moveToOtherSide}
+                        aria-label="Move the open tab to the other side"
+                    >
+                        <VerticalSplit fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="New file">
+                    <IconButton
+                        size="small"
+                        onClick={addFile}
+                        aria-label="New file"
+                    >
+                        <Add fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+        );
+
+    const renderPane = (pane: Pane, index: number) => (
+        <EditorPane
+            key={index}
+            index={index}
+            pane={pane}
+            focused={index == focused}
+            split={panes.length > 1}
+            onFocus={() => setFocused(index)}
+            isDirty={isDirty}
+            drag={drag}
+            changeTab={(tab) => changeTab(index, tab)}
+            closeTab={(tab) => closePaneTab(index, tab)}
+            onEdit={onEdit}
+            runtimeError={
+                runtimeError != null &&
+                activeTabFileId(pane) == runtimeError.fileId
+                    ? runtimeError.range
+                    : null
+            }
+            graphSource={graphSource}
+            actions={paneActions(index)}
+        />
+    );
 
     return (
         <>
@@ -763,81 +548,32 @@ const Editor = () => {
                         rename={(index) => setRenaming(files[index])}
                         del={deleteFileClick}
                     />
-                    <Stack
-                        direction="column"
-                        flex={1}
-                        minWidth={0}
-                        minHeight={0}
-                    >
-                        <Box
-                            display="flex"
-                            flexDirection="row"
-                            alignItems="center"
-                            flexShrink={0}
-                        >
-                            <EditorTabs
-                                tabState={tabState}
-                                tabs={tabs}
-                                isDirty={isDirty}
-                                changeTab={changeTab}
-                                closeTab={closeTab}
-                                moveTab={moveTab}
+                    {eachTab(panes).length == 0 ? (
+                        <EmptyWorkspace newFileClick={addFile} />
+                    ) : (
+                        renderPane(panes[0], 0)
+                    )}
+                    {panes.length > 1 && (
+                        <>
+                            <Splitter
+                                width={splitWidth}
+                                setWidth={resizeSplit}
+                                minWidth={minSplitWidth}
+                                minBefore={minCodeWidth}
                             />
-                            {/* icon buttons: a Button with only an icon
-                                keeps the width of a text button */}
-                            <Box flexShrink={0} px={0.5}>
-                                <Tooltip title="Control flow graph">
-                                    <IconButton
-                                        size="small"
-                                        onClick={openGraph}
-                                        aria-label="Control flow graph"
-                                    >
-                                        <AccountTree fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title="New file">
-                                    <IconButton
-                                        size="small"
-                                        onClick={addFile}
-                                        aria-label="New file"
-                                    >
-                                        <Add fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            </Box>
-                        </Box>
-                        {tabs.length == 0 ? (
-                            <EmptyWorkspace newFileClick={addFile} />
-                        ) : activeTab?.kind == "graph" ? (
-                            // keyed so switching between graphs redraws
-                            // rather than reusing the previous one's state
-                            <GraphView
-                                key={activeTab.id}
-                                code={graphSource(activeTab.fileId)}
-                            />
-                        ) : (
-                            <CodeMirror
-                                height="100%"
-                                width="100%"
-                                theme={
-                                    mode == "dark"
-                                        ? darkEditorTheme
-                                        : lightEditorTheme
-                                }
-                                extensions={extensions}
-                                value={code}
-                                onChange={onChange}
-                                // the editor scrolls itself; its box
-                                // only has to fill the space
-                                style={{
-                                    flex: 1,
-                                    minHeight: 0,
-                                    overflow: "hidden",
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexShrink: 0,
+                                    width: splitWidth,
+                                    maxWidth: "60%",
                                 }}
-                            />
-                        )}
-                    </Stack>
-                    {activeTab?.kind == "file" && (
+                            >
+                                {renderPane(panes[1], 1)}
+                            </Box>
+                        </>
+                    )}
+                    {outputFile != null && (
                         <>
                             <Splitter
                                 width={outputWidth}
@@ -856,10 +592,19 @@ const Editor = () => {
                                 }}
                             >
                                 <OutputBar
-                                    code={code}
-                                    fileId={activeTab.file.id}
-                                    filename={activeTab.file.filename}
-                                    onRuntimeError={setRuntimeError}
+                                    code={outputFile.contents}
+                                    fileId={outputFile.id}
+                                    filename={outputFile.filename}
+                                    onRuntimeError={(range) =>
+                                        setRuntimeError(
+                                            range == null
+                                                ? null
+                                                : {
+                                                      fileId: outputFile.id,
+                                                      range: range,
+                                                  }
+                                        )
+                                    }
                                 />
                             </Box>
                         </>
@@ -910,6 +655,12 @@ const Editor = () => {
             </Stack>
         </>
     );
+};
+
+/// The file the pane has in front, if it is a file at all.
+const activeTabFileId = (pane: Pane) => {
+    const tab = activeTab(pane);
+    return tab?.kind == "file" ? tab.file.id : null;
 };
 
 export default Editor;

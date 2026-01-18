@@ -9,6 +9,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { getControlFlowGraph } from "services/server";
 
+/// How long edits have to pause before the graph is drawn again. Drawing
+/// means a round trip and a graphviz layout, so it waits for a real pause
+/// rather than following every keystroke.
+const redrawDelay = 800;
+
 /// Draws the control flow graph of `code`.
 ///
 /// The server analyzes the source and returns Graphviz DOT; the layout is done
@@ -19,10 +24,18 @@ const GraphView = ({ code }: { code: string }) => {
     const container = useRef<HTMLDivElement | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    /// Whether a drawing is on screen, which a failed redraw leaves in place.
+    const [drawn, setDrawn] = useState(false);
 
-    // the graph is of the code as it was when the tab was opened or last
-    // refreshed, so editing does not redraw under the reader
+    // the code the drawing is of: the code as given, once edits pause
     const [source, setSource] = useState(code);
+
+    useEffect(() => {
+        if (code == source) return;
+
+        const timer = setTimeout(() => setSource(code), redrawDelay);
+        return () => clearTimeout(timer);
+    }, [code, source]);
 
     const draw = useCallback(async (): Promise<() => void> => {
         let cancelled = false;
@@ -64,6 +77,7 @@ const GraphView = ({ code }: { code: string }) => {
 
             if (!cancelled) {
                 container.current?.replaceChildren(svg);
+                setDrawn(true);
                 setLoading(false);
             }
         } catch (err) {
@@ -104,20 +118,45 @@ const GraphView = ({ code }: { code: string }) => {
                 "& svg text": { fill: "currentColor" },
             }}
         >
-            {loading && (
-                <Stack
-                    sx={{ position: "absolute", inset: 0, zIndex: 2 }}
-                    justifyContent={"center"}
-                    alignItems={"center"}
-                >
-                    <CircularProgress />
-                </Stack>
-            )}
+            {loading &&
+                (drawn ? (
+                    // a redraw of a graph already on screen: out of the way,
+                    // so the drawing stays readable while it is replaced
+                    <CircularProgress
+                        size={20}
+                        sx={{
+                            position: "absolute",
+                            top: 12,
+                            left: 12,
+                            zIndex: 2,
+                        }}
+                    />
+                ) : (
+                    <Stack
+                        sx={{ position: "absolute", inset: 0, zIndex: 2 }}
+                        justifyContent={"center"}
+                        alignItems={"center"}
+                    >
+                        <CircularProgress />
+                    </Stack>
+                ))}
 
             {error != null && (
-                <Box sx={{ position: "absolute", inset: 0, zIndex: 2, p: 2 }}>
-                    <Alert severity="error">
+                <Box
+                    sx={{
+                        position: "absolute",
+                        // over a drawing it is a banner, so the graph below it
+                        // can still be read and moved; with nothing drawn it
+                        // is all there is to show
+                        inset: drawn ? "8px 8px auto 8px" : 0,
+                        zIndex: 2,
+                        p: drawn ? 0 : 2,
+                        pointerEvents: "none",
+                    }}
+                >
+                    <Alert severity="error" sx={{ pointerEvents: "auto" }}>
                         Could not draw the graph: {error}
+                        {drawn && ". The last drawing is still shown."}
                     </Alert>
                 </Box>
             )}
@@ -145,7 +184,7 @@ const GraphView = ({ code }: { code: string }) => {
                             <IconButton
                                 size="small"
                                 onClick={() => setSource(code)}
-                                title="Redraw from the current code"
+                                title="Redraw now"
                             >
                                 <RefreshRounded fontSize="small" />
                             </IconButton>

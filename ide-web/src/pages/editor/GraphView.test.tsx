@@ -6,7 +6,7 @@ jest.mock("services/server", () => ({
     getControlFlowGraph: (code: string) => mockGetControlFlowGraph(code),
 }));
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import GraphView from "./GraphView";
 
 describe("GraphView", () => {
@@ -51,6 +51,38 @@ describe("GraphView", () => {
         await waitFor(() => {
             expect(screen.getByText(/Network Error/)).toBeInTheDocument();
         });
+    });
+
+    /// The drawing follows the code, but a redraw is a round trip and a
+    /// graphviz layout, so it waits for the edits to pause.
+    it("redraws once edits pause, not on every change", async () => {
+        jest.useFakeTimers();
+        mockGetControlFlowGraph.mockResolvedValue({
+            dot: null,
+            diagnostics: [],
+        });
+
+        const { rerender } = render(<GraphView code={"output 1"} />);
+        await act(async () => {});
+        expect(mockGetControlFlowGraph).toHaveBeenCalledTimes(1);
+
+        rerender(<GraphView code={"output 12"} />);
+        await act(async () => {
+            jest.advanceTimersByTime(400);
+        });
+        rerender(<GraphView code={"output 123"} />);
+        await act(async () => {
+            jest.advanceTimersByTime(700);
+        });
+        expect(mockGetControlFlowGraph).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            jest.advanceTimersByTime(100);
+        });
+        expect(mockGetControlFlowGraph).toHaveBeenCalledTimes(2);
+        expect(mockGetControlFlowGraph).toHaveBeenLastCalledWith("output 123");
+
+        jest.useRealTimers();
     });
 
     it("asks the server for the code it was given", async () => {
