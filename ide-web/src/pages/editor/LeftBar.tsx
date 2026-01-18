@@ -1,16 +1,19 @@
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import { IBFile } from "services/server";
 import IbIcon from "./IbIcon";
 import ClearIcon from "@mui/icons-material/Clear";
+import DriveFileRenameOutline from "@mui/icons-material/DriveFileRenameOutline";
 import { surfaces } from "theme";
 
 const LeftBar = ({
     files,
     click,
+    rename,
     del,
 }: {
     files: IBFile[];
     click: (index: number) => void;
+    rename: (index: number) => void;
     del: (index: number) => void;
 }) => {
     return (
@@ -42,6 +45,7 @@ const LeftBar = ({
                         key={file.id}
                         file={file}
                         click={() => click(index)}
+                        rename={() => rename(index)}
                         del={() => {
                             del(index);
                         }}
@@ -55,10 +59,12 @@ const LeftBar = ({
 const BarEntry = ({
     file,
     click,
+    rename,
     del,
 }: {
     file: IBFile;
     click: () => void;
+    rename: () => void;
     del: () => void;
 }) => {
     return (
@@ -92,9 +98,24 @@ const BarEntry = ({
                     {file.filename}
                 </Typography>
             </Stack>
-            <IconButton size="small" onClick={del} aria-label="Delete file">
-                <ClearIcon fontSize="small" />
-            </IconButton>
+            <Tooltip title="Rename">
+                <IconButton
+                    size="small"
+                    onClick={rename}
+                    aria-label={`Rename ${file.filename}`}
+                >
+                    <DriveFileRenameOutline fontSize="small" />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+                <IconButton
+                    size="small"
+                    onClick={del}
+                    aria-label={`Delete ${file.filename}`}
+                >
+                    <ClearIcon fontSize="small" />
+                </IconButton>
+            </Tooltip>
         </Box>
     );
 };

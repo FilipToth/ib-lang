@@ -9,7 +9,7 @@ use axum::{
 use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
-use sync::{create_file, delete_file, get_files, sync_file};
+use sync::{create_file, delete_file, get_files, rename_file, sync_file};
 use throttle::Throttle;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -35,6 +35,25 @@ struct Diagnostic {
 #[derive(Serialize)]
 struct RouteSuccess {
     success: bool,
+    /// Why it failed, worded for the person using the editor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+impl RouteSuccess {
+    fn ok(success: bool) -> Json<RouteSuccess> {
+        Json(RouteSuccess {
+            success,
+            error: None,
+        })
+    }
+
+    fn from(result: Result<(), String>) -> Json<RouteSuccess> {
+        Json(RouteSuccess {
+            success: result.is_ok(),
+            error: result.err(),
+        })
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -74,6 +93,7 @@ async fn serve() {
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
         .route("/save", post(save_file_route))
+        .route("/rename", post(rename_file_route))
         .layer(axum::middleware::from_fn(auth_middleware));
 
     let app = Router::new()
@@ -153,36 +173,33 @@ async fn create_file_route(
     Extension(uid): Extension<String>,
     query: Query<HashMap<String, String>>,
 ) -> Json<RouteSuccess> {
-    let failed_resp = RouteSuccess { success: false };
-
-    let id = match query.0.get("id") {
-        Some(id) => id,
-        None => return Json(failed_resp),
+    let (Some(id), Some(filename)) = (query.0.get("id"), query.0.get("filename")) else {
+        return RouteSuccess::ok(false);
     };
 
-    let filename = match query.0.get("filename") {
-        Some(f) => f,
-        None => return Json(failed_resp),
+    RouteSuccess::from(create_file(uid, id.clone(), filename.clone()))
+}
+
+async fn rename_file_route(
+    Extension(uid): Extension<String>,
+    query: Query<HashMap<String, String>>,
+) -> Json<RouteSuccess> {
+    let (Some(id), Some(filename)) = (query.0.get("id"), query.0.get("filename")) else {
+        return RouteSuccess::ok(false);
     };
 
-    let success = create_file(uid.clone(), id.clone(), filename.clone());
-
-    let resp = RouteSuccess { success: success };
-    Json(resp)
+    RouteSuccess::from(rename_file(uid, id.clone(), filename.clone()))
 }
 
 async fn delete_file_route(
     Extension(uid): Extension<String>,
     query: Query<HashMap<String, String>>,
 ) -> Json<RouteSuccess> {
-    let failed = RouteSuccess { success: false };
-    let id = match query.0.get("id") {
-        Some(id) => id,
-        None => return Json(failed),
+    let Some(id) = query.0.get("id") else {
+        return RouteSuccess::ok(false);
     };
 
-    let success = delete_file(uid, id.clone());
-    Json(RouteSuccess { success: success })
+    RouteSuccess::ok(delete_file(uid, id.clone()))
 }
 
 /// Stores the posted source as the contents of file `id`.
@@ -193,14 +210,13 @@ async fn save_file_route(
 ) -> Json<RouteSuccess> {
     let id = match query.0.get("id") {
         Some(id) => id,
-        None => return Json(RouteSuccess { success: false }),
+        None => return RouteSuccess::ok(false),
     };
 
     // missing or malformed, the save is written unguarded
     let seq = query.0.get("seq").and_then(|s| s.parse::<u64>().ok());
 
-    let success = sync_file(uid, id.clone(), body, seq);
-    Json(RouteSuccess { success: success })
+    RouteSuccess::ok(sync_file(uid, id.clone(), body, seq))
 }
 
 fn setup_db() {

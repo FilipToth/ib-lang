@@ -29,11 +29,13 @@ import {
     IBFile,
     createFile,
     deleteFile,
+    failureReason,
     getFiles,
+    renameFile,
     saveFile,
 } from "services/server";
 import { Add, Clear, FiberManualRecord } from "@mui/icons-material";
-import NewFileDialog from "./NewFileDialog";
+import FileNameDialog from "./FileNameDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
 import IbIcon from "./IbIcon";
@@ -373,6 +375,8 @@ const Editor = () => {
     const [tabs, setTabs] = useState<EditorTab[]>([]);
     const [files, setFiles] = useState<IBFile[]>([]);
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+    /// The file the rename dialog is open for.
+    const [renaming, setRenaming] = useState<IBFile | null>(null);
     const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -541,10 +545,9 @@ const Editor = () => {
 
         try {
             await createFile(uuid, filename);
-        } catch {
-            setNewFileDialogOpen(false);
-            setError(`Could not create ${filename}.`);
-            return;
+        } catch (err) {
+            // shown in the dialog, which stays open to try another name
+            throw new Error(failureReason(err));
         }
 
         const file: IBFile = {
@@ -564,6 +567,31 @@ const Editor = () => {
         saver.known(uuid, "");
 
         setNewFileDialogOpen(false);
+    };
+
+    /// Renames the file on the server, then everywhere it is shown. Tabs hold
+    /// the file itself, so they follow; graph tabs carry a title of their own.
+    const handleRenameFile = async (filename: string) => {
+        const file = renaming;
+        if (file == null) return;
+
+        try {
+            await renameFile(file.id, filename);
+        } catch (err) {
+            throw new Error(failureReason(err));
+        }
+
+        file.filename = filename;
+        setFiles((fs) => [...fs]);
+        setTabs((ts) =>
+            ts.map((tab) =>
+                tab.kind == "graph" && tab.fileId == file.id
+                    ? { ...tab, title: `${filename} flow` }
+                    : tab
+            )
+        );
+
+        setRenaming(null);
     };
 
     const deleteFileClick = (index: number) => {
@@ -732,6 +760,7 @@ const Editor = () => {
                     <LeftBar
                         files={files}
                         click={openFileOrChangeTab}
+                        rename={(index) => setRenaming(files[index])}
                         del={deleteFileClick}
                     />
                     <Stack
@@ -836,10 +865,25 @@ const Editor = () => {
                         </>
                     )}
                 </Stack>
-                <NewFileDialog
+                <FileNameDialog
                     isOpen={newFileDialogOpen}
+                    title="New File"
+                    confirmLabel="Create"
+                    takenNames={files.map((f) => f.filename)}
                     close={() => setNewFileDialogOpen(false)}
                     dialogOK={handleCreateFile}
+                />
+                <FileNameDialog
+                    isOpen={renaming != null}
+                    title="Rename File"
+                    confirmLabel="Rename"
+                    initialStem={renaming?.filename.replace(/\.ib$/, "")}
+                    // its own name is fine to keep
+                    takenNames={files
+                        .filter((f) => f.id != renaming?.id)
+                        .map((f) => f.filename)}
+                    close={() => setRenaming(null)}
+                    dialogOK={handleRenameFile}
                 />
                 <DeleteFileDialog
                     isOpen={delFileIndex != null}

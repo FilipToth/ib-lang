@@ -52,6 +52,28 @@ pub fn get_filename_uid(id: String) -> Option<DBFilenameUid> {
     Some(res)
 }
 
+/// Whether `uid` has a file named `filename` other than file `except`.
+pub fn filename_taken(uid: &str, filename: &str, except: &str) -> bool {
+    let conn = Connection::open(DB_PATH).unwrap();
+
+    // a failed query answers "taken", so a name is never reused on a guess
+    conn.query_row(
+        "SELECT COUNT(*) FROM files WHERE uid = ?1 AND filename = ?2 AND id != ?3",
+        [uid, filename, except],
+        |row| row.get::<_, i64>(0),
+    )
+    .map_or(true, |count| count > 0)
+}
+
+pub fn set_filename(id: &str, filename: &str) -> bool {
+    let conn = Connection::open(DB_PATH).unwrap();
+    conn.execute(
+        "UPDATE files SET filename = ?1 WHERE id = ?2",
+        [filename, id],
+    )
+    .is_ok_and(|changed| changed == 1)
+}
+
 pub fn remove_file(id: String) {
     let conn = Connection::open(DB_PATH).unwrap();
     let _ = conn.execute("DELETE FROM files WHERE id = ?1", [id]);

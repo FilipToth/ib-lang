@@ -117,12 +117,38 @@ export const saveFile = async (
     ensureSuccess(req.data);
 };
 
+export const renameFile = async (id: string, filename: string) => {
+    const headers = await getHeaders();
+    const params = {
+        id: id,
+        filename: filename,
+    };
+
+    const req = await axios.post(`${API_BASE}rename`, undefined, {
+        params: params,
+        headers: headers,
+    });
+
+    ensureSuccess(req.data);
+};
+
+/// A request the server turned down, with its reason when it gave one.
+export class RefusedError extends Error {}
+
 /// The file routes answer a refused request with `{ success: false }` rather
 /// than an error status, so that is turned into a rejection here.
-const ensureSuccess = (data: { success: boolean }) => {
+const ensureSuccess = (data: { success: boolean; error?: string }) => {
     if (!data.success) {
-        throw new Error("The server refused the request");
+        throw new RefusedError(data.error ?? "The server refused the request.");
     }
+};
+
+/// Words a failed request for the person using the editor: the server's
+/// reason if it gave one, and otherwise that it could not be reached.
+export const failureReason = (error: unknown): string => {
+    if (error instanceof RefusedError) return error.message;
+
+    return "The server could not be reached. Check your connection.";
 };
 
 const getHeaders = async () => {
