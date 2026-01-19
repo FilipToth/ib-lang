@@ -32,8 +32,9 @@ enum WebsocketMessageKind {
 
 impl<'de> Deserialize<'de> for WebsocketMessageKind {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         let value = u8::deserialize(deserializer)?;
         match value {
             0 => Ok(WebsocketMessageKind::Execute),
@@ -44,20 +45,19 @@ impl<'de> Deserialize<'de> for WebsocketMessageKind {
             _ => Err(serde::de::Error::custom(format!(
                 "{} is an invalid value for WebSocketMessageKind",
                 value
-            )))
+            ))),
         }
     }
 }
 
 impl Serialize for WebsocketMessageKind {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_u8(*self as u8)
     }
 }
-
-
 
 #[derive(Serialize, Deserialize)]
 struct WebsocketMessage {
@@ -113,11 +113,11 @@ impl EvalIO for WebSocketEvaluator {
                 Some(msg) => {
                     let msg: WebsocketMessage = match serde_json::from_str(&msg) {
                         Ok(msg) => msg,
-                        Err(_) => unreachable!()
+                        Err(_) => unreachable!(),
                     };
 
                     msg.payload
-                },
+                }
                 None => unreachable!(),
             },
             Err(_) => unreachable!(),
@@ -203,7 +203,9 @@ async fn execute(body: String, socket: Arc<Mutex<WebSocket>>) {
         return;
     };
 
-    let mut io = WebSocketEvaluator { socket: socket.clone() };
+    let mut io = WebSocketEvaluator {
+        socket: socket.clone(),
+    };
     evaluator::eval(root, &mut io).await;
 
     let _ = socket.lock().await.send(Message::Close(None)).await;

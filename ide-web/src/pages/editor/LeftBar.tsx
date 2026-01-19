@@ -1,4 +1,12 @@
-import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import {
+    Box,
+    Button,
+    IconButton,
+    Stack,
+    Tooltip,
+    Typography,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import { IBFile } from "services/server";
 import IbIcon from "./IbIcon";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -10,11 +18,13 @@ const LeftBar = ({
     click,
     rename,
     del,
+    newFile,
 }: {
     files: IBFile[];
     click: (index: number) => void;
     rename: (index: number) => void;
     del: (index: number) => void;
+    newFile: () => void;
 }) => {
     return (
         <Stack
@@ -25,10 +35,8 @@ const LeftBar = ({
                     // screen and does not take a quarter of a large one
                     width: "clamp(180px, 18vw, 280px)",
                     flexShrink: 0,
-                    // the height is the row's; a long list scrolls in it
+                    // the height is the row's; the list inside scrolls
                     minHeight: 0,
-                    overflowY: "auto",
-                    py: 0.5,
                     bgcolor: surfaces.light.sidebar,
                     borderRight: 1,
                     borderColor: "divider",
@@ -39,19 +47,39 @@ const LeftBar = ({
                     }),
             ]}
         >
-            {files.map((file, index) => {
-                return (
-                    <BarEntry
-                        key={file.id}
-                        file={file}
-                        click={() => click(index)}
-                        rename={() => rename(index)}
-                        del={() => {
-                            del(index);
-                        }}
-                    />
-                );
-            })}
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", py: 0.5 }}>
+                {files.map((file, index) => {
+                    return (
+                        <BarEntry
+                            key={file.id}
+                            file={file}
+                            click={() => click(index)}
+                            rename={() => rename(index)}
+                            del={() => {
+                                del(index);
+                            }}
+                        />
+                    );
+                })}
+            </Box>
+            {/* stays in sight however long the list is */}
+            <Box
+                sx={{
+                    flexShrink: 0,
+                    borderTop: 1,
+                    borderColor: "divider",
+                    p: 1,
+                }}
+            >
+                <Button
+                    fullWidth
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={newFile}
+                >
+                    New file
+                </Button>
+            </Box>
         </Stack>
     );
 };

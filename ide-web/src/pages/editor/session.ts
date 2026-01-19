@@ -39,7 +39,7 @@ export const sessionOf = (panes: Pane[], focused: number): StoredSession => ({
 /// stored session itself is whatever was in the browser.
 export const restoreSession = (
     stored: StoredSession | null,
-    files: IBFile[]
+    files: IBFile[],
 ): { panes: Pane[]; focused: number } => {
     const byId = new Map(files.map((file) => [file.id, file]));
     /// What is already open, since a file, or its graph, belongs to one tab.
@@ -59,7 +59,7 @@ export const restoreSession = (
             taken.add(key);
 
             tabs.push(
-                tab.kind == "file" ? { kind: "file", file } : graphTab(file)
+                tab.kind == "file" ? { kind: "file", file } : graphTab(file),
             );
         }
 
@@ -86,7 +86,7 @@ export const restoreSession = (
 
     const focused = Math.max(
         0,
-        Math.min(stored?.focused ?? 0, panes.length - 1)
+        Math.min(stored?.focused ?? 0, panes.length - 1),
     );
     return { panes, focused };
 };
@@ -133,7 +133,7 @@ const isSession = (value: unknown): value is StoredSession => {
             pane.tabs.every(
                 (tab) =>
                     (tab?.kind == "file" || tab?.kind == "graph") &&
-                    (tab.fileId == null || typeof tab.fileId == "string")
-            )
+                    (tab.fileId == null || typeof tab.fileId == "string"),
+            ),
     );
 };

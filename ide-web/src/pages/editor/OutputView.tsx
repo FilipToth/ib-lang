@@ -4,31 +4,36 @@ import { useLayoutEffect, useRef } from "react";
 /// How close to the bottom, in pixels, still counts as at the bottom.
 const bottomSlack = 16;
 
-/// A piece of what a run has put out: what the program printed, or a problem
-/// that stopped it.
+/// A piece of what a run has put out: what the program printed, what was
+/// typed back at it, or a problem that stopped it.
 export interface OutputEntry {
-    kind: "output" | "error";
+    kind: "output" | "input" | "error";
     text: string;
 }
+
+/// What each kind is drawn in. Input is set off from the program's own output
+/// the way a terminal sets off what was typed.
+const entryColour = {
+    output: "inherit",
+    input: "text.secondary",
+    error: "error.main",
+};
 
 /// `entries` with `text` added to it. Text of the kind the last piece already
 /// has joins it, rather than making a piece of its own.
 export const appendEntry = (
     entries: OutputEntry[],
     kind: OutputEntry["kind"],
-    text: string
+    text: string,
 ): OutputEntry[] => {
     const last = entries[entries.length - 1];
     if (last?.kind != kind) return [...entries, { kind, text }];
 
-    return [
-        ...entries.slice(0, -1),
-        { kind, text: last.text + text },
-    ];
+    return [...entries.slice(0, -1), { kind, text: last.text + text }];
 };
 
-/// A program's output, as it printed it, with anything that went wrong in
-/// the error colour, following along as more arrives.
+/// A program's output, as it printed it, with what was typed back at it and
+/// anything that went wrong set apart, following along as more arrives.
 ///
 /// Following stops once the reader scrolls up to look at something, so new
 /// output does not pull them away from it, and starts again when they scroll
@@ -102,12 +107,7 @@ const OutputView = ({ entries }: { entries: OutputEntry[] }) => {
                         component="span"
                         key={index}
                         data-kind={entry.kind}
-                        sx={{
-                            color:
-                                entry.kind == "error"
-                                    ? "error.main"
-                                    : "inherit",
-                        }}
+                        sx={{ color: entryColour[entry.kind] }}
                     >
                         {entry.text}
                     </Box>

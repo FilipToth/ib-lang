@@ -5,7 +5,7 @@ const dropped = (
     tabs: string[],
     from: number,
     index: number,
-    side: "before" | "after"
+    side: "before" | "after",
 ) => moveItem(tabs, from, dropIndex(from, { index, side })).join("");
 
 describe("tab reordering", () => {

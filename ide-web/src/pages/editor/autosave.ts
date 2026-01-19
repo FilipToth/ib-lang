@@ -4,7 +4,7 @@ export type SaveFn = (
     id: string,
     contents: string,
     seq: number,
-    signal: AbortSignal
+    signal: AbortSignal,
 ) => Promise<void>;
 
 export interface AutoSaverOptions {
@@ -92,7 +92,7 @@ export class AutoSaver {
         // a steady stream of edits never pauses, so it is cut off at maxWait
         const wait = Math.min(
             this.delay,
-            Math.max(0, file.dirtySince + this.maxWait - now)
+            Math.max(0, file.dirtySince + this.maxWait - now),
         );
 
         this.schedule(id, file, wait);
@@ -200,7 +200,7 @@ export class AutoSaver {
                 (error) => {
                     file.failures += 1;
                     this.onError(id, error, file.failures);
-                }
+                },
             )
             .catch((error) => {
                 // a throwing callback must not stall the file
@@ -217,7 +217,7 @@ export class AutoSaver {
                 if (file.failures > 0) {
                     const backoff = Math.min(
                         this.retryDelay * 2 ** (file.failures - 1),
-                        this.maxRetryDelay
+                        this.maxRetryDelay,
                     );
                     this.schedule(id, file, backoff);
                 } else if (file.timer == null) {

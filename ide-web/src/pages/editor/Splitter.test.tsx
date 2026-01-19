@@ -13,7 +13,7 @@ if (typeof window.PointerEvent == "undefined") {
         }
     }
 
-    (window as any).PointerEvent = PointerEvent;
+    Object.assign(window, { PointerEvent });
 }
 
 /// A splitter after a pane `before` pixels wide, resizing one `width` wide.
@@ -29,12 +29,12 @@ function setup(width: number, before: number) {
                 minWidth={200}
                 minBefore={300}
             />
-        </div>
+        </div>,
     );
 
     // jsdom does no layout
     const pane = screen.getByTestId("before");
-    pane.getBoundingClientRect = () => ({ width: before } as DOMRect);
+    pane.getBoundingClientRect = () => ({ width: before }) as DOMRect;
 
     const splitter = screen.getByRole("separator");
     // jsdom has no pointer capture

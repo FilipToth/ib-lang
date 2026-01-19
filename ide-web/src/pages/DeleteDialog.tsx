@@ -18,7 +18,6 @@ const DeleteFileDialog = ({
     dialogOK: () => void;
     close: () => void;
 }) => {
-
     return (
         <>
             <Dialog open={isOpen}>

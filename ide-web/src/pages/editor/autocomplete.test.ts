@@ -46,7 +46,8 @@ describe("autocomplete symbol resolution", () => {
     });
 
     it("suggests a function declared after another statement", () => {
-        const doc = "ALPHA = 1\noutput ALPHA\nfunction doThing()\n  output 1\nend\n";
+        const doc =
+            "ALPHA = 1\noutput ALPHA\nfunction doThing()\n  output 1\nend\n";
         const labels = completionsAt(doc);
         expect(labels).toContain("doThing");
     });

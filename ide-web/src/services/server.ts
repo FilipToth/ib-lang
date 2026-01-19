@@ -44,7 +44,7 @@ export interface IBControlFlowGraph {
 }
 
 export const getControlFlowGraph = async (
-    code: string
+    code: string,
 ): Promise<IBControlFlowGraph> => {
     const headers = await getHeaders();
     const req = await axios.post(`${API_BASE}control-flow`, code, {
@@ -100,7 +100,7 @@ export const saveFile = async (
     id: string,
     contents: string,
     seq: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
 ) => {
     const headers = await getHeaders();
     const params = {

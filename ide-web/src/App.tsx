@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import Editor from "./pages/editor/Editor";
-import React, { ReactNode } from "react";
+import React from "react";
 import LoginPage from "pages/Login";
 import SignupPage from "pages/SignUp";
 import useAuthUser from "services/useAuthUser";

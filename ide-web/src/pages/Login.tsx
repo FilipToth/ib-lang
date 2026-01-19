@@ -31,7 +31,7 @@ const LoginPage = () => {
 
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
-    const [dialog, setDialog] = useState<String | null>(null);
+    const [dialog, setDialog] = useState<string | null>(null);
 
     const emailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setEmail(e.target.value);

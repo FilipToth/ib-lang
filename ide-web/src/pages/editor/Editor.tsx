@@ -1,11 +1,5 @@
 import OutputBar from "./OutputBar";
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TopBar } from "components/TopBar";
 import {
     Alert,
@@ -110,7 +104,7 @@ const Editor = () => {
     const [focused, setFocused] = useState(0);
     const [files, setFiles] = useState<IBFile[]>([]);
     const [runtimeError, setRuntimeError] = useState<FileRuntimeError | null>(
-        null
+        null,
     );
     const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
     /// The file the rename dialog is open for.
@@ -122,12 +116,12 @@ const Editor = () => {
     const [outputWidth, resizeOutput] = useStoredWidth(
         outputWidthKey,
         minOutputWidth,
-        0.35
+        0.35,
     );
     const [splitWidth, resizeSplit] = useStoredWidth(
         splitWidthKey,
         minSplitWidth,
-        0.4
+        0.4,
     );
 
     /// Bumped by every edit. Files are edited in place, so this is what tells
@@ -166,7 +160,7 @@ const Editor = () => {
                     const name = file?.filename ?? "a file";
                     setError(`Could not save ${name}. Retrying…`);
                 },
-            })
+            }),
     );
 
     /// An edit of `file` in one of the panes.
@@ -179,7 +173,7 @@ const Editor = () => {
             // the highlight belongs to the source that was run
             setRuntimeError((e) => (e?.fileId == file.id ? null : e));
         },
-        [saver]
+        [saver],
     );
 
     const focusPane = (ref: TabRef) => {
@@ -211,14 +205,14 @@ const Editor = () => {
                 });
             },
         }),
-        []
+        [],
     );
 
     const openFileOrChangeTab = (fileIndex: number) => {
         const file = files[fileIndex];
         const open = findTab(
             panes,
-            (tab) => tab.kind == "file" && tab.file.id == file.id
+            (tab) => tab.kind == "file" && tab.file.id == file.id,
         );
 
         // a file is open in one pane only; opening it again goes to it
@@ -247,10 +241,7 @@ const Editor = () => {
         const file = graphFile();
         const tab = graphTab(file);
 
-        const open = findTab(
-            panes,
-            (t) => t.kind == "graph" && t.id == tab.id
-        );
+        const open = findTab(panes, (t) => t.kind == "graph" && t.id == tab.id);
         if (open != null) {
             focusPane(open);
             return;
@@ -275,7 +266,7 @@ const Editor = () => {
             panes,
             { pane: focused, index: pane.active },
             other,
-            null
+            null,
         );
 
         setPanes(moved.panes);
@@ -345,9 +336,9 @@ const Editor = () => {
                 tabs: pane.tabs.map((tab) =>
                     tab.kind == "graph" && tab.fileId == file.id
                         ? { ...tab, title: `${filename} flow` }
-                        : tab
+                        : tab,
                 ),
-            }))
+            })),
         );
 
         setRenaming(null);
@@ -379,7 +370,7 @@ const Editor = () => {
 
         const open = findTab(
             panes,
-            (tab) => tab.kind == "file" && tab.file.id == file.id
+            (tab) => tab.kind == "file" && tab.file.id == file.id,
         );
         if (open != null) closePaneTab(open.pane, open.index);
     };
@@ -400,7 +391,7 @@ const Editor = () => {
 
             setFiles(f);
             setSaved(
-                Object.fromEntries(f.map((file) => [file.id, file.contents]))
+                Object.fromEntries(f.map((file) => [file.id, file.contents])),
             );
             f.forEach((file) => saver.known(file.id, file.contents));
 
@@ -476,20 +467,30 @@ const Editor = () => {
     /// focused pane, or the one the other pane holds while a graph is.
     const outputFile = graphFile();
 
+    /// Whether the graph the button would open is already on screen.
+    const graphIsOpen =
+        findTab(
+            panes,
+            (tab) => tab.kind == "graph" && tab.id == graphTab(graphFile()).id,
+        ) != null;
+
     const paneActions = (pane: number) =>
         pane != focused ? null : (
             // icon buttons: a Button with only an icon keeps the width of a
             // text button
             <Box flexShrink={0} px={0.5}>
-                <Tooltip title="Control flow graph">
-                    <IconButton
-                        size="small"
-                        onClick={openGraph}
-                        aria-label="Control flow graph"
-                    >
-                        <AccountTree fontSize="small" />
-                    </IconButton>
-                </Tooltip>
+                {/* nothing for it to open while that graph is open */}
+                {!graphIsOpen && (
+                    <Tooltip title="Control flow graph">
+                        <IconButton
+                            size="small"
+                            onClick={openGraph}
+                            aria-label="Control flow graph"
+                        >
+                            <AccountTree fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                )}
                 <Tooltip
                     title={
                         panes.length > 1
@@ -563,6 +564,7 @@ const Editor = () => {
                         click={openFileOrChangeTab}
                         rename={(index) => setRenaming(files[index])}
                         del={deleteFileClick}
+                        newFile={addFile}
                     />
                     {eachTab(panes).length == 0 ? (
                         <EmptyWorkspace newFileClick={addFile} />
@@ -618,7 +620,7 @@ const Editor = () => {
                                                 : {
                                                       fileId: outputFile.id,
                                                       range: range,
-                                                  }
+                                                  },
                                         )
                                     }
                                 />

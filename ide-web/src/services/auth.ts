@@ -12,29 +12,29 @@ const githubProvider = new firebase.auth.GithubAuthProvider();
 
 export const signInEmailPwd = async (
     email: string,
-    pwd: string
+    pwd: string,
 ): Promise<UserCredential | null> => {
     try {
         const credential = await signInWithEmailAndPassword(auth, email, pwd);
         return credential;
-    } catch (err) {
+    } catch {
         return null;
     }
 };
 
 export const signUpEmailPwd = async (
     email: string,
-    pwd: string
+    pwd: string,
 ): Promise<UserCredential | null> => {
     try {
         const credential = await createUserWithEmailAndPassword(
             auth,
             email,
-            pwd
+            pwd,
         );
 
         return credential;
-    } catch (err) {
+    } catch {
         return null;
     }
 };

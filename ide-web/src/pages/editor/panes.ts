@@ -52,7 +52,7 @@ export const tabAt = (panes: Pane[], ref: TabRef): EditorTab | undefined =>
 /// Where the first tab `matches` is, if it is open at all.
 export const findTab = (
     panes: Pane[],
-    matches: (tab: EditorTab) => boolean
+    matches: (tab: EditorTab) => boolean,
 ): TabRef | null => {
     for (let pane = 0; pane < panes.length; pane++) {
         const index = panes[pane].tabs.findIndex(matches);
@@ -70,7 +70,7 @@ export const eachTab = (panes: Pane[]): EditorTab[] =>
 export const openTab = (
     panes: Pane[],
     pane: number,
-    tab: EditorTab
+    tab: EditorTab,
 ): Pane[] => {
     const next = [...panes];
 
@@ -85,7 +85,7 @@ export const openTab = (
 
 export const focusTab = (panes: Pane[], ref: TabRef): Pane[] =>
     panes.map((pane, index) =>
-        index == ref.pane ? { ...pane, active: ref.index } : pane
+        index == ref.pane ? { ...pane, active: ref.index } : pane,
     );
 
 /// The tab that takes over from the one closed at `closed`.
@@ -93,11 +93,7 @@ const activeAfterClose = (active: number, closed: number, left: number) => {
     // one before the open tab shifts it left; the open one falls back to its
     // neighbour on the left
     const next =
-        closed < active
-            ? active - 1
-            : closed == active
-            ? closed - 1
-            : active;
+        closed < active ? active - 1 : closed == active ? closed - 1 : active;
 
     return Math.max(0, Math.min(next, left - 1));
 };
@@ -135,7 +131,7 @@ export const moveTab = (
     panes: Pane[],
     from: TabRef,
     to: number,
-    target: DropTarget | null
+    target: DropTarget | null,
 ): { panes: Pane[]; focus: TabRef } => {
     const moved = tabAt(panes, from);
     const unchanged = { panes, focus: from };

@@ -71,8 +71,8 @@ const Splitter = ({
             e.key == "ArrowLeft"
                 ? keyStep
                 : e.key == "ArrowRight"
-                ? -keyStep
-                : 0;
+                  ? -keyStep
+                  : 0;
         if (step == 0) return;
 
         e.preventDefault();

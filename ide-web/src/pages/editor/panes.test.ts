@@ -23,7 +23,7 @@ const layout = (panes: Pane[]) =>
                     const name = tab.kind == "file" ? tab.file.id : tab.id;
                     return index == pane.active ? `[${name}]` : name;
                 })
-                .join(" ")
+                .join(" "),
         )
         .join(" | ");
 
@@ -32,7 +32,7 @@ const panesOf = (...sides: string[][]) =>
     sides.reduce(
         (panes, names, side) =>
             names.reduce((acc, name) => openTab(acc, side, file(name)), panes),
-        singlePane()
+        singlePane(),
     );
 
 describe("panes", () => {
@@ -52,14 +52,14 @@ describe("panes", () => {
         it("falls back to the tab on the left", () => {
             const panes = panesOf(["a", "b", "c"]);
             expect(layout(closeTab(panes, { pane: 0, index: 2 }))).toBe(
-                "a [b]"
+                "a [b]",
             );
         });
 
         it("keeps the open tab open when one before it closes", () => {
             const panes = panesOf(["a", "b", "c"]);
             expect(layout(closeTab(panes, { pane: 0, index: 0 }))).toBe(
-                "b [c]"
+                "b [c]",
             );
         });
 
@@ -73,7 +73,7 @@ describe("panes", () => {
         it("drops the first pane too, leaving the second one", () => {
             const panes = panesOf(["a"], ["graph"]);
             expect(layout(closeTab(panes, { pane: 0, index: 0 }))).toBe(
-                "[graph]"
+                "[graph]",
             );
         });
 
@@ -87,24 +87,20 @@ describe("panes", () => {
     describe("moving", () => {
         it("reorders within a pane, keeping the open tab open", () => {
             const panes = panesOf(["a", "b", "c"]);
-            const moved = moveTab(
-                panes,
-                { pane: 0, index: 0 },
-                0,
-                { index: 2, side: "after" }
-            );
+            const moved = moveTab(panes, { pane: 0, index: 0 }, 0, {
+                index: 2,
+                side: "after",
+            });
 
             expect(layout(moved.panes)).toBe("b [c] a");
         });
 
         it("moves a tab to the other pane and opens it there", () => {
             const panes = panesOf(["a", "b"], ["graph"]);
-            const moved = moveTab(
-                panes,
-                { pane: 0, index: 1 },
-                1,
-                { index: 0, side: "before" }
-            );
+            const moved = moveTab(panes, { pane: 0, index: 1 }, 1, {
+                index: 0,
+                side: "before",
+            });
 
             expect(layout(moved.panes)).toBe("[a] | [b] graph");
             expect(moved.focus).toEqual({ pane: 1, index: 0 });
@@ -114,12 +110,10 @@ describe("panes", () => {
         /// it as an ordinary full-width tab.
         it("drops the pane the moved tab came from when it empties", () => {
             const panes = panesOf(["a"], ["graph"]);
-            const moved = moveTab(
-                panes,
-                { pane: 1, index: 0 },
-                0,
-                { index: 0, side: "after" }
-            );
+            const moved = moveTab(panes, { pane: 1, index: 0 }, 0, {
+                index: 0,
+                side: "after",
+            });
 
             expect(layout(moved.panes)).toBe("a [graph]");
             expect(moved.focus).toEqual({ pane: 0, index: 1 });
@@ -141,12 +135,10 @@ describe("panes", () => {
 
         it("leaves a tab dropped where it already is", () => {
             const panes = panesOf(["a", "b"]);
-            const moved = moveTab(
-                panes,
-                { pane: 0, index: 0 },
-                0,
-                { index: 0, side: "after" }
-            );
+            const moved = moveTab(panes, { pane: 0, index: 0 }, 0, {
+                index: 0,
+                side: "after",
+            });
 
             expect(layout(moved.panes)).toBe("a [b]");
         });
@@ -156,7 +148,7 @@ describe("panes", () => {
         const panes = panesOf(["a"], ["b"]);
         const found = findTab(
             panes,
-            (tab) => tab.kind == "file" && tab.file.id == "b"
+            (tab) => tab.kind == "file" && tab.file.id == "b",
         );
 
         expect(found).toEqual({ pane: 1, index: 0 });

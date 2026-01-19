@@ -27,7 +27,7 @@ const SignupPage = () => {
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
     const [confirmPwd, setConfirmPwd] = useState("");
-    const [dialog, setDialog] = useState<String | null>(null);
+    const [dialog, setDialog] = useState<string | null>(null);
 
     const showDialog = (msg: string) => {
         setDialog(msg);

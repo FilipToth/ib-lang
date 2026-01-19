@@ -17,7 +17,7 @@ function setup(options: {
             takenNames={options.takenNames ?? []}
             dialogOK={dialogOK}
             close={() => {}}
-        />
+        />,
     );
 
     const input = screen.getByLabelText("File name") as HTMLInputElement;
@@ -51,7 +51,7 @@ describe("FileNameDialog", () => {
         submit();
 
         expect(
-            await screen.findByText("A file named taken.ib already exists.")
+            await screen.findByText("A file named taken.ib already exists."),
         ).toBeInTheDocument();
         expect(dialogOK).not.toHaveBeenCalled();
     });
@@ -64,8 +64,8 @@ describe("FileNameDialog", () => {
 
         expect(
             await screen.findByText(
-                "File names cannot contain periods or slashes."
-            )
+                "File names cannot contain periods or slashes.",
+            ),
         ).toBeInTheDocument();
         expect(dialogOK).not.toHaveBeenCalled();
     });

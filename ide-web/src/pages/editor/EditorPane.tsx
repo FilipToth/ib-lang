@@ -29,7 +29,7 @@ const baseExtensions = [
                 },
                 shift: indentLess,
             },
-        ])
+        ]),
     ),
     indentUnit.of("    "),
 ];
@@ -88,13 +88,13 @@ const EditorPane = ({
             const file = editing.current;
             if (file != null) onEdit(file, value);
         },
-        [onEdit]
+        [onEdit],
     );
 
     // likewise rebuilt only when the highlight changes
     const extensions = useMemo(
         () => [...baseExtensions, runtimeErrorHighlight(runtimeError)],
-        [runtimeError]
+        [runtimeError],
     );
 
     return (

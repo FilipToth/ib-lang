@@ -69,7 +69,7 @@ const setTabDragImage = (e: React.DragEvent<HTMLElement>) => {
     e.dataTransfer.setDragImage(
         dragImage,
         Math.min(e.clientX - rect.left, dragImage.offsetWidth),
-        dragImage.offsetHeight / 2
+        dragImage.offsetHeight / 2,
     );
 };
 
@@ -286,8 +286,8 @@ const EditorTabs = ({
                                 marker == "before"
                                     ? "inset 2px 0 0 currentColor"
                                     : marker == "after"
-                                    ? "inset -2px 0 0 currentColor"
-                                    : "none",
+                                      ? "inset -2px 0 0 currentColor"
+                                      : "none",
                         }}
                     />
                 );

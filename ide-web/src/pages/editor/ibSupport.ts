@@ -49,7 +49,7 @@ const LANG_DEF = LRLanguage.define({
                 ToKeyword: t.keyword,
                 WhileKeyword: t.keyword,
                 UntilKeyword: t.keyword,
-                NewKeyword: t.keyword
+                NewKeyword: t.keyword,
             }),
             foldNodeProp.add({
                 Application: foldInside,

@@ -38,7 +38,7 @@ const getTypeSymbols = (type: string | null): Symbol[] => {
 const getMemberExprSymbols = (
     identifier: SyntaxNode,
     doc: Text,
-    existingSymbols: Symbol[]
+    existingSymbols: Symbol[],
 ) => {
     // expr.identifier
     const expr = identifier.prevSibling!;
@@ -65,7 +65,7 @@ const getMemberExprSymbols = (
 const resolveSymbols = (
     tree: Tree,
     context: CompletionContext,
-    word: string | undefined
+    word: string | undefined,
 ) => {
     const nodeBefore = tree.resolveInner(context.pos, -1);
 
@@ -88,7 +88,7 @@ const resolveSymbols = (
         const typeSymbols = getMemberExprSymbols(
             nodeBefore,
             context.state.doc,
-            symbols
+            symbols,
         );
 
         symbols.push(...typeSymbols);
@@ -115,7 +115,7 @@ const getScopesRecursive = (node: SyntaxNode, scopes: SyntaxNode[]) => {
 const resolveSymbolsInScope = (
     scopeChild: SyntaxNode,
     context: CompletionContext,
-    symbols: Symbol[]
+    symbols: Symbol[],
 ) => {
     // a scope will always contain atoms, the first
     // child of the atom is the actual node
@@ -125,7 +125,7 @@ const resolveSymbolsInScope = (
         const identifierNode = node.getChild("Identifier");
         const identifier = context.state.sliceDoc(
             identifierNode?.from,
-            identifierNode?.to
+            identifierNode?.to,
         );
 
         const document = context.state.doc;
@@ -178,13 +178,14 @@ const getVariableDeclarationType = (document: Text, varNode: SyntaxNode) => {
 const checkForParameters = (
     block: SyntaxNode,
     context: CompletionContext,
-    symbols: Symbol[]
+    symbols: Symbol[],
 ) => {
     // parameters are in scope in the function's own block. look the list up on
     // the declaration rather than as the block's previous sibling, since a
     // return type can sit between the two
     const declaration = block.parent;
-    if (declaration == null || declaration.name != "FunctionDeclaration") return;
+    if (declaration == null || declaration.name != "FunctionDeclaration")
+        return;
 
     const parameters = declaration.getChild("ParameterList");
     if (parameters == null) return;
@@ -195,13 +196,13 @@ const checkForParameters = (
 const checkForParametersRecursive = (
     param: SyntaxNode,
     context: CompletionContext,
-    symbols: Symbol[]
+    symbols: Symbol[],
 ) => {
     if (param.name == "Parameter") {
         const identifierNode = param.getChild("Identifier");
         const identifier = context.state.sliceDoc(
             identifierNode?.from,
-            identifierNode?.to
+            identifierNode?.to,
         );
 
         const symbol: Symbol = {
@@ -221,7 +222,7 @@ const applyIfCompletion = (
     view: EditorView,
     _completion: Completion,
     from: number,
-    to: number
+    to: number,
 ) => {
     const tree = syntaxTree(view.state);
     const indents = getIndent(tree, from, 4) - 4;
@@ -242,7 +243,7 @@ const applyFunctionCompletion = (
     view: EditorView,
     _completion: Completion,
     from: number,
-    to: number
+    to: number,
 ) => {
     const tree = syntaxTree(view.state);
     const indents = getIndent(tree, from, 4);
@@ -263,7 +264,7 @@ const applyForCompletion = (
     view: EditorView,
     _completion: Completion,
     from: number,
-    to: number
+    to: number,
 ) => {
     const tree = syntaxTree(view.state);
     const indents = getIndent(tree, from, 4);
@@ -284,7 +285,7 @@ const applyUntilCompletion = (
     view: EditorView,
     _completion: Completion,
     from: number,
-    to: number
+    to: number,
 ) => {
     const tree = syntaxTree(view.state);
     const indents = getIndent(tree, from, 4);
@@ -305,7 +306,7 @@ const applyWhileCompletion = (
     view: EditorView,
     _completion: Completion,
     from: number,
-    to: number
+    to: number,
 ) => {
     const tree = syntaxTree(view.state);
     const indents = getIndent(tree, from, 4);

@@ -1,13 +1,15 @@
 import {
     Alert,
     Button,
+    IconButton,
     CircularProgress,
     Snackbar,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from "@mui/material";
-import { PlayArrowRounded } from "@mui/icons-material";
+import { ClearAll, PlayArrowRounded } from "@mui/icons-material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
@@ -139,7 +141,8 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     useEffect(() => {
         // socket state changed
         switch (readyState) {
-            case ReadyState.OPEN:
+            // braced: what is declared here belongs to this case alone
+            case ReadyState.OPEN: {
                 // send execute request
                 setRunning(true);
                 const msg: WebSocketMessage = {
@@ -148,28 +151,50 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                     file_id: fileId,
                 };
 
-                const msg_raw = JSON.stringify(msg);
-                sendMessage(msg_raw);
+                sendMessage(JSON.stringify(msg));
                 break;
+            }
             case ReadyState.CLOSING:
             case ReadyState.CLOSED:
                 setSocketUrl(null);
                 setRunning(false);
+                // the program is gone; nothing is waiting to be typed at
+                setAwaitingInput(false);
                 break;
         }
     }, [readyState]);
 
     const sendInput = () => {
+        if (!awaitingInput) return;
+
         const msg: WebSocketMessage = {
             kind: WebSocketMessageKind.Input,
             payload: input,
         };
 
-        const msg_raw = JSON.stringify(msg);
-        sendMessage(msg_raw);
+        sendMessage(JSON.stringify(msg));
+
+        // in the output as well, so the run reads back as it happened
+        append("input", `${input}\n`);
+
         setAwaitingInput(false);
         setInput("");
     };
+
+    /// Empties the panel. The file it names goes with it, unless the run it
+    /// belongs to is still going.
+    const clearOutput = () => {
+        setEntries([]);
+        if (!running) setRanFile(null);
+    };
+
+    /// Ready to type the moment the program asks, without reaching for the
+    /// mouse.
+    const inputField = useRef<HTMLInputElement | null>(null);
+
+    useEffect(() => {
+        if (awaitingInput) inputField.current?.focus();
+    }, [awaitingInput]);
 
     return (
         <>
@@ -204,50 +229,93 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                     >
                         {ranFile == null ? "Output" : `Output: ${ranFile}`}
                     </Typography>
-                    <Button
-                        variant="contained"
-                        onClick={onClick}
-                        disabled={running}
-                        // a long file name is cut short instead
-                        sx={{ flexShrink: 0 }}
-                        startIcon={
-                            running ? (
-                                <CircularProgress size={16} color="inherit" />
-                            ) : (
-                                <PlayArrowRounded />
-                            )
-                        }
+                    {/* a long file name is cut short instead of pushing
+                        these out of the panel */}
+                    <Stack
+                        direction={"row"}
+                        gap={1}
+                        alignItems={"center"}
+                        flexShrink={0}
                     >
-                        Run
-                    </Button>
+                        <Tooltip title="Clear output">
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={clearOutput}
+                                    disabled={entries.length == 0}
+                                    aria-label="Clear output"
+                                >
+                                    <ClearAll fontSize="small" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Button
+                            variant="contained"
+                            onClick={onClick}
+                            disabled={running}
+                            startIcon={
+                                running ? (
+                                    <CircularProgress
+                                        size={16}
+                                        color="inherit"
+                                    />
+                                ) : (
+                                    <PlayArrowRounded />
+                                )
+                            }
+                        >
+                            Run
+                        </Button>
+                    </Stack>
                 </Stack>
                 <OutputView entries={entries} />
+                {/* only while the program is waiting: there is nothing to
+                    type at otherwise */}
                 {awaitingInput && (
-                    <Typography variant="body2" color="primary">
-                        Waiting for input
-                    </Typography>
+                    <>
+                        <Typography variant="body2" color="primary">
+                            Waiting for input
+                        </Typography>
+                        <Stack
+                            direction={"row"}
+                            gap={1}
+                            alignItems={"flex-start"}
+                        >
+                            <TextField
+                                multiline
+                                // grows with what is typed, up to a point,
+                                // then scrolls instead of eating the
+                                // output's space
+                                maxRows={4}
+                                fullWidth
+                                autoFocus
+                                inputRef={inputField}
+                                size="small"
+                                placeholder={
+                                    "Enter to send, " +
+                                    "shift-enter for a new line"
+                                }
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key != "Enter" || e.shiftKey) return;
+
+                                    // a newline would otherwise go into the
+                                    // input rather than sending it
+                                    e.preventDefault();
+                                    sendInput();
+                                }}
+                            />
+                            <Button
+                                variant="outlined"
+                                onClick={sendInput}
+                                sx={{ height: 40 }}
+                            >
+                                Send
+                            </Button>
+                        </Stack>
+                    </>
                 )}
-                <Stack direction={"row"} gap={1} alignItems={"flex-start"}>
-                    <TextField
-                        multiline
-                        // grows with what is typed, up to a point, then
-                        // scrolls instead of eating the output's space
-                        maxRows={4}
-                        fullWidth
-                        size="small"
-                        placeholder="Input"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                    />
-                    <Button
-                        variant="outlined"
-                        disabled={!awaitingInput}
-                        onClick={sendInput}
-                        sx={{ height: 40 }}
-                    >
-                        Send
-                    </Button>
-                </Stack>
             </Stack>
         </>
     );

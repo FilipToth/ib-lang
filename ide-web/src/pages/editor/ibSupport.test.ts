@@ -85,8 +85,7 @@ describe("indentation", () => {
         expect(indentAfter("loop while a\n    output A\nend")).toBe(0);
         expect(indentAfter("output 1")).toBe(0);
         expect(indentAfter("")).toBe(0);
-        const nested =
-            "function f()\n    if a then\n        output A\n    end";
+        const nested = "function f()\n    if a then\n        output A\n    end";
         expect(indentAfter(nested)).toBe(4);
     });
 

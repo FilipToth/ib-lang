@@ -20,7 +20,7 @@ const layout = (panes: Pane[]) =>
                         tab.kind == "file" ? tab.file.filename : tab.title;
                     return index == pane.active ? `[${name}]` : name;
                 })
-                .join(" ")
+                .join(" "),
         )
         .join(" | ");
 
@@ -32,7 +32,7 @@ const stored = (...sides: string[][]): StoredSession => ({
         tabs: names.map((name) =>
             name.startsWith("graph:")
                 ? { kind: "graph" as const, fileId: name.slice(6) }
-                : { kind: "file" as const, fileId: name }
+                : { kind: "file" as const, fileId: name },
         ),
     })),
     focused: 0,
@@ -63,7 +63,7 @@ describe("restoring the session", () => {
     it("leaves out tabs whose file is gone", () => {
         const session = restoreSession(
             stored(["a", "deleted"], ["graph:deleted"]),
-            files
+            files,
         );
 
         expect(layout(session.panes)).toBe("[a.ib]");
@@ -71,9 +71,7 @@ describe("restoring the session", () => {
 
     it("opens the first file when there is nothing to reopen", () => {
         expect(layout(restoreSession(null, files).panes)).toBe("[a.ib]");
-        expect(layout(restoreSession(stored([]), files).panes)).toBe(
-            "[a.ib]"
-        );
+        expect(layout(restoreSession(stored([]), files).panes)).toBe("[a.ib]");
     });
 
     it("leaves an empty workspace when there are no files", () => {
@@ -87,12 +85,10 @@ describe("restoring the session", () => {
     it("holds the open tab and the pane in range", () => {
         const session = restoreSession(
             {
-                panes: [
-                    { tabs: [{ kind: "file", fileId: "a" }], active: 7 },
-                ],
+                panes: [{ tabs: [{ kind: "file", fileId: "a" }], active: 7 }],
                 focused: 5,
             },
-            files
+            files,
         );
 
         expect(layout(session.panes)).toBe("[a.ib]");
@@ -109,7 +105,7 @@ describe("restoring the session", () => {
         const panes = openTab(
             openTab(singlePane(), 0, { kind: "file", file: files[0] }),
             1,
-            { kind: "file", file: files[1] }
+            { kind: "file", file: files[1] },
         );
 
         const session = restoreSession(sessionOf(panes, 1), files);

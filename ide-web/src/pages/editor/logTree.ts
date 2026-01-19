@@ -15,7 +15,7 @@ const logTreeInternal = (
     syntaxNode: SyntaxNode,
     indent: number,
     prev: Node,
-    doc: Text
+    doc: Text,
 ) => {
     const text = textify(syntaxNode, doc);
     const node: Node = { name: syntaxNode.name, children: [], text: text };

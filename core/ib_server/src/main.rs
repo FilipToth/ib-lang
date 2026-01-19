@@ -16,8 +16,8 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use ws::handle_ws;
 
-extern crate ibc;
 extern crate dotenv;
+extern crate ibc;
 
 pub mod auth;
 pub mod db;
@@ -136,10 +136,7 @@ struct ControlFlowGraph {
 
 /// Draws the control flow graph of the posted source. Unlike `/diagnostics`
 /// this does not sync the file: it is a view of code the caller already has.
-async fn control_flow(
-    Extension(_uid): Extension<String>,
-    body: String,
-) -> Json<ControlFlowGraph> {
+async fn control_flow(Extension(_uid): Extension<String>, body: String) -> Json<ControlFlowGraph> {
     let (errors, dot) = ibc::analysis::control_flow_graph(body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];

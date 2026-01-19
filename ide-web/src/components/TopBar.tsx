@@ -2,10 +2,8 @@ import {
     AppBar,
     IconButton,
     Toolbar,
-    Typography,
     Menu,
     MenuItem,
-    Tabs,
     Box,
 } from "@mui/material";
 import { AccountCircle } from "@mui/icons-material";

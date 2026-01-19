@@ -1,9 +1,5 @@
 import { Extension, StateField } from "@codemirror/state";
-import {
-    Decoration,
-    DecorationSet,
-    EditorView,
-} from "@uiw/react-codemirror";
+import { Decoration, DecorationSet, EditorView } from "@uiw/react-codemirror";
 
 /// Where a runtime error happened, as character offsets into the source the
 /// server was given.

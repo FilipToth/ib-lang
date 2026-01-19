@@ -18,7 +18,11 @@ describe("GraphView", () => {
         mockGetControlFlowGraph.mockResolvedValue({
             dot: null,
             diagnostics: [
-                { message: "Cannot find value 'X'", offset_start: 0, offset_end: 1 },
+                {
+                    message: "Cannot find value 'X'",
+                    offset_start: 0,
+                    offset_end: 1,
+                },
             ],
         });
 
@@ -26,20 +30,21 @@ describe("GraphView", () => {
 
         await waitFor(() => {
             expect(
-                screen.getByText(/Cannot find value 'X'/)
+                screen.getByText(/Cannot find value 'X'/),
             ).toBeInTheDocument();
         });
     });
 
     it("falls back to a general reason when no diagnostic came back", async () => {
-        mockGetControlFlowGraph.mockResolvedValue({ dot: null, diagnostics: [] });
+        mockGetControlFlowGraph.mockResolvedValue({
+            dot: null,
+            diagnostics: [],
+        });
 
         render(<GraphView code={"output X"} />);
 
         await waitFor(() => {
-            expect(
-                screen.getByText(/does not compile/)
-            ).toBeInTheDocument();
+            expect(screen.getByText(/does not compile/)).toBeInTheDocument();
         });
     });
 
@@ -86,7 +91,10 @@ describe("GraphView", () => {
     });
 
     it("asks the server for the code it was given", async () => {
-        mockGetControlFlowGraph.mockResolvedValue({ dot: null, diagnostics: [] });
+        mockGetControlFlowGraph.mockResolvedValue({
+            dot: null,
+            diagnostics: [],
+        });
 
         render(<GraphView code={"output 42"} />);
 

@@ -42,7 +42,7 @@ fn invalid_filename(filename: &str) -> Option<String> {
 }
 
 fn taken_message(filename: &str) -> String {
-    format!("A file named {} already exists.", filename)
+    format!("A file named {filename} already exists.")
 }
 
 pub fn create_file(uid: String, id: String, filename: String) -> Result<(), String> {
@@ -61,7 +61,7 @@ pub fn create_file(uid: String, id: String, filename: String) -> Result<(), Stri
     let conn = Connection::open("./data/files.db").unwrap();
     conn.execute(
         "INSERT INTO files (id, uid, filename) VALUES (?1, ?2, ?3)",
-        &[&id, &uid, &filename],
+        [&id, &uid, &filename],
     )
     .map(|_| ())
     .map_err(|_| "The file could not be created.".to_string())

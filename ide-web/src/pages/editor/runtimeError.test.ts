@@ -5,7 +5,7 @@ import runtimeErrorHighlight, { RuntimeErrorRange } from "./runtimeError";
 /// The ranges the highlight decorates in a document of `doc`.
 function markedRanges(
     doc: string,
-    error: RuntimeErrorRange | null
+    error: RuntimeErrorRange | null,
 ): Array<[number, number]> {
     const state = EditorState.create({
         doc,

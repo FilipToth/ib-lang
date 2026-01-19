@@ -15,6 +15,7 @@ function sized(panel: HTMLElement, scrollHeight: number, clientHeight: number) {
 
 const printed = (text: string): OutputEntry => ({ kind: "output", text });
 const failed = (text: string): OutputEntry => ({ kind: "error", text });
+const typed = (text: string): OutputEntry => ({ kind: "input", text });
 
 describe("OutputView", () => {
     it("shows output as printed, line breaks and spacing kept", () => {
@@ -29,7 +30,7 @@ describe("OutputView", () => {
         render(
             <OutputView
                 entries={[printed("1\n"), failed("Runtime error: /0\n")]}
-            />
+            />,
         );
 
         const panel = screen.getByTestId("output");
@@ -38,6 +39,23 @@ describe("OutputView", () => {
         const errors = panel.querySelectorAll('[data-kind="error"]');
         expect(errors).toHaveLength(1);
         expect(errors[0].textContent).toBe("Runtime error: /0\n");
+    });
+
+    /// Reading the panel back should show the run as it happened, the way a
+    /// terminal does.
+    it("marks what was typed at the program", () => {
+        render(
+            <OutputView
+                entries={[printed("Name? "), typed("Ada\n"), printed("Hi\n")]}
+            />,
+        );
+
+        const panel = screen.getByTestId("output");
+        expect(panel.textContent).toBe("Name? Ada\nHi\n");
+
+        const input = panel.querySelectorAll('[data-kind="input"]');
+        expect(input).toHaveLength(1);
+        expect(input[0].textContent).toBe("Ada\n");
     });
 
     it("follows new output to the bottom", () => {
@@ -85,7 +103,7 @@ describe("OutputView", () => {
             const entries = appendEntry(
                 appendEntry([], "output", "1\n"),
                 "output",
-                "2\n"
+                "2\n",
             );
 
             expect(entries).toEqual([printed("1\n2\n")]);
@@ -95,7 +113,7 @@ describe("OutputView", () => {
             const entries = appendEntry(
                 appendEntry([], "output", "1\n"),
                 "error",
-                "stopped\n"
+                "stopped\n",
             );
 
             expect(entries).toEqual([printed("1\n"), failed("stopped\n")]);
