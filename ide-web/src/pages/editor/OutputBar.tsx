@@ -14,7 +14,11 @@ import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
 import { RuntimeErrorRange } from "./runtimeError";
-import OutputView, { OutputEntry, appendEntry } from "./OutputView";
+import OutputView, {
+    CodeLocation,
+    OutputEntry,
+    appendEntry,
+} from "./OutputView";
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
@@ -25,6 +29,8 @@ interface OutputProps {
     /// Reports where a runtime error happened so the editor can highlight it,
     /// and null once a new run starts.
     onRuntimeError: (error: RuntimeErrorRange | null) => void;
+    /// Asks the editor to show the place a clicked error came from.
+    goTo: (at: CodeLocation) => void;
 }
 
 enum WebSocketMessageKind {
@@ -48,6 +54,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     fileId,
     filename,
     onRuntimeError,
+    goTo,
 }) => {
     const [entries, setEntries] = useState<OutputEntry[]>([]);
     /// The file the output came from. The panel stays put when another tab is
@@ -63,8 +70,12 @@ const OutputBar: FunctionComponent<OutputProps> = ({
 
     /// Puts a line in the output panel: what the program printed, or why it
     /// stopped.
-    const append = (kind: OutputEntry["kind"], text: string) => {
-        setEntries((es) => appendEntry(es, kind, text));
+    const append = (
+        kind: OutputEntry["kind"],
+        text: string,
+        at?: CodeLocation,
+    ) => {
+        setEntries((es) => appendEntry(es, kind, text, at));
     };
 
     /// For problems that are not the program's: the snackbar clears itself,
@@ -113,23 +124,30 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             case WebSocketMessageKind.Output:
                 append("output", msg.payload);
                 break;
-            case WebSocketMessageKind.RuntimeError:
+            case WebSocketMessageKind.RuntimeError: {
+                const at =
+                    msg.offset_start != undefined &&
+                    msg.offset_end != undefined &&
+                    fileId != undefined
+                        ? {
+                              fileId: fileId,
+                              start: msg.offset_start,
+                              end: msg.offset_end,
+                          }
+                        : undefined;
+
                 // in the output, where it belongs to the run that caused it
-                // and stays until the next one
-                append("error", `\nRuntime error: ${msg.payload}\n`);
+                // and stays until the next one. It is clicked to go to the
+                // line it came from
+                append("error", `\nRuntime error: ${msg.payload}\n`, at);
 
                 // the highlight stays until the next run or the next edit
-                if (
-                    msg.offset_start != undefined &&
-                    msg.offset_end != undefined
-                ) {
-                    onRuntimeError({
-                        start: msg.offset_start,
-                        end: msg.offset_end,
-                    });
+                if (at != null) {
+                    onRuntimeError({ start: at.start, end: at.end });
                 }
 
                 break;
+            }
             case WebSocketMessageKind.AnalysisError:
                 // the program was not run at all, and the linter already
                 // underlines why
@@ -268,7 +286,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                         </Button>
                     </Stack>
                 </Stack>
-                <OutputView entries={entries} />
+                <OutputView entries={entries} goTo={goTo} />
                 {/* only while the program is waiting: there is nothing to
                     type at otherwise */}
                 {awaitingInput && (

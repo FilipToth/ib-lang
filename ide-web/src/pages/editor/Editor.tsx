@@ -25,6 +25,7 @@ import FileNameDialog from "./FileNameDialog";
 import EmptyWorkspace from "./EmptyWorkspace";
 import LeftBar from "./LeftBar";
 import { RuntimeErrorRange } from "./runtimeError";
+import { CodeLocation } from "./OutputView";
 import { AutoSaver } from "./autosave";
 import Splitter from "./Splitter";
 import DeleteFileDialog from "pages/DeleteDialog";
@@ -112,6 +113,12 @@ const Editor = () => {
     const [delFileIndex, setDelDialogIndex] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    /// A place in a file to show, from clicking an error in the output. The
+    /// count tells one request from the next, so clicking the same error
+    /// again goes back to it.
+    const [reveal, setReveal] = useState<
+        (CodeLocation & { nonce: number }) | null
+    >(null);
 
     const [outputWidth, resizeOutput] = useStoredWidth(
         outputWidthKey,
@@ -271,6 +278,26 @@ const Editor = () => {
 
         setPanes(moved.panes);
         setFocused(moved.focus.pane);
+    };
+
+    /// Goes to the place an error in the output came from: its file, in the
+    /// pane that holds it, reopened if its tab has since been closed.
+    const goTo = (at: CodeLocation) => {
+        const open = findTab(
+            panes,
+            (tab) => tab.kind == "file" && tab.file.id == at.fileId,
+        );
+
+        if (open != null) {
+            focusPane(open);
+        } else {
+            const file = files.find((f) => f.id == at.fileId);
+            if (file == null) return;
+
+            setPanes(openTab(panes, focused, { kind: "file", file: file }));
+        }
+
+        setReveal((last) => ({ ...at, nonce: (last?.nonce ?? 0) + 1 }));
     };
 
     const changeTab = (pane: number, index: number) => {
@@ -537,6 +564,11 @@ const Editor = () => {
                     ? runtimeError.range
                     : null
             }
+            reveal={
+                reveal != null && activeTabFileId(pane) == reveal.fileId
+                    ? reveal
+                    : null
+            }
             graphSource={graphSource}
             actions={paneActions(index)}
         />
@@ -613,6 +645,7 @@ const Editor = () => {
                                     code={outputFile.contents}
                                     fileId={outputFile.id}
                                     filename={outputFile.filename}
+                                    goTo={goTo}
                                     onRuntimeError={(range) =>
                                         setRuntimeError(
                                             range == null

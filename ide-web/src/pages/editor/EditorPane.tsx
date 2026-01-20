@@ -1,6 +1,13 @@
-import CodeMirror, { Prec, ViewUpdate, keymap } from "@uiw/react-codemirror";
+import CodeMirror, {
+    EditorSelection,
+    EditorView,
+    Prec,
+    ReactCodeMirrorRef,
+    ViewUpdate,
+    keymap,
+} from "@uiw/react-codemirror";
 import { Box, Stack } from "@mui/material";
-import { ReactNode, useCallback, useMemo, useRef } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { indentLess, indentMore } from "@codemirror/commands";
 import { acceptCompletion, completionStatus } from "@codemirror/autocomplete";
 import { indentUnit } from "@codemirror/language";
@@ -48,6 +55,7 @@ const EditorPane = ({
     closeTab,
     onEdit,
     runtimeError,
+    reveal,
     graphSource,
     actions,
 }: {
@@ -66,6 +74,10 @@ const EditorPane = ({
     onEdit: (file: IBFile, contents: string) => void;
     /// Where the last run of the open file failed, if it did.
     runtimeError: RuntimeErrorRange | null;
+    /// A place in the open file to show and select, such as the line a
+    /// runtime error came from. `nonce` tells one request from the next, so
+    /// asking for the same place twice works.
+    reveal: (RuntimeErrorRange & { nonce: number }) | null;
     graphSource: (fileId: string | null) => string;
     /// Buttons for the right of the tab row.
     actions?: ReactNode;
@@ -90,6 +102,24 @@ const EditorPane = ({
         },
         [onEdit],
     );
+
+    const editor = useRef<ReactCodeMirrorRef>(null);
+
+    useEffect(() => {
+        const view = editor.current?.view;
+        if (reveal == null || view == null) return;
+
+        // the code may have been edited since the run it came from
+        const end = Math.min(reveal.end, view.state.doc.length);
+        const start = Math.min(reveal.start, end);
+        const range = EditorSelection.range(start, end);
+
+        view.dispatch({
+            selection: range,
+            effects: EditorView.scrollIntoView(range, { y: "center" }),
+        });
+        view.focus();
+    }, [reveal]);
 
     // likewise rebuilt only when the highlight changes
     const extensions = useMemo(
@@ -137,6 +167,7 @@ const EditorPane = ({
                 <GraphView key={tab.id} code={graphSource(tab.fileId)} />
             ) : (
                 <CodeMirror
+                    ref={editor}
                     height="100%"
                     width="100%"
                     theme={mode == "dark" ? darkEditorTheme : lightEditorTheme}

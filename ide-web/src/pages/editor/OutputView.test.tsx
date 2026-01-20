@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import OutputView, { OutputEntry, appendEntry } from "./OutputView";
 
 /// jsdom does no layout, so the panel is given the sizes a browser would.
@@ -98,6 +98,49 @@ describe("OutputView", () => {
         expect(panel.scrollTop).toBe(900);
     });
 
+    /// The error says where it came from, so it is a way back to the line
+    /// that failed.
+    describe("going to the code", () => {
+        const at = { fileId: "a", start: 7, end: 12 };
+
+        it("gives the place a clicked error came from", () => {
+            const goTo = jest.fn();
+            render(
+                <OutputView
+                    entries={[{ kind: "error", text: "divided by 0", at }]}
+                    goTo={goTo}
+                />,
+            );
+
+            fireEvent.click(screen.getByRole("button"));
+            expect(goTo).toHaveBeenCalledWith(at);
+        });
+
+        it("does the same from the keyboard", () => {
+            const goTo = jest.fn();
+            render(
+                <OutputView
+                    entries={[{ kind: "error", text: "divided by 0", at }]}
+                    goTo={goTo}
+                />,
+            );
+
+            fireEvent.keyDown(screen.getByRole("button"), { key: "Enter" });
+            expect(goTo).toHaveBeenCalledWith(at);
+        });
+
+        it("leaves an error that came from nowhere unclickable", () => {
+            render(
+                <OutputView
+                    entries={[failed("Cannot run: broken\n")]}
+                    goTo={jest.fn()}
+                />,
+            );
+
+            expect(screen.queryByRole("button")).not.toBeInTheDocument();
+        });
+    });
+
     describe("appendEntry", () => {
         it("joins text of the kind last added", () => {
             const entries = appendEntry(
@@ -117,6 +160,19 @@ describe("OutputView", () => {
             );
 
             expect(entries).toEqual([printed("1\n"), failed("stopped\n")]);
+        });
+
+        /// Joining them would send a click to the wrong line.
+        it("keeps a piece that points somewhere on its own", () => {
+            const at = { fileId: "a", start: 1, end: 2 };
+            const entries = appendEntry(
+                appendEntry([], "error", "first\n", at),
+                "error",
+                "second\n",
+                { ...at, start: 5, end: 6 },
+            );
+
+            expect(entries).toHaveLength(2);
         });
 
         it("does not change the entries it is given", () => {
