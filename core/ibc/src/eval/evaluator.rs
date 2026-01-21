@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     fmt, mem,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
 
 use async_recursion::async_recursion;
@@ -35,9 +38,39 @@ pub const MAX_CALL_DEPTH: usize = 500;
 /// are reserved address space, not memory in use, so asking for room is cheap.
 pub const EVAL_STACK_SIZE: usize = 256 * 1024 * 1024;
 
+/// Lets whoever started a program stop it.
+///
+/// The evaluator checks this between statements and on every turn of a loop,
+/// so a program stops between steps rather than being torn down part way
+/// through one. Cloning shares the same flag.
+#[derive(Clone, Default)]
+pub struct CancelToken {
+    stopped: Arc<AtomicBool>,
+}
+
+impl CancelToken {
+    pub fn new() -> CancelToken {
+        CancelToken::default()
+    }
+
+    pub fn cancel(&self) {
+        self.stopped.store(true, Ordering::Relaxed);
+    }
+
+    /// Clears the flag, so the token can start another program.
+    pub fn reset(&self) {
+        self.stopped.store(false, Ordering::Relaxed);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.stopped.load(Ordering::Relaxed)
+    }
+}
+
 pub struct EvalInfo {
     pub heap: EvalHeap,
     depth: usize,
+    cancel: CancelToken,
 }
 
 /// A declared function: its body, and the variables one run of it owns.
@@ -154,9 +187,21 @@ impl fmt::Display for RuntimeError {
 pub enum Signal {
     Return(EvalValue),
     Error(RuntimeError),
+    /// Whoever started the program asked for it to stop.
+    Cancelled,
 }
 
 pub type EvalResult<T = EvalValue> = Result<T, Signal>;
+
+/// `Err(Signal::Cancelled)` once the program has been asked to stop, so the
+/// caller can pass it up with `?` like any other signal.
+fn check_cancelled(info: &Arc<Mutex<EvalInfo>>) -> EvalResult<()> {
+    if info.lock().unwrap().cancel.is_cancelled() {
+        return Err(Signal::Cancelled);
+    }
+
+    Ok(())
+}
 
 /// Raises a runtime error at `span`.
 pub fn runtime_error<T>(message: impl Into<String>, span: Span) -> EvalResult<T> {
@@ -427,6 +472,9 @@ async fn eval_for_loop(
     // the spec's from/to loop includes its upper bound: `loop COUNT from 0 to 5`
     // runs for 0..=5, which is what makes `from 0 to COUNT-1` visit COUNT items
     for index in lower_value..=upper_value {
+        // a loop whose body is empty never reaches the block's own check
+        check_cancelled(&info)?;
+
         let index_val = EvalValue::Int(index);
         info.lock().unwrap().heap.assign_var(iterator, index_val);
 
@@ -446,6 +494,8 @@ async fn eval_until_loop(
     io: &mut impl EvalIO,
 ) -> EvalResult {
     loop {
+        check_cancelled(&info)?;
+
         let condition = eval_rec(expr, info.clone(), io).await?;
         if condition.get_bool(expr.span)? {
             break;
@@ -464,6 +514,8 @@ async fn eval_while_loop(
     io: &mut impl EvalIO,
 ) -> EvalResult {
     loop {
+        check_cancelled(&info)?;
+
         let condition = eval_rec(expr, info.clone(), io).await?;
         if !condition.get_bool(expr.span)? {
             break;
@@ -552,6 +604,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             declare_block_functions(children, &info);
 
             for child in children.iter() {
+                check_cancelled(&info)?;
                 eval_rec(child, info.clone(), io).await?;
             }
 
@@ -729,15 +782,18 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
     Ok(val)
 }
 
-pub async fn eval(root: &BoundNode, io: &mut impl EvalIO) {
+/// Runs a program. `cancel` stops it early, between steps.
+pub async fn eval(root: &BoundNode, io: &mut impl EvalIO, cancel: CancelToken) {
     let heap = EvalHeap::new();
     let info = EvalInfo {
         heap: heap,
         depth: 0,
+        cancel: cancel,
     };
 
     // an error stops the program and is reported here, once. a return outside
-    // any function also stops it, the same as reaching the end.
+    // any function also stops it, the same as reaching the end, and so does
+    // being cancelled -- the caller asked for that, so there is nothing to say.
     if let Err(Signal::Error(error)) = eval_rec(root, Arc::new(Mutex::new(info)), io).await {
         io.runtime_error(error).await;
     }

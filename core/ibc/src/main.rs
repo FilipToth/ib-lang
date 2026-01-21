@@ -212,7 +212,8 @@ async fn run(source: String) {
         return;
     };
 
-    eval::evaluator::eval(root, &mut IBEvaluator).await;
+    let cancel = eval::evaluator::CancelToken::new();
+    eval::evaluator::eval(root, &mut IBEvaluator, cancel).await;
 }
 
 fn main() {

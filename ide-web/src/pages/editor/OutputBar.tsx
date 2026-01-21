@@ -2,14 +2,13 @@ import {
     Alert,
     Button,
     IconButton,
-    CircularProgress,
     Snackbar,
     Stack,
     TextField,
     Tooltip,
     Typography,
 } from "@mui/material";
-import { ClearAll, PlayArrowRounded } from "@mui/icons-material";
+import { ClearAll, PlayArrowRounded, StopRounded } from "@mui/icons-material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
@@ -39,6 +38,8 @@ enum WebSocketMessageKind {
     Input,
     RuntimeError,
     AnalysisError,
+    /// Asks the server to stop the running program, and comes back when it has.
+    Stop,
 }
 
 interface WebSocketMessage {
@@ -148,6 +149,11 @@ const OutputBar: FunctionComponent<OutputProps> = ({
 
                 break;
             }
+            case WebSocketMessageKind.Stop:
+                // the run ended because it was asked to, which is worth saying:
+                // the output would otherwise just stop part way
+                append("error", `\n${msg.payload}\n`);
+                break;
             case WebSocketMessageKind.AnalysisError:
                 // the program was not run at all, and the linter already
                 // underlines why
@@ -181,6 +187,26 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                 break;
         }
     }, [readyState]);
+
+    /// Asks the server to stop the program. The server stops it between steps,
+    /// says so, and closes, which is what clears `running`.
+    ///
+    /// The button stays live rather than waiting on that: if the socket is
+    /// already gone, dropping it here is what ends the run, and pressing again
+    /// only asks twice.
+    const stop = () => {
+        if (readyState != ReadyState.OPEN) {
+            setSocketUrl(null);
+            return;
+        }
+
+        const msg: WebSocketMessage = {
+            kind: WebSocketMessageKind.Stop,
+            payload: "",
+        };
+
+        sendMessage(JSON.stringify(msg));
+    };
 
     const sendInput = () => {
         if (!awaitingInput) return;
@@ -267,22 +293,22 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                                 </IconButton>
                             </span>
                         </Tooltip>
+                        {/* one button: it runs the program, and while that
+                            program is running it stops it */}
                         <Button
                             variant="contained"
-                            onClick={onClick}
-                            disabled={running}
+                            color={running ? "error" : "primary"}
+                            onClick={running ? stop : onClick}
+                            aria-label={running ? "Stop program" : "Run program"}
                             startIcon={
                                 running ? (
-                                    <CircularProgress
-                                        size={16}
-                                        color="inherit"
-                                    />
+                                    <StopRounded />
                                 ) : (
                                     <PlayArrowRounded />
                                 )
                             }
                         >
-                            Run
+                            {running ? "Stop" : "Run"}
                         </Button>
                     </Stack>
                 </Stack>

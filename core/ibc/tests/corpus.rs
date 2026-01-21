@@ -75,7 +75,7 @@ fn run(name: &str, source: String) -> String {
             let runtime = tokio::runtime::Runtime::new().unwrap();
 
             runtime.block_on(async {
-                evaluator::eval(&root, &mut io).await;
+                evaluator::eval(&root, &mut io, evaluator::CancelToken::new()).await;
             });
 
             io.captured()
