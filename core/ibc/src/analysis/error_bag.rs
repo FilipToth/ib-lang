@@ -16,6 +16,7 @@ pub enum ErrorKind {
     LoopBoundMustBeInt(TypeKind),
     InvalidCharacter(char),
     UnexpectedToken,
+    NestingTooDeep,
 
     // Binding Errors
     FailedParsing,
@@ -82,6 +83,7 @@ impl ErrorKind {
                 format!("'{}' cannot be used here", character)
             }
             Self::UnexpectedToken => "Unexpected token".to_string(),
+            Self::NestingTooDeep => "Nested too deeply to parse".to_string(),
             Self::ConflictingDeclaration(identifier) => {
                 format!("'{}' is already declared with a different type", identifier)
             }

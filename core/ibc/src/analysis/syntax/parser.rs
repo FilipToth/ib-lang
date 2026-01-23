@@ -13,13 +13,56 @@ use super::{
 
 type LexerTokens<'a> = Peekable<Iter<'a, LexerToken>>;
 
+// parsing is recursive descent, so nesting in the source becomes nesting on
+// the stack. overflowing it aborts the process instead of panicking, which
+// would take the whole server down with it, so depth is capped.
+//
+// the smallest stack any of this runs on is a 2MB thread, where an unoptimised
+// build gets through the parser, binder and control flow analysis at a nesting
+// of a little over 200 before it overflows. the cap keeps well clear of that,
+// and is still an order of magnitude past anything written by hand.
+pub const MAX_NESTING_DEPTH: usize = 96;
+
 struct Parser<'a> {
     tokens: LexerTokens<'a>,
+    depth: usize,
+    // how long the error bag was when the depth limit was hit, so the cascade
+    // the abandoned parse leaves behind on its way out can be dropped
+    too_deep: Option<usize>,
 }
 
 impl<'a> Parser<'a> {
     fn new(tokens: LexerTokens<'a>) -> Self {
-        Parser { tokens: tokens }
+        Parser {
+            tokens: tokens,
+            depth: 0,
+            too_deep: None,
+        }
+    }
+
+    // called on the way into every recursive production. false means the
+    // production must bail; `leave` still has to run, so callers pair the two.
+    fn enter(&mut self, errors: &mut ErrorBag) -> bool {
+        self.depth += 1;
+        if self.depth <= MAX_NESTING_DEPTH {
+            return true;
+        }
+
+        // only the frame that crosses the limit reports. the ones above it are
+        // unwinding and would each add the same error again.
+        if self.depth == MAX_NESTING_DEPTH + 1 {
+            if let Some(t) = self.tokens.peek() {
+                errors.add(ErrorKind::NestingTooDeep, t.span);
+            }
+
+            self.too_deep = Some(errors.errors.len());
+        }
+
+        false
+    }
+
+    fn leave(&mut self) {
+        self.depth -= 1;
     }
 
     fn parse_expression(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
@@ -27,6 +70,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_binary_expression(
+        &mut self,
+        parent_precedence: usize,
+        errors: &mut ErrorBag,
+    ) -> Option<SyntaxToken> {
+        let result = if self.enter(errors) {
+            self.parse_binary_expression_inner(parent_precedence, errors)
+        } else {
+            None
+        };
+
+        self.leave();
+        result
+    }
+
+    fn parse_binary_expression_inner(
         &mut self,
         parent_precedence: usize,
         errors: &mut ErrorBag,
@@ -425,6 +483,21 @@ impl<'a> Parser<'a> {
         preceding: Span,
         errors: &mut ErrorBag,
     ) -> Option<TypeAnnotation> {
+        let result = if self.enter(errors) {
+            self.parse_type_annotation_inner(preceding, errors)
+        } else {
+            None
+        };
+
+        self.leave();
+        result
+    }
+
+    fn parse_type_annotation_inner(
+        &mut self,
+        preceding: Span,
+        errors: &mut ErrorBag,
+    ) -> Option<TypeAnnotation> {
         let (name, name_span) = match self.parse_identifier() {
             Some(i) => i,
             None => {
@@ -636,6 +709,17 @@ impl<'a> Parser<'a> {
     /// only statement of the else branch, so nothing past the parser has to
     /// know chains exist.
     fn parse_if_chain(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let result = if self.enter(errors) {
+            self.parse_if_chain_inner(errors)
+        } else {
+            None
+        };
+
+        self.leave();
+        result
+    }
+
+    fn parse_if_chain_inner(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let keyword = self.tokens.next().unwrap();
         let start_loc = keyword.span.start.clone();
 
@@ -1056,6 +1140,17 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
+        let result = if self.enter(errors) {
+            self.parse_statement_inner(errors)
+        } else {
+            None
+        };
+
+        self.leave();
+        result
+    }
+
+    fn parse_statement_inner(&mut self, errors: &mut ErrorBag) -> Option<SyntaxToken> {
         let peek = self.tokens.peek()?;
         match peek.kind {
             LexerTokenKind::OutputKeyword => self.parse_output_statement(errors),
@@ -1158,11 +1253,20 @@ pub fn parse(tokens: Vec<LexerToken>, errors: &mut ErrorBag) -> Option<SyntaxTok
     let error_count = errors.errors.len();
     let root = parser.parse_scope(errors)?;
 
-    // a nested scope leaves `end` and `else` for its construct to consume. at
-    // the top level there is no construct, so one left over is stray.
-    if errors.errors.len() == error_count {
-        if let Some(t) = parser.tokens.peek() {
-            errors.add(ErrorKind::UnexpectedToken, t.span);
+    match parser.too_deep {
+        // once the depth limit is hit the parse is abandoned, and every frame
+        // it unwinds through reports the construct it never got to close.
+        // those follow from the one error that matters, so they go.
+        Some(mark) => errors.errors.truncate(mark),
+
+        // a nested scope leaves `end` and `else` for its construct to consume.
+        // at the top level there is no construct, so one left over is stray.
+        None => {
+            if errors.errors.len() == error_count {
+                if let Some(t) = parser.tokens.peek() {
+                    errors.add(ErrorKind::UnexpectedToken, t.span);
+                }
+            }
         }
     }
 

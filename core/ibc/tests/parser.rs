@@ -1,6 +1,6 @@
-use ibc::analysis::error_bag::ErrorBag;
+use ibc::analysis::error_bag::{ErrorBag, ErrorKind};
 use ibc::analysis::syntax::lexer::lex;
-use ibc::analysis::syntax::parser::parse;
+use ibc::analysis::syntax::parser::{parse, MAX_NESTING_DEPTH};
 use ibc::analysis::syntax::syntax_token::{SyntaxKind, SyntaxToken};
 
 /// Parses `src` and returns the root token plus any diagnostics collected
@@ -227,4 +227,100 @@ fn an_else_if_chain_takes_exactly_one_end() {
         errors.errors.len() > 0,
         "a chain closed twice must be reported"
     );
+}
+
+// --- nesting depth ---
+//
+// the parser is recursive descent, so nesting in the source becomes nesting on
+// the stack. overflowing it aborts the process instead of panicking, so these
+// check the depth cap turns that into an ordinary diagnostic. the inputs are
+// far past the cap on purpose: without it they abort the test binary.
+
+/// The number of nesting errors reported, which the cap holds at one no matter
+/// how deep the input goes.
+fn nesting_errors(errors: &ErrorBag) -> usize {
+    errors
+        .errors
+        .iter()
+        .filter(|e| matches!(e.kind, ErrorKind::NestingTooDeep))
+        .count()
+}
+
+#[test]
+fn deeply_nested_parentheses_are_reported_rather_than_fatal() {
+    let src = format!("X = {}1{}", "(".repeat(10_000), ")".repeat(10_000));
+    let (_, errors) = parse_source(&src);
+
+    assert_eq!(nesting_errors(&errors), 1);
+
+    // the abandoned parse unwinds through every open construct, and none of
+    // that is worth showing next to the one error that explains it
+    assert_eq!(errors.errors.len(), 1);
+}
+
+#[test]
+fn deeply_nested_blocks_are_reported_rather_than_fatal() {
+    let src = format!(
+        "{}output 1\n{}",
+        "if true then\n".repeat(10_000),
+        "end\n".repeat(10_000)
+    );
+
+    let (_, errors) = parse_source(&src);
+
+    assert_eq!(nesting_errors(&errors), 1);
+    assert_eq!(errors.errors.len(), 1);
+}
+
+#[test]
+fn deeply_nested_generics_are_reported_rather_than_fatal() {
+    let src = format!(
+        "X = new {}Int{}()",
+        "Array<".repeat(10_000),
+        ">".repeat(10_000)
+    );
+    let (_, errors) = parse_source(&src);
+
+    assert_eq!(nesting_errors(&errors), 1);
+    assert_eq!(errors.errors.len(), 1);
+}
+
+#[test]
+fn a_deep_else_if_chain_is_reported_rather_than_fatal() {
+    // each link of a chain is an if inside the else of the one before it, so a
+    // long chain recurses as deep as a stack of nested ifs would
+    let src = format!(
+        "if true then\n    output 1\n{}end",
+        "else if true then\n    output 1\n".repeat(10_000)
+    );
+
+    let (_, errors) = parse_source(&src);
+
+    assert_eq!(nesting_errors(&errors), 1);
+    assert_eq!(errors.errors.len(), 1);
+}
+
+#[test]
+fn nesting_the_parser_accepts_binds_without_overflowing() {
+    // the binder and control flow analysis walk a tree the parser built, so
+    // the cap bounds them too. this hands them about the deepest tree the
+    // parser will accept, on the smallest stack any of it runs on. the few
+    // levels of slack are the statement and the assignment around the parens,
+    // which count against the cap as well.
+    let deepest = MAX_NESTING_DEPTH - 6;
+    let src = format!("X = {}1{}", "(".repeat(deepest), ")".repeat(deepest));
+
+    let worker = std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(move || {
+            let result = ibc::analysis::analyze(src);
+
+            assert_eq!(result.errors.errors.len(), 0);
+            assert!(result.root.is_some());
+        })
+        .expect("cannot start the analysis thread");
+
+    worker
+        .join()
+        .expect("analysing at the cap overflowed the stack");
 }
