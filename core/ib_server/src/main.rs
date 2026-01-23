@@ -107,7 +107,13 @@ async fn serve() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn diagnostics(body: String) -> Json<Vec<Diagnostic>> {
+async fn diagnostics(
+    Extension(throttle): Extension<Throttle>,
+    body: String,
+) -> Json<Vec<Diagnostic>> {
+    // the editor posts on every keystroke, so this is the route that decides
+    // how much analysis the box is doing at any one moment
+    let _slot = throttle.analysis_slot().await;
     let result = ibc::analysis::analyze(body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -136,7 +142,12 @@ struct ControlFlowGraph {
 
 /// Draws the control flow graph of the posted source. Unlike `/diagnostics`
 /// this does not sync the file: it is a view of code the caller already has.
-async fn control_flow(Extension(_uid): Extension<String>, body: String) -> Json<ControlFlowGraph> {
+async fn control_flow(
+    Extension(_uid): Extension<String>,
+    Extension(throttle): Extension<Throttle>,
+    body: String,
+) -> Json<ControlFlowGraph> {
+    let _slot = throttle.analysis_slot().await;
     let (errors, dot) = ibc::analysis::control_flow_graph(body);
 
     let mut diagnostics: Vec<Diagnostic> = vec![];

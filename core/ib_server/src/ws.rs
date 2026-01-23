@@ -15,7 +15,7 @@ use ibc::eval::{
     evaluator::{self, CancelToken, RuntimeError},
     EvalIO,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, OwnedSemaphorePermit};
 use tokio::task::JoinHandle;
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -158,8 +158,18 @@ async fn execute(
     sender: Sender,
     input: Arc<Mutex<mpsc::Receiver<String>>>,
     cancel: CancelToken,
+    throttle: Throttle,
+    // held for the whole run; releases the slot on drop, including if this
+    // task panics
+    _run_slot: OwnedSemaphorePermit,
 ) {
-    let result = ibc::analysis::analyze(body);
+    // scoped so the analysis slot is back before evaluation starts. holding it
+    // across the run would mean a program waiting on input also holds up
+    // everyone else's diagnostics
+    let result = {
+        let _slot = throttle.analysis_slot().await;
+        ibc::analysis::analyze(body)
+    };
 
     // a program with errors is not run. the editor already underlines them
     // through the diagnostics route, so this only has to say why nothing ran
@@ -233,6 +243,15 @@ async fn handle_execute(
         return None;
     }
 
+    let Some(run_slot) = throttle.try_run_slot() else {
+        refuse(
+            sender,
+            "The server is busy running other programs, please try again in a moment",
+        )
+        .await;
+        return None;
+    };
+
     // a token is reused across runs on one connection, so an earlier stop
     // must not stop this one before it begins
     cancel.reset();
@@ -242,6 +261,8 @@ async fn handle_execute(
         sender.clone(),
         input.clone(),
         cancel.clone(),
+        throttle.clone(),
+        run_slot,
     ));
 
     Some(task)

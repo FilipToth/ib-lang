@@ -4,6 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
 /// Maximum sockets a single user may hold open at once.
 const MAX_CONNECTIONS_PER_USER: usize = 3;
 /// Maximum sockets held open across all users.
@@ -12,6 +14,12 @@ const MAX_TOTAL_CONNECTIONS: usize = 128;
 const MAX_EXECUTES_PER_WINDOW: usize = 12;
 /// Sliding window the execute budget is measured over.
 const EXECUTE_WINDOW: Duration = Duration::from_secs(60);
+/// Analyses running at once, across all users. Parsing and binding allocate
+/// for the whole program, so this is what bounds the memory a burst of
+/// keystrokes can ask for at the same time.
+const MAX_CONCURRENT_ANALYSES: usize = 3;
+/// Programs running at once, across all users.
+const MAX_CONCURRENT_RUNS: usize = 3;
 
 #[derive(Default)]
 struct UserBucket {
@@ -25,16 +33,52 @@ struct ThrottleInner {
     users: HashMap<String, UserBucket>,
 }
 
-/// Per-user admission control for the websocket endpoint. Cheap in-process
-/// counters, shared across handlers via an `Extension`.
-#[derive(Clone, Default)]
+/// Admission control for the analysis and websocket endpoints: per-user
+/// counters plus caps on the work running at once, shared across handlers via
+/// an `Extension`.
+///
+/// Analyses and runs get a semaphore each rather than sharing one. A run holds
+/// its slot until the program ends, and a program sitting at an input prompt
+/// does not end until the person types something, so a shared cap of three
+/// would let three idle prompts stop everyone else getting diagnostics.
+#[derive(Clone)]
 pub struct Throttle {
     inner: Arc<Mutex<ThrottleInner>>,
+    analyses: Arc<Semaphore>,
+    runs: Arc<Semaphore>,
+}
+
+impl Default for Throttle {
+    fn default() -> Self {
+        Throttle {
+            inner: Arc::new(Mutex::new(ThrottleInner::default())),
+            analyses: Arc::new(Semaphore::new(MAX_CONCURRENT_ANALYSES)),
+            runs: Arc::new(Semaphore::new(MAX_CONCURRENT_RUNS)),
+        }
+    }
 }
 
 impl Throttle {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Waits for an analysis slot. Analysis is milliseconds of CPU, so callers
+    /// queue for one rather than being turned away.
+    pub async fn analysis_slot(&self) -> OwnedSemaphorePermit {
+        self.analyses
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("the analysis semaphore is never closed")
+    }
+
+    /// Takes a slot for a program run, or None when they are all taken. The
+    /// slot is held until the program ends, which has no bound when the
+    /// program is waiting on input, so callers are turned away with a message
+    /// instead of queueing behind a wait that may never come.
+    pub fn try_run_slot(&self) -> Option<OwnedSemaphorePermit> {
+        self.runs.clone().try_acquire_owned().ok()
     }
 
     /// Reserves a connection slot for `uid`. The returned guard releases the

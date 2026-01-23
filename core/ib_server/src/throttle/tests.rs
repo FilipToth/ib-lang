@@ -1,3 +1,5 @@
+use tokio::time::timeout;
+
 use super::*;
 
 /// Opens `count` connections for `uid` and returns the guards, which the
@@ -132,4 +134,77 @@ fn releasing_every_slot_reclaims_the_user_entry() {
 
     assert_eq!(lock.users.len(), 0, "idle users must not accumulate");
     assert_eq!(lock.total_connections, 0);
+}
+
+// --- concurrency slots ---
+
+#[test]
+fn caps_the_programs_running_at_once() {
+    let throttle = Throttle::new();
+
+    let _held: Vec<OwnedSemaphorePermit> = (0..MAX_CONCURRENT_RUNS)
+        .map(|_| throttle.try_run_slot().expect("should be under the cap"))
+        .collect();
+
+    assert!(
+        throttle.try_run_slot().is_none(),
+        "the run past the cap must be turned away"
+    );
+}
+
+#[test]
+fn a_finished_run_gives_its_slot_back() {
+    let throttle = Throttle::new();
+
+    let mut held: Vec<OwnedSemaphorePermit> = (0..MAX_CONCURRENT_RUNS)
+        .map(|_| throttle.try_run_slot().expect("should be under the cap"))
+        .collect();
+
+    assert!(throttle.try_run_slot().is_none());
+
+    held.pop();
+
+    assert!(
+        throttle.try_run_slot().is_some(),
+        "the slot must come back when the run ends"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn analyses_wait_for_a_slot_rather_than_being_turned_away() {
+    let throttle = Throttle::new();
+
+    let mut held: Vec<OwnedSemaphorePermit> = Vec::new();
+    for _ in 0..MAX_CONCURRENT_ANALYSES {
+        held.push(throttle.analysis_slot().await);
+    }
+
+    let waiting = timeout(Duration::from_secs(1), throttle.analysis_slot()).await;
+    assert!(
+        waiting.is_err(),
+        "a fourth analysis has nothing to take yet"
+    );
+
+    held.pop();
+
+    let freed = timeout(Duration::from_secs(1), throttle.analysis_slot()).await;
+    assert!(
+        freed.is_ok(),
+        "the waiter must be let through once a slot frees"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_busy_program_does_not_hold_up_analysis() {
+    // the reason runs and analyses have a semaphore each: a program sitting at
+    // an input prompt holds its run slot for as long as the person takes, and
+    // that must not stop anyone else's editor underlining errors
+    let throttle = Throttle::new();
+
+    let _running: Vec<OwnedSemaphorePermit> = (0..MAX_CONCURRENT_RUNS)
+        .map(|_| throttle.try_run_slot().expect("should be under the cap"))
+        .collect();
+
+    let analysis = timeout(Duration::from_secs(1), throttle.analysis_slot()).await;
+    assert!(analysis.is_ok(), "analysis has its own budget");
 }

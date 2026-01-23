@@ -19,3 +19,7 @@ tokio = { version = "1.40.0", features = ["full"] }
 tokio-tungstenite = "0.26.1"
 tower = "0.5.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
+
+[dev-dependencies]
+# start_paused, so the tests that assert a caller waits do not actually sleep
+tokio = { version = "1.40.0", features = ["full", "test-util"] }
