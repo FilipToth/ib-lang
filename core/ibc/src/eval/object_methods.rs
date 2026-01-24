@@ -8,7 +8,7 @@ use crate::analysis::{
     span::Span,
 };
 
-use super::evaluator::{runtime_error, EvalInfo, EvalResult, EvalValue};
+use super::evaluator::{charge_element, runtime_error, EvalInfo, EvalResult, EvalValue};
 
 fn out_of_bounds<T>(index: i64, len: usize, span: Span) -> EvalResult<T> {
     let msg = format!(
@@ -35,12 +35,22 @@ pub fn get_element(state: &ArrayState, index: i64, span: Span) -> EvalResult {
 /// Writes `value` at `index`. Arrays have no declared size and start out
 /// empty, so writing one past the end appends -- that is what lets the spec's
 /// `LIST[COUNT] = DATA` fill an array. Anything further out is an error.
-pub fn set_element(state: &mut ArrayState, index: i64, value: EvalValue, span: Span) -> EvalResult {
+pub fn set_element(
+    state: &mut ArrayState,
+    index: i64,
+    value: EvalValue,
+    info: &Arc<Mutex<EvalInfo>>,
+    span: Span,
+) -> EvalResult {
     let len = state.internal.len();
 
     match usize::try_from(index) {
         Ok(i) if i < len => state.internal[i] = value.clone(),
-        Ok(i) if i == len => state.internal.push(value.clone()),
+        Ok(i) if i == len => {
+            // writing one past the end appends, so this is the array growing
+            charge_element(info, span)?;
+            state.internal.push(value.clone())
+        }
         _ => return out_of_bounds(index, len, span),
     }
 
@@ -58,6 +68,7 @@ fn execute_array_method(
             let item = &symbol.parameters[0].symbol;
             let item_value = info.lock().unwrap().heap.get_var(item);
 
+            charge_element(&info, span)?;
             state.internal.push(item_value);
             Ok(EvalValue::Void)
         }
@@ -117,6 +128,7 @@ fn execute_collection_method(
             let item = &symbol.parameters[0].symbol;
             let item_value = info.lock().unwrap().heap.get_var(item);
 
+            charge_element(&info, span)?;
             state.internal.push(item_value);
             Ok(EvalValue::Void)
         }
@@ -139,6 +151,7 @@ fn execute_stack_method(
             let item = &symbol.parameters[0].symbol;
             let item_value = info.lock().unwrap().heap.get_var(item);
 
+            charge_element(&info, span)?;
             state.internal.push(item_value);
             Ok(EvalValue::Void)
         }
@@ -165,6 +178,7 @@ fn execute_queue_method(
             let item = &symbol.parameters[0].symbol;
             let item_value = info.lock().unwrap().heap.get_var(item);
 
+            charge_element(&info, span)?;
             state.internal.insert(0, item_value);
             Ok(EvalValue::Void)
         }

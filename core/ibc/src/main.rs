@@ -213,7 +213,13 @@ async fn run(source: String) {
     };
 
     let cancel = eval::evaluator::CancelToken::new();
-    eval::evaluator::eval(root, &mut IBEvaluator, cancel).await;
+    eval::evaluator::eval(
+        root,
+        &mut IBEvaluator,
+        cancel,
+        eval::evaluator::EvalLimits::default(),
+    )
+    .await;
 }
 
 fn main() {

@@ -9,9 +9,31 @@ use std::{
 use rusqlite::Connection;
 
 use crate::{
-    db::{filename_taken, get_filename_uid, remove_file, set_filename},
+    db::{count_files, filename_taken, get_filename_uid, remove_file, set_filename},
     IbFile,
 };
+
+/// Files one user may have. Storage is a folder per user on a small box, so
+/// this and `MAX_FILE_BYTES` together are what bound how much disk one account
+/// can take: sixteen megabytes at the most.
+const MAX_FILES_PER_USER: usize = 64;
+
+/// How large a single file may be. A program that long is already far past
+/// anything the editor is for, and the analysis routes hold to the same
+/// number, since they are handed the same source.
+pub const MAX_FILE_BYTES: usize = 256 * 1024;
+
+/// Why contents of this size are not allowed, if they are not.
+pub fn oversized(len: usize) -> Option<String> {
+    if len <= MAX_FILE_BYTES {
+        return None;
+    }
+
+    Some(format!(
+        "Files can be at most {} KB.",
+        MAX_FILE_BYTES / 1024
+    ))
+}
 
 // TODO: Delete file requests
 
@@ -51,6 +73,16 @@ pub fn create_file(uid: String, id: String, filename: String) -> Result<(), Stri
     }
 
     let _files = lock_files();
+
+    // a failed count answers "at the cap", so the limit is never passed on a
+    // database that cannot be read
+    let count = count_files(&uid).unwrap_or(MAX_FILES_PER_USER);
+    if count >= MAX_FILES_PER_USER {
+        return Err(format!(
+            "You can have at most {} files. Delete one to make room.",
+            MAX_FILES_PER_USER
+        ));
+    }
 
     // two files of one name would be stored at one path, each overwriting
     // the other
@@ -244,7 +276,7 @@ pub fn get_files(uid: String) -> Vec<IbFile> {
 
 #[cfg(test)]
 mod tests {
-    use super::invalid_filename;
+    use super::{invalid_filename, oversized, MAX_FILE_BYTES};
 
     #[test]
     fn accepts_names_the_editor_makes() {
@@ -271,5 +303,16 @@ mod tests {
         assert!(invalid_filename("  .ib").is_some());
         assert!(invalid_filename("a.b.ib").is_some());
         assert!(invalid_filename(&format!("{}.ib", "a".repeat(100))).is_some());
+    }
+
+    #[test]
+    fn accepts_a_file_up_to_the_cap() {
+        assert_eq!(oversized(0), None);
+        assert_eq!(oversized(MAX_FILE_BYTES), None);
+    }
+
+    #[test]
+    fn refuses_a_file_over_the_cap() {
+        assert!(oversized(MAX_FILE_BYTES + 1).is_some());
     }
 }

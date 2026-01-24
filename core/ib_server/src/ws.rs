@@ -12,7 +12,7 @@ use axum::{
 use futures_util::stream::SplitSink;
 use futures_util::{lock::Mutex, SinkExt, StreamExt};
 use ibc::eval::{
-    evaluator::{self, CancelToken, RuntimeError},
+    evaluator::{self, CancelToken, EvalLimits, RuntimeError},
     EvalIO,
 };
 use tokio::sync::{mpsc, OwnedSemaphorePermit};
@@ -189,7 +189,7 @@ async fn execute(
         input: input,
     };
 
-    evaluator::eval(root, &mut io, cancel.clone()).await;
+    evaluator::eval(root, &mut io, cancel.clone(), EvalLimits::default()).await;
 
     // say so rather than just falling quiet, so the client knows the run ended
     // because it was asked to

@@ -52,6 +52,18 @@ pub fn get_filename_uid(id: String) -> Option<DBFilenameUid> {
     Some(res)
 }
 
+/// How many files `uid` has. `None` when the count could not be read, which
+/// callers treat as being at the cap rather than under it.
+pub fn count_files(uid: &str) -> Option<usize> {
+    let conn = Connection::open(DB_PATH).ok()?;
+
+    conn.query_row("SELECT COUNT(*) FROM files WHERE uid = ?1", [uid], |row| {
+        row.get::<_, i64>(0)
+    })
+    .ok()
+    .map(|count| count as usize)
+}
+
 /// Whether `uid` has a file named `filename` other than file `except`.
 pub fn filename_taken(uid: &str, filename: &str, except: &str) -> bool {
     let conn = Connection::open(DB_PATH).unwrap();

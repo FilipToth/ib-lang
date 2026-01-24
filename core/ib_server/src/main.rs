@@ -2,14 +2,16 @@ use std::{collections::HashMap, fs, path::Path};
 
 use auth::auth_middleware;
 use axum::{
-    extract::Query,
+    extract::{DefaultBodyLimit, Query},
     routing::{get, post},
     Extension, Json, Router,
 };
 use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
-use sync::{create_file, delete_file, get_files, rename_file, sync_file};
+use sync::{
+    create_file, delete_file, get_files, oversized, rename_file, sync_file, MAX_FILE_BYTES,
+};
 use throttle::Throttle;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -86,13 +88,23 @@ async fn serve() {
 
     let throttle = Throttle::new();
 
+    // the routes that take a program as their body. axum would otherwise
+    // buffer up to its own 2MB default, and analysis is CPU bound, so the size
+    // of the body is what decides how long a worker is held.
+    let source_limit = DefaultBodyLimit::max(MAX_FILE_BYTES);
+
     let protected_router = Router::new()
-        .route("/diagnostics", post(diagnostics))
-        .route("/control-flow", post(control_flow))
+        .route("/diagnostics", post(diagnostics).layer(source_limit.clone()))
+        .route("/control-flow", post(control_flow).layer(source_limit))
         .route("/files", get(files))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
-        .route("/save", post(save_file_route))
+        // twice the cap, so an oversized save is refused by the handler with a
+        // message rather than by the layer with a bare 413
+        .route(
+            "/save",
+            post(save_file_route).layer(DefaultBodyLimit::max(2 * MAX_FILE_BYTES)),
+        )
         .route("/rename", post(rename_file_route))
         .layer(axum::middleware::from_fn(auth_middleware));
 
@@ -220,6 +232,10 @@ async fn save_file_route(
         Some(id) => id,
         None => return RouteSuccess::ok(false),
     };
+
+    if let Some(reason) = oversized(body.len()) {
+        return RouteSuccess::from(Err(reason));
+    }
 
     // missing or malformed, the save is written unguarded
     let seq = query.0.get("seq").and_then(|s| s.parse::<u64>().ok());

@@ -52,7 +52,7 @@ fn run_until(source: &str, stop_after: usize) -> Vec<String> {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
-        evaluator::eval(root, &mut io, cancel).await;
+        evaluator::eval(root, &mut io, cancel, evaluator::EvalLimits::default()).await;
     });
 
     let lines = lines.lock().unwrap();
@@ -117,7 +117,7 @@ fn a_program_cancelled_before_it_starts_does_nothing() {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
-        evaluator::eval(root, &mut io, cancel).await;
+        evaluator::eval(root, &mut io, cancel, evaluator::EvalLimits::default()).await;
     });
 
     assert!(lines.lock().unwrap().is_empty());
@@ -150,7 +150,7 @@ fn an_empty_loop_stops_when_cancelled() {
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         runtime.block_on(async {
-            evaluator::eval(root, &mut io, token).await;
+            evaluator::eval(root, &mut io, token, evaluator::EvalLimits::default()).await;
         });
 
         let lines = lines.lock().unwrap().clone();

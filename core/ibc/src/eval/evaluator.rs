@@ -38,6 +38,38 @@ pub const MAX_CALL_DEPTH: usize = 500;
 /// are reserved address space, not memory in use, so asking for room is cheap.
 pub const EVAL_STACK_SIZE: usize = 256 * 1024 * 1024;
 
+/// What one run of a program may spend before it is stopped.
+///
+/// Neither of these is a limit anything written by hand comes near. They are
+/// here so a runaway program -- an accidental infinite loop is the usual one --
+/// stops itself rather than taking the host down with it, which on a small box
+/// means every other program running on it as well.
+#[derive(Clone, Copy)]
+pub struct EvalLimits {
+    /// Statements and turns of a loop the run may execute. This measures work
+    /// done rather than time passed, so a program is not charged for the time
+    /// it sits waiting for somebody to answer an `input()`.
+    pub steps: u64,
+    /// Elements the run may add to collections.
+    ///
+    /// Counted over the whole run rather than at any one moment: nothing
+    /// tracks a collection being dropped, so removing an element does not give
+    /// the budget back. That makes the count an over-estimate of what is held
+    /// at once, which is the safe direction to be wrong in.
+    pub elements: u64,
+}
+
+impl Default for EvalLimits {
+    fn default() -> Self {
+        EvalLimits {
+            // measured at about eight seconds of solid work
+            steps: 50_000_000,
+            // measured at a peak of about 60MB held
+            elements: 2_000_000,
+        }
+    }
+}
+
 /// Lets whoever started a program stop it.
 ///
 /// The evaluator checks this between statements and on every turn of a loop,
@@ -71,6 +103,9 @@ pub struct EvalInfo {
     pub heap: EvalHeap,
     depth: usize,
     cancel: CancelToken,
+    limits: EvalLimits,
+    steps: u64,
+    elements: u64,
 }
 
 /// A declared function: its body, and the variables one run of it owns.
@@ -193,11 +228,34 @@ pub enum Signal {
 
 pub type EvalResult<T = EvalValue> = Result<T, Signal>;
 
-/// `Err(Signal::Cancelled)` once the program has been asked to stop, so the
-/// caller can pass it up with `?` like any other signal.
-fn check_cancelled(info: &Arc<Mutex<EvalInfo>>) -> EvalResult<()> {
-    if info.lock().unwrap().cancel.is_cancelled() {
+/// Charges one step against the run's budget, and stops the program if it has
+/// been asked to stop or has done too much.
+///
+/// Called once for each statement and once for each turn of a loop, which is
+/// what makes a loop with an empty body countable too.
+fn check_step(info: &Arc<Mutex<EvalInfo>>, span: Span) -> EvalResult<()> {
+    let mut lock = info.lock().unwrap();
+
+    if lock.cancel.is_cancelled() {
         return Err(Signal::Cancelled);
+    }
+
+    lock.steps += 1;
+    if lock.steps > lock.limits.steps {
+        return runtime_error("The program ran for too long and was stopped", span);
+    }
+
+    Ok(())
+}
+
+/// Charges one element against the run's allocation budget. Called wherever a
+/// collection grows.
+pub fn charge_element(info: &Arc<Mutex<EvalInfo>>, span: Span) -> EvalResult<()> {
+    let mut lock = info.lock().unwrap();
+
+    lock.elements += 1;
+    if lock.elements > lock.limits.elements {
+        return runtime_error("The program stored too much data and was stopped", span);
     }
 
     Ok(())
@@ -473,7 +531,7 @@ async fn eval_for_loop(
     // runs for 0..=5, which is what makes `from 0 to COUNT-1` visit COUNT items
     for index in lower_value..=upper_value {
         // a loop whose body is empty never reaches the block's own check
-        check_cancelled(&info)?;
+        check_step(&info, body.span)?;
 
         let index_val = EvalValue::Int(index);
         info.lock().unwrap().heap.assign_var(iterator, index_val);
@@ -494,7 +552,7 @@ async fn eval_until_loop(
     io: &mut impl EvalIO,
 ) -> EvalResult {
     loop {
-        check_cancelled(&info)?;
+        check_step(&info, expr.span)?;
 
         let condition = eval_rec(expr, info.clone(), io).await?;
         if condition.get_bool(expr.span)? {
@@ -514,7 +572,7 @@ async fn eval_while_loop(
     io: &mut impl EvalIO,
 ) -> EvalResult {
     loop {
-        check_cancelled(&info)?;
+        check_step(&info, expr.span)?;
 
         let condition = eval_rec(expr, info.clone(), io).await?;
         if !condition.get_bool(expr.span)? {
@@ -541,7 +599,7 @@ fn eval_index_operands(
     let index = index.get_int(span)?;
 
     let EvalValue::Object(state) = base else {
-        return not_indexable(span);
+        return not_indexable(span); 
     };
 
     Ok((state, index))
@@ -561,13 +619,14 @@ async fn eval_index_assignment_expr(
     base: EvalValue,
     index: EvalValue,
     value: EvalValue,
+    info: &Arc<Mutex<EvalInfo>>,
     span: Span,
 ) -> EvalResult {
     let (state, index) = eval_index_operands(base, index, span)?;
 
     let mut state = state.lock().await;
     match &mut *state {
-        ObjectState::Array(array) => set_element(array, index, value, span),
+        ObjectState::Array(array) => set_element(array, index, value, info, span),
         _ => not_indexable(span),
     }
 }
@@ -604,7 +663,7 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
             declare_block_functions(children, &info);
 
             for child in children.iter() {
-                check_cancelled(&info)?;
+                check_step(&info, child.span)?;
                 eval_rec(child, info.clone(), io).await?;
             }
 
@@ -735,8 +794,8 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
         BoundNodeKind::IndexAssignmentExpression { base, index, value } => {
             let base_value = eval_rec(&base, info.clone(), io).await?;
             let index_value = eval_rec(&index, info.clone(), io).await?;
-            let value = eval_rec(&value, info, io).await?;
-            eval_index_assignment_expr(base_value, index_value, value, node.span).await?
+            let value = eval_rec(&value, info.clone(), io).await?;
+            eval_index_assignment_expr(base_value, index_value, value, &info, node.span).await?
         }
         BoundNodeKind::ObjectMemberExpression { base, next } => {
             let base_value = eval_rec(&base, info.clone(), io).await?;
@@ -782,13 +841,22 @@ async fn eval_rec(node: &BoundNode, info: Arc<Mutex<EvalInfo>>, io: &mut impl Ev
     Ok(val)
 }
 
-/// Runs a program. `cancel` stops it early, between steps.
-pub async fn eval(root: &BoundNode, io: &mut impl EvalIO, cancel: CancelToken) {
+/// Runs a program. `cancel` stops it early, between steps, and `limits` caps
+/// what it may spend before it is stopped for running away.
+pub async fn eval(
+    root: &BoundNode,
+    io: &mut impl EvalIO,
+    cancel: CancelToken,
+    limits: EvalLimits,
+) {
     let heap = EvalHeap::new();
     let info = EvalInfo {
         heap: heap,
         depth: 0,
         cancel: cancel,
+        limits: limits,
+        steps: 0,
+        elements: 0,
     };
 
     // an error stops the program and is reported here, once. a return outside
