@@ -21,6 +21,10 @@ import OutputView, {
 
 const WS_URL = process.env.REACT_APP_WEBSOCKETS_URL;
 
+/// Marks the Firebase ID token that follows it in the subprotocol list. The
+/// server answers with this same name, and refuses the handshake without it.
+const AUTH_SUBPROTOCOL = "ib-auth-v1";
+
 interface OutputProps {
     code: string;
     fileId: string | undefined;
@@ -67,7 +71,20 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     const [error, setError] = useState<string | null>(null);
 
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
-    const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl);
+    /// The token the socket authenticates with. It is held only while a run is
+    /// live, and travels as a subprotocol rather than in the URL, which would
+    /// put it in access logs and browser history.
+    const [jwt, setJwt] = useState<string | null>(null);
+
+    const { sendMessage, lastMessage, readyState } = useWebSocket(sockerUrl, {
+        protocols: jwt == null ? undefined : [AUTH_SUBPROTOCOL, jwt],
+    });
+
+    /// Set from asking for a run until the socket opens. A close while it is
+    /// set means the handshake was refused -- an expired token, a server with
+    /// no room, or a tab still running the code it loaded before a deploy --
+    /// which would otherwise show as nothing happening at all.
+    const awaitingOpen = useRef(false);
 
     /// Puts a line in the output panel: what the program printed, or why it
     /// stopped.
@@ -97,16 +114,21 @@ const OutputBar: FunctionComponent<OutputProps> = ({
         }
 
         // the socket is authenticated with the same Firebase ID token the REST
-        // API uses; it goes in the query string because the browser WebSocket
-        // API cannot set request headers
-        const jwt = await auth.currentUser?.getIdToken();
-        if (jwt == undefined) {
+        // API uses. the browser WebSocket API cannot set request headers, so it
+        // travels as a subprotocol, which is the one part of the handshake the
+        // browser does let us choose
+        const token = await auth.currentUser?.getIdToken();
+        if (token == undefined) {
             showError("You are signed out. Sign in again to run code.");
             return;
         }
 
         setRanFile(filename ?? null);
-        setSocketUrl(`${WS_URL}?token=${encodeURIComponent(jwt)}`);
+        awaitingOpen.current = true;
+
+        // both land in one render, so the socket opens with the token set
+        setJwt(token);
+        setSocketUrl(WS_URL);
     };
 
     useEffect(() => {
@@ -168,6 +190,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             // braced: what is declared here belongs to this case alone
             case ReadyState.OPEN: {
                 // send execute request
+                awaitingOpen.current = false;
                 setRunning(true);
                 const msg: WebSocketMessage = {
                     kind: WebSocketMessageKind.Execute,
@@ -180,7 +203,16 @@ const OutputBar: FunctionComponent<OutputProps> = ({
             }
             case ReadyState.CLOSING:
             case ReadyState.CLOSED:
+                if (awaitingOpen.current) {
+                    awaitingOpen.current = false;
+                    showError(
+                        "Could not start the run. Reload the page and try again.",
+                    );
+                }
+
                 setSocketUrl(null);
+                // a live token is not worth keeping between runs
+                setJwt(null);
                 setRunning(false);
                 // the program is gone; nothing is waiting to be typed at
                 setAwaitingInput(false);
@@ -196,6 +228,8 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     /// only asks twice.
     const stop = () => {
         if (readyState != ReadyState.OPEN) {
+            // asked for, so not a handshake that failed
+            awaitingOpen.current = false;
             setSocketUrl(null);
             return;
         }

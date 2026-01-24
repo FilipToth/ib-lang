@@ -1,11 +1,9 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::Query,
-    http::StatusCode,
+    http::{header::SEC_WEBSOCKET_PROTOCOL, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Extension,
 };
@@ -341,14 +339,52 @@ async fn handle_ws_socket(
     }
 }
 
+/// Names the scheme the client is authenticating with, so the token that
+/// follows it is not mistaken for a subprotocol the server should speak.
+///
+/// Versioned because the server echoes it back in the handshake: a later
+/// scheme can be offered alongside this one and the client learns from the
+/// echo which of them it got.
+const AUTH_SUBPROTOCOL: &str = "ib-auth-v1";
+
+/// The bearer token offered in `Sec-WebSocket-Protocol`: the marker, then the
+/// token, and nothing else.
+///
+/// The browser WebSocket API cannot set request headers, and a subprotocol is
+/// the one part of the handshake it does control. The token travels here
+/// rather than in the query string because a URL reaches access logs, proxy
+/// logs and history, none of which are treated as holding credentials.
+///
+/// Trimming has to agree with what axum does when it decides whether to echo
+/// the marker, or this could read a token out of a handshake axum then
+/// declines, leaving the browser to fail a connection the server thought it
+/// had accepted.
+fn offered_token(header: &str) -> Option<&str> {
+    let mut offered = header.split(',').map(str::trim);
+
+    let marker = offered.next()?;
+    let token = offered.next()?;
+
+    if marker != AUTH_SUBPROTOCOL || token.is_empty() || offered.next().is_some() {
+        return None;
+    }
+
+    Some(token)
+}
+
 pub async fn handle_ws(
     ws: WebSocketUpgrade,
-    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
     Extension(throttle): Extension<Throttle>,
 ) -> Response {
-    // The browser WebSocket API cannot set request headers, so the Firebase
-    // ID token travels as a query parameter rather than in Authorization.
-    let Some(token) = params.get("token") else {
+    // one header line is all the one client sends. a proxy that split the
+    // offer across two would need `get_all` joined back together, but nothing
+    // sits in front of this server
+    let offered = headers
+        .get(SEC_WEBSOCKET_PROTOCOL)
+        .and_then(|value| value.to_str().ok());
+
+    let Some(token) = offered.and_then(offered_token) else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
 
@@ -362,5 +398,11 @@ pub async fn handle_ws(
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     };
 
-    ws.on_upgrade(move |socket| handle_ws_socket(socket, uid, throttle, guard))
+    // the handshake has to name the subprotocol it accepted: a browser fails a
+    // connection where it offered some and the answer chose none
+    ws.protocols([AUTH_SUBPROTOCOL])
+        .on_upgrade(move |socket| handle_ws_socket(socket, uid, throttle, guard))
 }
+
+#[cfg(test)]
+mod tests;
