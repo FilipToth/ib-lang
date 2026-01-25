@@ -16,7 +16,7 @@ use crate::{
 /// Files one user may have. Storage is a folder per user on a small box, so
 /// this and `MAX_FILE_BYTES` together are what bound how much disk one account
 /// can take: sixteen megabytes at the most.
-const MAX_FILES_PER_USER: usize = 64;
+pub const MAX_FILES_PER_USER: usize = 64;
 
 /// How large a single file may be. A program that long is already far past
 /// anything the editor is for, and the analysis routes hold to the same
@@ -230,6 +230,25 @@ pub fn sync_file(uid: String, id: String, code: String, seq: Option<u64>) -> boo
     }
 
     true
+}
+
+/// How much disk `uid`'s files take. A file that was never saved has nothing
+/// on disk and counts as nothing, and the temporary file a save writes beside
+/// its target is not the user's.
+pub fn bytes_used(uid: &str) -> u64 {
+    let dir = Path::new("data").join(uid);
+
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+
+    entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|meta| meta.is_file())
+        .map(|meta| meta.len())
+        .sum()
 }
 
 pub fn get_files(uid: String) -> Vec<IbFile> {

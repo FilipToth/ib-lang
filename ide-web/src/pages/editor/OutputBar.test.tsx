@@ -5,6 +5,9 @@ let mockReadyState = 1;
 /// Records what the component asked the socket for, so a test can check the
 /// url and the subprotocols it connects with.
 const mockUseWebSocket = jest.fn();
+/// The frame the component sees on mount. Stands in for the server, which the
+/// socket would otherwise have to be reached to hear from.
+let mockLastMessage: { data: string } | null = null;
 
 jest.mock("react-use-websocket", () => ({
     __esModule: true,
@@ -12,7 +15,7 @@ jest.mock("react-use-websocket", () => ({
         mockUseWebSocket(...args);
         return {
             sendMessage: mockSendMessage,
-            lastMessage: null,
+            lastMessage: mockLastMessage,
             readyState: mockReadyState,
         };
     },
@@ -48,6 +51,7 @@ const CLOSED = 3;
 
 /// The kinds the server and client agree on, by position.
 const STOP_KIND = 5;
+const USAGE_KIND = 6;
 
 /// Must match AUTH_SUBPROTOCOL in OutputBar.tsx and ws.rs.
 const AUTH_SUBPROTOCOL = "ib-auth-v1";
@@ -70,6 +74,7 @@ describe("the run button", () => {
         mockUseWebSocket.mockReset();
         mockReadyState = CLOSED;
         mockToken = null;
+        mockLastMessage = null;
     });
 
     it("runs the program when nothing is running", () => {
@@ -109,6 +114,7 @@ describe("the socket's credentials", () => {
         mockUseWebSocket.mockReset();
         mockReadyState = CLOSED;
         mockToken = null;
+        mockLastMessage = null;
     });
 
     it("offers the token as a subprotocol, and keeps it out of the url", async () => {
@@ -144,5 +150,39 @@ describe("the socket's credentials", () => {
 
         const connectedWith = mockUseWebSocket.mock.calls.map((call) => call[0]);
         expect(connectedWith.every((url) => url == null)).toBe(true);
+    });
+});
+
+/// A run's cost is reported however it ended, so a program stopped for going
+/// past a budget still says how far it got.
+describe("what a run cost", () => {
+    beforeEach(() => {
+        mockSendMessage.mockReset();
+        mockUseWebSocket.mockReset();
+        mockReadyState = CLOSED;
+        mockToken = null;
+        mockLastMessage = null;
+    });
+
+    it("shows the spend the server reports", async () => {
+        mockLastMessage = {
+            data: JSON.stringify({
+                kind: USAGE_KIND,
+                payload: "",
+                steps: 1234,
+                elements: 20,
+            }),
+        };
+
+        renderBar();
+
+        expect(
+            await screen.findByText("1,234 steps, 20 items stored"),
+        ).toBeInTheDocument();
+    });
+
+    it("shows nothing before a run has reported one", () => {
+        renderBar();
+        expect(screen.queryByText(/items stored/)).toBeNull();
     });
 });

@@ -12,6 +12,7 @@ import { ClearAll, PlayArrowRounded, StopRounded } from "@mui/icons-material";
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { auth } from "services/firebase";
+import { formatCount } from "components/format";
 import { RuntimeErrorRange } from "./runtimeError";
 import OutputView, {
     CodeLocation,
@@ -44,6 +45,8 @@ enum WebSocketMessageKind {
     AnalysisError,
     /// Asks the server to stop the running program, and comes back when it has.
     Stop,
+    /// What the run that just ended spent of its budget.
+    Usage,
 }
 
 interface WebSocketMessage {
@@ -52,6 +55,9 @@ interface WebSocketMessage {
     file_id?: string;
     offset_start?: number;
     offset_end?: number;
+    /// Only set on Usage messages.
+    steps?: number;
+    elements?: number;
 }
 
 const OutputBar: FunctionComponent<OutputProps> = ({
@@ -68,6 +74,13 @@ const OutputBar: FunctionComponent<OutputProps> = ({
     const [awaitingInput, setAwaitingInput] = useState(false);
     const [input, setInput] = useState("");
     const [running, setRunning] = useState(false);
+    /// What the last run spent, once the server reports it. The caps it is
+    /// measured against live in the usage dialog; here it is only worth
+    /// showing what this run actually cost.
+    const [usage, setUsage] = useState<{
+        steps: number;
+        elements: number;
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const [sockerUrl, setSocketUrl] = useState<string | null>(null);
@@ -124,6 +137,7 @@ const OutputBar: FunctionComponent<OutputProps> = ({
         }
 
         setRanFile(filename ?? null);
+        setUsage(null);
         awaitingOpen.current = true;
 
         // both land in one render, so the socket opens with the token set
@@ -180,6 +194,12 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                 // the program was not run at all, and the linter already
                 // underlines why
                 append("error", `Cannot run: ${msg.payload}\n`);
+                break;
+            case WebSocketMessageKind.Usage:
+                setUsage({
+                    steps: msg.steps ?? 0,
+                    elements: msg.elements ?? 0,
+                });
                 break;
         }
     }, [lastMessage]);
@@ -298,15 +318,29 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                     alignItems={"center"}
                     justifyContent={"space-between"}
                 >
-                    <Typography
-                        variant="subtitle1"
-                        fontWeight={600}
-                        noWrap
-                        title={ranFile ?? undefined}
-                        sx={{ minWidth: 0 }}
-                    >
-                        {ranFile == null ? "Output" : `Output: ${ranFile}`}
-                    </Typography>
+                    <Stack minWidth={0}>
+                        <Typography
+                            variant="subtitle1"
+                            fontWeight={600}
+                            noWrap
+                            title={ranFile ?? undefined}
+                        >
+                            {ranFile == null ? "Output" : `Output: ${ranFile}`}
+                        </Typography>
+                        {/* what the run cost, against the caps in the usage
+                            dialog. shown however it ended, so a program that
+                            was stopped still says how far it got */}
+                        {usage != null && (
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                noWrap
+                            >
+                                {formatCount(usage.steps)} steps,{" "}
+                                {formatCount(usage.elements)} items stored
+                            </Typography>
+                        )}
+                    </Stack>
                     {/* a long file name is cut short instead of pushing
                         these out of the panel */}
                     <Stack

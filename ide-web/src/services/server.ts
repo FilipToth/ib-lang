@@ -54,6 +54,35 @@ export const getControlFlowGraph = async (
     return req.data;
 };
 
+/// One thing the account is held to: how much has been spent, and how much is
+/// allowed.
+export interface IBAllowance {
+    used: number;
+    allowed: number;
+}
+
+export interface IBLimits {
+    files: IBAllowance;
+    bytes: IBAllowance;
+    /// The largest a single file may be, which `bytes.allowed` is a multiple of.
+    bytes_per_file: number;
+    runs: IBAllowance;
+    /// How long the run allowance takes to refill.
+    run_window_seconds: number;
+    /// Per run rather than per account, so these are a ceiling, not a balance.
+    steps_per_run: number;
+    elements_per_run: number;
+}
+
+export const getLimits = async (): Promise<IBLimits> => {
+    const headers = await getHeaders();
+    const req = await axios.get(`${API_BASE}limits`, {
+        headers: headers,
+    });
+
+    return req.data;
+};
+
 export const getFiles = async (): Promise<IBFile[]> => {
     const headers = await getHeaders();
     const req = await axios.get(`${API_BASE}files`, {

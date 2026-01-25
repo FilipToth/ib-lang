@@ -11,10 +11,12 @@ import React, { ReactNode, useState } from "react";
 import { auth } from "services/firebase";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
+import UsageDialog from "./UsageDialog";
 
 export const TopBar = ({ children }: { children: ReactNode }) => {
     const navigate = useNavigate();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [usageOpen, setUsageOpen] = useState(false);
 
     const accountClick = (e: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(e.currentTarget);
@@ -27,6 +29,11 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
     const signOut = () => {
         auth.signOut();
         navigate("/login");
+    };
+
+    const showUsage = () => {
+        closeMenu();
+        setUsageOpen(true);
     };
 
     return (
@@ -52,10 +59,18 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
                         anchorEl={anchorEl}
                         onClose={closeMenu}
                     >
+                        <MenuItem onClick={showUsage}>
+                            Usage and limits
+                        </MenuItem>
                         <MenuItem onClick={signOut}>Sign Out</MenuItem>
                     </Menu>
                 </div>
             </Toolbar>
+
+            <UsageDialog
+                open={usageOpen}
+                onClose={() => setUsageOpen(false)}
+            />
         </AppBar>
     );
 };

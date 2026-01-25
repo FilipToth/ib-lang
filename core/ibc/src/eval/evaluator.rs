@@ -59,6 +59,31 @@ pub struct EvalLimits {
     pub elements: u64,
 }
 
+/// What a run actually spent. The counterpart of `EvalLimits`, so a host can
+/// show one against the other rather than only saying which was reached.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct EvalUsage {
+    pub steps: u64,
+    pub elements: u64,
+}
+
+/// Groups a number's digits, so a budget in a message reads as a quantity
+/// rather than a smear of zeroes.
+fn grouped(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+
+        out.push(c);
+    }
+
+    out
+}
+
 impl Default for EvalLimits {
     fn default() -> Self {
         EvalLimits {
@@ -242,7 +267,12 @@ fn check_step(info: &Arc<Mutex<EvalInfo>>, span: Span) -> EvalResult<()> {
 
     lock.steps += 1;
     if lock.steps > lock.limits.steps {
-        return runtime_error("The program ran for too long and was stopped", span);
+        let message = format!(
+            "The program ran too long and was stopped after {} steps",
+            grouped(lock.limits.steps)
+        );
+
+        return runtime_error(message, span);
     }
 
     Ok(())
@@ -255,7 +285,12 @@ pub fn charge_element(info: &Arc<Mutex<EvalInfo>>, span: Span) -> EvalResult<()>
 
     lock.elements += 1;
     if lock.elements > lock.limits.elements {
-        return runtime_error("The program stored too much data and was stopped", span);
+        let message = format!(
+            "The program stored too much and was stopped after {} items",
+            grouped(lock.limits.elements)
+        );
+
+        return runtime_error(message, span);
     }
 
     Ok(())
@@ -848,7 +883,7 @@ pub async fn eval(
     io: &mut impl EvalIO,
     cancel: CancelToken,
     limits: EvalLimits,
-) {
+) -> EvalUsage {
     let heap = EvalHeap::new();
     let info = EvalInfo {
         heap: heap,
@@ -859,10 +894,20 @@ pub async fn eval(
         elements: 0,
     };
 
+    let info = Arc::new(Mutex::new(info));
+
     // an error stops the program and is reported here, once. a return outside
     // any function also stops it, the same as reaching the end, and so does
     // being cancelled -- the caller asked for that, so there is nothing to say.
-    if let Err(Signal::Error(error)) = eval_rec(root, Arc::new(Mutex::new(info)), io).await {
+    if let Err(Signal::Error(error)) = eval_rec(root, info.clone(), io).await {
         io.runtime_error(error).await;
+    }
+
+    // reported however the run ended, so a program that was stopped can be
+    // shown how close to the budget it got
+    let lock = info.lock().unwrap();
+    EvalUsage {
+        steps: lock.steps,
+        elements: lock.elements,
     }
 }

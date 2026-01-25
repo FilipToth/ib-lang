@@ -31,6 +31,8 @@ enum WebsocketMessageKind {
     AnalysisError = 4,
     /// Asks for the running program to be stopped, and confirms that it was.
     Stop = 5,
+    /// What the run that just ended spent of its budget.
+    Usage = 6,
 }
 
 impl<'de> Deserialize<'de> for WebsocketMessageKind {
@@ -46,6 +48,7 @@ impl<'de> Deserialize<'de> for WebsocketMessageKind {
             3 => Ok(WebsocketMessageKind::RuntimeError),
             4 => Ok(WebsocketMessageKind::AnalysisError),
             5 => Ok(WebsocketMessageKind::Stop),
+            6 => Ok(WebsocketMessageKind::Usage),
             _ => Err(serde::de::Error::custom(format!(
                 "{} is an invalid value for WebSocketMessageKind",
                 value
@@ -77,6 +80,11 @@ struct WebsocketMessage {
     offset_start: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     offset_end: Option<usize>,
+    /// What the run spent. Only set on Usage messages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    steps: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    elements: Option<u64>,
 }
 
 /// The half of the socket that is written to. The other half stays with the
@@ -104,6 +112,8 @@ fn notice(kind: WebsocketMessageKind, payload: String) -> WebsocketMessage {
         file_id: None,
         offset_start: None,
         offset_end: None,
+        steps: None,
+        elements: None,
     }
 }
 
@@ -137,6 +147,8 @@ impl EvalIO for WebSocketEvaluator {
             file_id: None,
             offset_start: Some(error.span.start.char_offset),
             offset_end: Some(error.span.end.char_offset),
+            steps: None,
+            elements: None,
         };
 
         send(&self.sender, msg).await;
@@ -187,7 +199,21 @@ async fn execute(
         input: input,
     };
 
-    evaluator::eval(root, &mut io, cancel.clone(), EvalLimits::default()).await;
+    let usage = evaluator::eval(root, &mut io, cancel.clone(), EvalLimits::default()).await;
+
+    // sent however the run ended, including when a budget is what ended it, so
+    // the editor can show the spend against the cap rather than only the error
+    let msg = WebsocketMessage {
+        kind: WebsocketMessageKind::Usage,
+        payload: String::new(),
+        file_id: None,
+        offset_start: None,
+        offset_end: None,
+        steps: Some(usage.steps),
+        elements: Some(usage.elements),
+    };
+
+    send(&sender, msg).await;
 
     // say so rather than just falling quiet, so the client knows the run ended
     // because it was asked to
@@ -323,7 +349,9 @@ async fn handle_ws_socket(
             }
             // server only accepts execute, stop and input
             WebsocketMessageKind::Output => {}
-            WebsocketMessageKind::AnalysisError | WebsocketMessageKind::RuntimeError => {}
+            WebsocketMessageKind::AnalysisError
+            | WebsocketMessageKind::RuntimeError
+            | WebsocketMessageKind::Usage => {}
         };
     }
 

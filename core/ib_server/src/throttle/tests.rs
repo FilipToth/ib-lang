@@ -136,6 +136,26 @@ fn releasing_every_slot_reclaims_the_user_entry() {
     assert_eq!(lock.total_connections, 0);
 }
 
+/// The budget has to be readable without being charged, or looking at how many
+/// runs are left would use one up.
+#[test]
+fn reports_the_execute_budget_without_spending_it() {
+    let throttle = Throttle::new();
+
+    assert_eq!(throttle.executes_used("alice"), 0);
+
+    throttle.try_execute("alice");
+    throttle.try_execute("alice");
+
+    assert_eq!(throttle.executes_used("alice"), 2);
+
+    // reading it twice more must not move it
+    assert_eq!(throttle.executes_used("alice"), 2);
+    assert_eq!(throttle.executes_used("alice"), 2);
+
+    assert_eq!(throttle.executes_used("bob"), 0, "bob has spent nothing");
+}
+
 // --- concurrency slots ---
 
 #[test]

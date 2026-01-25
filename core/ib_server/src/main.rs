@@ -9,10 +9,13 @@ use axum::{
 use dotenv::dotenv;
 use rusqlite::Connection;
 use serde::Serialize;
+use db::count_files;
+use ibc::eval::evaluator::EvalLimits;
 use sync::{
-    create_file, delete_file, get_files, oversized, rename_file, sync_file, MAX_FILE_BYTES,
+    bytes_used, create_file, delete_file, get_files, oversized, rename_file, sync_file,
+    MAX_FILE_BYTES, MAX_FILES_PER_USER,
 };
-use throttle::Throttle;
+use throttle::{Throttle, EXECUTE_WINDOW, MAX_EXECUTES_PER_WINDOW};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
@@ -97,6 +100,7 @@ async fn serve() {
         .route("/diagnostics", post(diagnostics).layer(source_limit.clone()))
         .route("/control-flow", post(control_flow).layer(source_limit))
         .route("/files", get(files))
+        .route("/limits", get(limits))
         .route("/create", post(create_file_route))
         .route("/delete", post(delete_file_route))
         // twice the cap, so an oversized save is refused by the handler with a
@@ -179,6 +183,61 @@ async fn control_flow(
     };
 
     Json(graph)
+}
+
+/// One thing the caller is held to: how much of it they have spent, and how
+/// much they are allowed.
+#[derive(Serialize)]
+struct Allowance {
+    used: u64,
+    allowed: u64,
+}
+
+/// Everything the editor needs to show what a user may use and what they have
+/// used. Without it a refusal has to explain itself from nothing, and the caps
+/// a program runs under are invisible until one is hit.
+#[derive(Serialize)]
+struct Limits {
+    files: Allowance,
+    bytes: Allowance,
+    /// The largest a single file may be, which `bytes.allowed` is a multiple of.
+    bytes_per_file: u64,
+    runs: Allowance,
+    /// How long the run allowance takes to refill.
+    run_window_seconds: u64,
+    /// Per run rather than per account, so they are a ceiling, not a balance.
+    steps_per_run: u64,
+    elements_per_run: u64,
+}
+
+async fn limits(
+    Extension(uid): Extension<String>,
+    Extension(throttle): Extension<Throttle>,
+) -> Json<Limits> {
+    let per_run = EvalLimits::default();
+
+    let limits = Limits {
+        files: Allowance {
+            // a count that cannot be read is shown as none used rather than
+            // guessed at; the cap itself still refuses on the same failure
+            used: count_files(&uid).unwrap_or(0) as u64,
+            allowed: MAX_FILES_PER_USER as u64,
+        },
+        bytes: Allowance {
+            used: bytes_used(&uid),
+            allowed: (MAX_FILES_PER_USER * MAX_FILE_BYTES) as u64,
+        },
+        bytes_per_file: MAX_FILE_BYTES as u64,
+        runs: Allowance {
+            used: throttle.executes_used(&uid) as u64,
+            allowed: MAX_EXECUTES_PER_WINDOW as u64,
+        },
+        run_window_seconds: EXECUTE_WINDOW.as_secs(),
+        steps_per_run: per_run.steps,
+        elements_per_run: per_run.elements,
+    };
+
+    Json(limits)
 }
 
 async fn files(

@@ -11,9 +11,9 @@ const MAX_CONNECTIONS_PER_USER: usize = 3;
 /// Maximum sockets held open across all users.
 const MAX_TOTAL_CONNECTIONS: usize = 128;
 /// Maximum execute requests a single user may issue per window.
-const MAX_EXECUTES_PER_WINDOW: usize = 12;
+pub const MAX_EXECUTES_PER_WINDOW: usize = 12;
 /// Sliding window the execute budget is measured over.
-const EXECUTE_WINDOW: Duration = Duration::from_secs(60);
+pub const EXECUTE_WINDOW: Duration = Duration::from_secs(60);
 /// Analyses running at once, across all users. Parsing and binding allocate
 /// for the whole program, so this is what bounds the memory a burst of
 /// keystrokes can ask for at the same time.
@@ -25,6 +25,20 @@ const MAX_CONCURRENT_RUNS: usize = 3;
 struct UserBucket {
     connections: usize,
     executes: VecDeque<Instant>,
+}
+
+impl UserBucket {
+    /// Drops the executes that have aged out of the window, so what is left is
+    /// what the user has spent of it.
+    fn prune_executes(&mut self, now: Instant) {
+        while let Some(oldest) = self.executes.front() {
+            if now.duration_since(*oldest) >= EXECUTE_WINDOW {
+                self.executes.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -112,13 +126,7 @@ impl Throttle {
         let bucket = lock.users.entry(uid.to_string()).or_default();
         let now = Instant::now();
 
-        while let Some(oldest) = bucket.executes.front() {
-            if now.duration_since(*oldest) >= EXECUTE_WINDOW {
-                bucket.executes.pop_front();
-            } else {
-                break;
-            }
-        }
+        bucket.prune_executes(now);
 
         if bucket.executes.len() >= MAX_EXECUTES_PER_WINDOW {
             return false;
@@ -126,6 +134,19 @@ impl Throttle {
 
         bucket.executes.push_back(now);
         true
+    }
+
+    /// How much of the window `uid` has spent. Takes nothing: this is for
+    /// showing the budget, not for charging against it.
+    pub fn executes_used(&self, uid: &str) -> usize {
+        let mut lock = self.inner.lock().unwrap();
+
+        let Some(bucket) = lock.users.get_mut(uid) else {
+            return 0;
+        };
+
+        bucket.prune_executes(Instant::now());
+        bucket.executes.len()
     }
 
     fn release(&self, uid: &str) {
