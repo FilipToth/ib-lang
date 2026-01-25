@@ -1,0 +1,40 @@
+# Caddy gets and renews the certificate itself; the email is where letsencrypt
+# sends expiry warnings.
+{
+	email filip.toth@accelley.com
+}
+
+# Everything is one host: the landing site at the root, the editor under /app,
+# and the backend it talks to. One origin also means no CORS in the browser.
+iblang.on.accelley.com {
+	encode zstd gzip
+
+	# the REST API: ib_server serves it under /api itself, so the path is
+	# passed on as it stands
+	handle /api/* {
+		reverse_proxy ib-core:8080
+	}
+
+	# running code. Caddy passes the websocket upgrade through as it is
+	handle /wss {
+		reverse_proxy ib-core:8080
+	}
+
+	# the editor: `npm run build` in ide-web/, copied to /srv/ide-web.
+	# handle_path takes the /app off the front, so /app/static/x is read
+	# from /srv/ide-web/static/x, and anything else falls back to the page
+	# itself, which is what a single-page app needs
+	handle_path /app* {
+		root * /srv/ide-web
+		try_files {path} /index.html
+		file_server
+	}
+
+	# everything else is the landing site and the docs: `npm run build` in
+	# landing/, copied to /srv/landing
+	handle {
+		root * /srv/landing
+		try_files {path} /404.html
+		file_server
+	}
+}

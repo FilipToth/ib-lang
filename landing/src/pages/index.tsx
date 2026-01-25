@@ -18,9 +18,11 @@ function HomepageHeader() {
                 </Heading>
                 <p className="hero__subtitle">{siteConfig.tagline}</p>
                 <div className={styles.buttons}>
+                    {/* the editor is served beside this site rather than
+                        being a page of it */}
                     <Link
                         className="button button--secondary button--lg"
-                        to="https://ib-web-ide.firebaseapp.com/"
+                        href={`${siteConfig.url}/app`}
                     >
                         Launch App
                     </Link>
@@ -33,10 +35,7 @@ function HomepageHeader() {
 export default function Home(): ReactNode {
     const { siteConfig } = useDocusaurusContext();
     return (
-        <Layout
-            title={`Hello from ${siteConfig.title}`}
-            description="Description will go into a meta tag in <head />"
-        >
+        <Layout description={siteConfig.tagline}>
             <HomepageHeader />
             <main>
                 <HomepageFeatures />

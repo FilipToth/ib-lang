@@ -1,0 +1,65 @@
+# Production stack for the VPS. Only caddy is reachable from the internet; the
+# other two are on the compose network, which is why they publish no ports.
+#
+#   docker compose -f deploy/docker-compose.prod.yml up -d --build
+#
+# The two static sites are built elsewhere (locally or in CI) and copied to
+# /srv/ide-web and /srv/landing, which caddy serves read-only.
+
+services:
+    caddy:
+        image: caddy:2-alpine
+        container_name: caddy
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - /srv/ide-web:/srv/ide-web:ro
+            - /srv/landing:/srv/landing:ro
+            # the certificates: without this every restart asks for new ones
+            # and runs into letsencrypt's rate limit
+            - caddy-data:/data
+            - caddy-config:/config
+        mem_limit: 128m
+        depends_on:
+            - ib-core
+
+    auth-server:
+        build:
+            context: ../auth-server
+            dockerfile: Dockerfile
+        container_name: auth-server
+        restart: unless-stopped
+        # no ports: only ib-core talks to it, over the compose network
+        expose:
+            - 8081
+        mem_limit: 256m
+        cpus: 0.5
+
+    ib-core:
+        build:
+            context: ../core
+            dockerfile: Dockerfile
+        container_name: ib-core
+        restart: unless-stopped
+        environment:
+            # the container's own name, not localhost
+            AUTH_BACKEND_URL: http://auth-server:8081/auth
+        volumes:
+            # the sqlite database and everyone's files. Back this up
+            - ib-data:/usr/src/ibcore/data
+        expose:
+            - 8080
+        # people run their own programs in here: a runaway one should be the
+        # container's problem, not the machine's
+        mem_limit: 512m
+        cpus: 1.0
+        depends_on:
+            - auth-server
+
+volumes:
+    ib-data:
+    caddy-data:
+    caddy-config:

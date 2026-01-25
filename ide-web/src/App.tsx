@@ -28,7 +28,9 @@ const PrivateRouteHandler = () => {
 const App = () => {
     return (
         <React.StrictMode>
-            <BrowserRouter>
+            {/* the editor is served under /app; CRA fills this in from
+                the `homepage` in package.json */}
+            <BrowserRouter basename={process.env.PUBLIC_URL}>
                 <Routes>
                     <Route element={<PrivateRouteHandler />}>
                         <Route path="/" element={<Editor />}></Route>

@@ -4,6 +4,11 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+/// Where the site is served. The editor is a separate app under /app of the
+/// same host, so links to it are written out in full: docusaurus checks
+/// internal links against its own pages, and /app is not one of them.
+const url = "https://iblang.on.accelley.com";
+
 const config: Config = {
     title: "IB Pseudocode Web IDE",
     tagline:
@@ -11,15 +16,15 @@ const config: Config = {
     favicon: "img/favicon.svg",
 
     // Set the production url of your site here
-    url: "https://your-docusaurus-site.example.com",
+    url: url,
     // Set the /<baseUrl>/ pathname under which your site is served
     // For GitHub pages deployment, it is often '/<projectName>/'
     baseUrl: "/",
 
     // GitHub pages deployment config.
     // If you aren't using GitHub pages, you don't need these.
-    organizationName: "facebook", // Usually your GitHub org/user name.
-    projectName: "docusaurus", // Usually your repo name.
+    organizationName: "FilipToth",
+    projectName: "ib-lang",
 
     onBrokenLinks: "throw",
     onBrokenMarkdownLinks: "warn",
@@ -72,7 +77,7 @@ const config: Config = {
             title: "IB Pseudocode Web IDE",
             items: [
                 {
-                    to: "https://ib-web-ide.firebaseapp.com/",
+                    href: `${url}/app`,
                     label: "App",
                     position: "left",
                 },

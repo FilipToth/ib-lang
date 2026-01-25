@@ -1,23 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
-    <!-- for browsers that do not take an svg icon -->
-    <link rel="alternate icon" href="%PUBLIC_URL%/icon-192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#1565c0" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
-    <!--
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
+        <!-- for browsers that do not take an svg icon -->
+        <link rel="alternate icon" href="%PUBLIC_URL%/icon-192.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#1565c0" />
+        <meta
+            name="description"
+            content="Write, run and visualise IB pseudocode in the browser."
+        />
+        <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
+        <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
+        <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+        <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.
       Only files inside the `public` folder can be referenced from the HTML.
@@ -26,28 +26,29 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>React App</title>
-    <script>
-      // puts the saved light or dark mode on the page before it is first
-      // drawn, so a dark page does not flash light while the app loads. The
-      // key and class names are the ones MUI uses (see src/theme.ts).
-      (function () {
-        try {
-          var mode = localStorage.getItem("mui-mode") || "system";
-          if (mode === "system") {
-            mode = matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light";
-          }
-          document.documentElement.classList.add(mode);
-        } catch (e) {}
-      })();
-    </script>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!--
+        <title>IB Pseudocode Web IDE</title>
+        <script>
+            // puts the saved light or dark mode on the page before it is first
+            // drawn, so a dark page does not flash light while the app loads. The
+            // key and class names are the ones MUI uses (see src/theme.ts).
+            (function () {
+                try {
+                    var mode = localStorage.getItem("mui-mode") || "system";
+                    if (mode === "system") {
+                        mode = matchMedia("(prefers-color-scheme: dark)")
+                            .matches
+                            ? "dark"
+                            : "light";
+                    }
+                    document.documentElement.classList.add(mode);
+                } catch (e) {}
+            })();
+        </script>
+    </head>
+    <body>
+        <noscript>You need to enable JavaScript to run this app.</noscript>
+        <div id="root"></div>
+        <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
 
@@ -56,6 +57,5 @@
 
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-  </body>
+    --></body>
 </html>

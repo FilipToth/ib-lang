@@ -8,7 +8,7 @@ Welcome to the **IB Pseudocode Web IDE**—your ultimate tool for running and ma
 
 ## Getting Started
 
-Getting started is simple! Click the **Launch App** button on the landing page or go directly to [https://ib-web-ide.firebaseapp.com/](https://ib-web-ide.firebaseapp.com/).
+Getting started is simple! Click the **Launch App** button on the landing page or go directly to [https://iblang.on.accelley.com/app](https://iblang.on.accelley.com/app).
 
 Log in using your Google or GitHub account, or create a new account with your email and password—it’s quick and secure.
 
