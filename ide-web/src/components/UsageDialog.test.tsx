@@ -35,9 +35,7 @@ describe("the usage dialog", () => {
         mockGetLimits.mockResolvedValue(limits);
         render(<UsageDialog open={true} onClose={() => {}} />);
 
-        expect(
-            await screen.findByText(/50,000,000 steps/),
-        ).toBeInTheDocument();
+        expect(await screen.findByText(/50,000,000 steps/)).toBeInTheDocument();
         expect(screen.getByText(/2,000,000 items/)).toBeInTheDocument();
     });
 

@@ -80,8 +80,12 @@ describe("the run button", () => {
     it("runs the program when nothing is running", () => {
         renderBar();
 
-        expect(screen.getByRole("button", { name: "Run program" })).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "Stop program" })).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Run program" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Stop program" }),
+        ).toBeNull();
     });
 
     /// While a program runs there is nothing to run, and the one thing worth
@@ -90,17 +94,25 @@ describe("the run button", () => {
         mockReadyState = OPEN;
         renderBar();
 
-        expect(screen.getByRole("button", { name: "Stop program" })).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "Run program" })).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Stop program" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Run program" }),
+        ).toBeNull();
     });
 
     it("asks the server to stop when pressed", async () => {
         mockReadyState = OPEN;
         renderBar();
 
-        await userEvent.click(screen.getByRole("button", { name: "Stop program" }));
+        await userEvent.click(
+            screen.getByRole("button", { name: "Stop program" }),
+        );
 
-        const sent = mockSendMessage.mock.calls.map((call) => JSON.parse(call[0]));
+        const sent = mockSendMessage.mock.calls.map((call) =>
+            JSON.parse(call[0]),
+        );
         expect(sent.some((msg) => msg.kind == STOP_KIND)).toBe(true);
     });
 });
@@ -121,7 +133,9 @@ describe("the socket's credentials", () => {
         mockToken = "header.payload.signature";
         renderBar();
 
-        await userEvent.click(screen.getByRole("button", { name: "Run program" }));
+        await userEvent.click(
+            screen.getByRole("button", { name: "Run program" }),
+        );
 
         // the token is fetched before the socket is asked for, so the render
         // that carries it lands a tick after the click
@@ -146,9 +160,13 @@ describe("the socket's credentials", () => {
     it("does not connect at all when signed out", async () => {
         renderBar();
 
-        await userEvent.click(screen.getByRole("button", { name: "Run program" }));
+        await userEvent.click(
+            screen.getByRole("button", { name: "Run program" }),
+        );
 
-        const connectedWith = mockUseWebSocket.mock.calls.map((call) => call[0]);
+        const connectedWith = mockUseWebSocket.mock.calls.map(
+            (call) => call[0],
+        );
         expect(connectedWith.every((url) => url == null)).toBe(true);
     });
 });

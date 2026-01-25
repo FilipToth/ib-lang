@@ -1,9 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import {
-    signInEmailPwd,
-    signInWithGithub,
-    signInWithGoogle,
-} from "services/auth";
+import { signInEmailPwd, signInWithGoogle } from "services/auth";
 import Button from "@mui/material/Button";
 import {
     Alert,
@@ -64,14 +60,6 @@ const LoginPage = () => {
         });
     };
 
-    const signInGithub = () => {
-        signInWithGithub().then((credential) => {
-            if (credential == null) return;
-
-            navigate("/");
-        });
-    };
-
     // holding the form back until the session is known keeps it from flashing
     // in front of someone who is about to be redirected
     if (loading || user != null) {
@@ -126,9 +114,6 @@ const LoginPage = () => {
 
                         <Button variant="outlined" onClick={signInGoogle}>
                             Sign In With Google
-                        </Button>
-                        <Button variant="outlined" onClick={signInGithub}>
-                            Sign In With GitHub
                         </Button>
                     </Stack>
                 </Card>

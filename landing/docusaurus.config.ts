@@ -8,7 +8,7 @@ const config: Config = {
     title: "IB Pseudocode Web IDE",
     tagline:
         "Your All-in-One IDE for Running, Debugging, and Perfecting IB Pseudocode!",
-    favicon: "img/favicon.ico",
+    favicon: "img/favicon.svg",
 
     // Set the production url of your site here
     url: "https://your-docusaurus-site.example.com",
@@ -91,24 +91,16 @@ const config: Config = {
         },
         footer: {
             style: "dark",
+            // a flat list, so the links sit in one centred row rather
+            // than under titles of their own
             links: [
                 {
-                    title: "Docs",
-                    items: [
-                        {
-                            label: "Docs",
-                            to: "/docs/intro",
-                        },
-                    ],
+                    label: "Docs",
+                    to: "/docs/intro",
                 },
                 {
-                    title: "Community",
-                    items: [
-                        {
-                            label: "GitHub",
-                            href: "https://github.com/FilipToth/ib-lang",
-                        },
-                    ],
+                    label: "GitHub",
+                    href: "https://github.com/FilipToth/ib-lang",
                 },
             ],
             copyright: `Copyright © ${new Date().getFullYear()} Filip Toth. Built with Docusaurus.`,

@@ -8,7 +8,6 @@ import {
 } from "firebase/auth";
 
 const googleProvider = new firebase.auth.GoogleAuthProvider();
-const githubProvider = new firebase.auth.GithubAuthProvider();
 
 export const signInEmailPwd = async (
     email: string,
@@ -41,10 +40,5 @@ export const signUpEmailPwd = async (
 
 export const signInWithGoogle = async (): Promise<UserCredential | null> => {
     const credential = await signInWithPopup(auth, googleProvider);
-    return credential;
-};
-
-export const signInWithGithub = async (): Promise<UserCredential | null> => {
-    const credential = await signInWithPopup(auth, githubProvider);
     return credential;
 };

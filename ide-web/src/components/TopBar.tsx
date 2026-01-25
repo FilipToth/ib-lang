@@ -67,10 +67,7 @@ export const TopBar = ({ children }: { children: ReactNode }) => {
                 </div>
             </Toolbar>
 
-            <UsageDialog
-                open={usageOpen}
-                onClose={() => setUsageOpen(false)}
-            />
+            <UsageDialog open={usageOpen} onClose={() => setUsageOpen(false)} />
         </AppBar>
     );
 };

@@ -29,7 +29,7 @@ const theme = createTheme({
     colorSchemes: {
         light: {
             palette: {
-                primary: { main: "#556cd6" },
+                primary: { main: "#1565c0" },
                 secondary: { main: "#19857b" },
                 error: { main: red.A400 },
                 background: {
@@ -42,7 +42,7 @@ const theme = createTheme({
         dark: {
             palette: {
                 // the light primary is too dark to read on the dark surface
-                primary: { main: "#8c9eff" },
+                primary: { main: "#64b5f6" },
                 secondary: { main: "#4db6ac" },
                 error: { main: "#ff6e6e" },
                 background: {

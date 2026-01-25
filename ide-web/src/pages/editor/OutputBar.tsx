@@ -367,13 +367,11 @@ const OutputBar: FunctionComponent<OutputProps> = ({
                             variant="contained"
                             color={running ? "error" : "primary"}
                             onClick={running ? stop : onClick}
-                            aria-label={running ? "Stop program" : "Run program"}
+                            aria-label={
+                                running ? "Stop program" : "Run program"
+                            }
                             startIcon={
-                                running ? (
-                                    <StopRounded />
-                                ) : (
-                                    <PlayArrowRounded />
-                                )
+                                running ? <StopRounded /> : <PlayArrowRounded />
                             }
                         >
                             {running ? "Stop" : "Run"}
