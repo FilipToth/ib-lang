@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, IconButton, SxProps, Tab, Tabs, Typography } from "@mui/material";
 import { AccountTree, Clear, FiberManualRecord } from "@mui/icons-material";
-import IbIcon from "./IbIcon";
+import IbIcon, { ibIconSrc } from "./IbIcon";
 import { EditorTab, TabRef, tabId, tabTitle } from "./panes";
 import { DropTarget } from "./tabOrder";
 
@@ -28,7 +28,7 @@ export interface TabDrag {
 /// picture as the drag starts, before a freshly made image could be drawn, so
 /// a copy of the tab's own icon would come out blank.
 const dragIcon = new Image(24, 24);
-dragIcon.src = "assets/ib.png";
+dragIcon.src = ibIconSrc;
 
 /// Holds the drag picture. It stays in the page between drags, so the icon
 /// in it never has to be drawn anew.

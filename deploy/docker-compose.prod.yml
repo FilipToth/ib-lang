@@ -16,8 +16,8 @@ services:
             - "443:443"
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile:ro
-            - /srv/ide-web:/srv/ide-web:ro
-            - /srv/landing:/srv/landing:ro
+            - ./static/iblang-app:/srv/ide-web:ro
+            - ./static/iblang-docs:/srv/landing:ro
             # the certificates: without this every restart asks for new ones
             # and runs into letsencrypt's rate limit
             - caddy-data:/data
@@ -27,9 +27,7 @@ services:
             - ib-core
 
     auth-server:
-        build:
-            context: ../auth-server
-            dockerfile: Dockerfile
+        image: auth-server:latest
         container_name: auth-server
         restart: unless-stopped
         # no ports: only ib-core talks to it, over the compose network
@@ -39,9 +37,7 @@ services:
         cpus: 0.5
 
     ib-core:
-        build:
-            context: ../core
-            dockerfile: Dockerfile
+        image: ib-core:latest
         container_name: ib-core
         restart: unless-stopped
         environment:

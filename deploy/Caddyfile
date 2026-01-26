@@ -4,6 +4,14 @@
 	email filip.toth@accelley.com
 }
 
+# on.accelley.com is a namespace, not a site. Exact host only, so
+# iblang.on.accelley.com is unaffected — Caddy matches the literal hostname.
+# 302 for now; add `permanent` once the shape is settled (browsers cache 301s
+# hard and it's painful to undo).
+on.accelley.com {
+	redir https://accelley.com{uri}
+}
+
 # Everything is one host: the landing site at the root, the editor under /app,
 # and the backend it talks to. One origin also means no CORS in the browser.
 iblang.on.accelley.com {
@@ -24,7 +32,8 @@ iblang.on.accelley.com {
 	# handle_path takes the /app off the front, so /app/static/x is read
 	# from /srv/ide-web/static/x, and anything else falls back to the page
 	# itself, which is what a single-page app needs
-	handle_path /app* {
+	redir /app /app/
+	handle_path /app/* {
 		root * /srv/ide-web
 		try_files {path} /index.html
 		file_server
